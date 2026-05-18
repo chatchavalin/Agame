@@ -1,0 +1,1315 @@
+/* =============================================================================
+   A-Math Game — Stylesheet
+   Default theme: "Clean & Modern"
+   Theme switching planned for Phase 8 — colors are CSS variables for easy swap.
+   ============================================================================= */
+
+/* =============================================================================
+   THEME VARIABLES (default: Clean & Modern)
+   To add a theme later, just override these in a `.theme-xxx` class on body.
+   ============================================================================= */
+
+:root {
+  /* Page */
+  --bg-page: #f8f9fb;
+  --bg-card: #ffffff;
+  --text-primary: #1f2937;
+  --text-secondary: #6b7280;
+  --border-light: #e5e7eb;
+  --border-medium: #d1d5db;
+
+  /* Board cells */
+  --cell-plain: #f3f4f6;
+  --cell-3E: #dc2626;
+  --cell-2E: #f59e0b;
+  --cell-3T: #2563eb;
+  --cell-2T: #f97316;
+  --cell-3E-text: #ffffff;
+  --cell-2E-text: #ffffff;
+  --cell-3T-text: #ffffff;
+  --cell-2T-text: #ffffff;
+  --cell-border: #e5e7eb;
+
+  /* Center star */
+  --center-star: #fbbf24;
+
+  /* Tiles */
+  --tile-bg: #fef3c7;
+  --tile-border: #f59e0b;
+  --tile-text: #1f2937;
+  --tile-points: #6b7280;
+
+  /* Tile-back */
+  --tile-back-bg: #4338ca;
+  --tile-back-pattern: #6366f1;
+
+  /* Buttons */
+  --btn-primary-bg: #2563eb;
+  --btn-primary-text: #ffffff;
+  --btn-primary-hover: #1d4ed8;
+  --btn-secondary-bg: #e5e7eb;
+  --btn-secondary-text: #1f2937;
+  --btn-secondary-hover: #d1d5db;
+  --btn-disabled-bg: #f3f4f6;
+  --btn-disabled-text: #9ca3af;
+
+  /* Score */
+  --score-bg: #ffffff;
+  --score-border: #d1d5db;
+
+  /* Timer */
+  --timer-normal: #1f2937;
+  --timer-negative: #dc2626;
+
+  /* Sizes (override on mobile) */
+  --cell-size: 40px;
+  --tile-size: 38px;
+  --board-gap: 1px;
+  --rack-tile-size: 50px;
+}
+
+/* =============================================================================
+   PAGE BASICS
+   ============================================================================= */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Sarabun', Arial, sans-serif;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1 {
+  margin: 0 0 12px;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+#app {
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+/* =============================================================================
+   APP LAYOUT
+   ============================================================================= */
+
+.amath-app {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.opponent-area,
+.player-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  justify-content: space-between;
+}
+
+.board-area {
+  display: flex;
+  justify-content: center;
+}
+
+/* =============================================================================
+   SCORE BOXES
+   ============================================================================= */
+
+.score-box {
+  background: var(--score-bg);
+  border: 1px solid var(--score-border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  min-width: 80px;
+  text-align: center;
+}
+
+.score-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+}
+
+.score-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* =============================================================================
+   TIMER BOXES
+   ============================================================================= */
+
+.timer-box {
+  background: var(--score-bg);
+  border: 1px solid var(--score-border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  min-width: 70px;
+  text-align: center;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+}
+
+.timer-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+}
+
+.timer-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--timer-normal);
+}
+
+.timer-negative {
+  color: var(--timer-negative);
+}
+
+/* =============================================================================
+   BOARD
+   ============================================================================= */
+
+.amath-board {
+  display: grid;
+  grid-template-columns: repeat(15, var(--cell-size));
+  grid-template-rows: repeat(15, var(--cell-size));
+  gap: var(--board-gap);
+  background: var(--border-medium);
+  padding: 2px;
+  border-radius: 6px;
+}
+
+.amath-cell {
+  background: var(--cell-plain);
+  border: 1px solid var(--cell-border);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.amath-cell .premium-label {
+  font-size: 10px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+/* Premium squares */
+.amath-cell.premium-3E {
+  background: var(--cell-3E);
+  color: var(--cell-3E-text);
+  border-color: var(--cell-3E);
+}
+
+.amath-cell.premium-2E {
+  background: var(--cell-2E);
+  color: var(--cell-2E-text);
+  border-color: var(--cell-2E);
+}
+
+.amath-cell.premium-3T {
+  background: var(--cell-3T);
+  color: var(--cell-3T-text);
+  border-color: var(--cell-3T);
+}
+
+.amath-cell.premium-2T {
+  background: var(--cell-2T);
+  color: var(--cell-2T-text);
+  border-color: var(--cell-2T);
+}
+
+/* Center star */
+.amath-cell.center-cell .center-star {
+  position: absolute;
+  font-size: 20px;
+  color: var(--center-star);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.amath-cell.center-cell .premium-label {
+  display: none;
+}
+
+/* When a tile is placed, hide the premium label and star so tile uses full cell */
+.amath-cell:has(.amath-tile) .premium-label,
+.amath-cell:has(.amath-tile) .center-star {
+  display: none;
+}
+
+.amath-cell .amath-tile {
+  width: calc(var(--cell-size) - 4px);
+  height: calc(var(--cell-size) - 4px);
+}
+
+/* =============================================================================
+   TILES (on board)
+   ============================================================================= */
+
+.amath-tile {
+  width: var(--tile-size);
+  height: var(--tile-size);
+  background: var(--tile-bg);
+  border: 1.5px solid var(--tile-border);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  font-weight: 700;
+  color: var(--tile-text);
+  user-select: none;
+  z-index: 2;
+}
+
+.tile-face {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.tile-points {
+  position: absolute;
+  bottom: 2px;
+  right: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--tile-points);
+}
+
+.amath-tile.tile-op .tile-face,
+.amath-tile.tile-equals .tile-face,
+.amath-tile.tile-choice .tile-face {
+  font-size: 14px;
+}
+
+.amath-tile.tile-blank-unassigned {
+  background: #f3f4f6;
+  border-style: dashed;
+}
+
+.amath-tile.tile-blank-unassigned .tile-face {
+  color: var(--text-secondary);
+}
+
+/* =============================================================================
+   PHASE 5: SELECTION + TENTATIVE TILES
+   ============================================================================= */
+
+.amath-tile.tile-selected {
+  outline: 3px solid #2563eb;
+  outline-offset: 2px;
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3);
+}
+
+.amath-tile.tile-tentative {
+  background: #dbeafe;
+  border-color: #3b82f6;
+  border-style: dashed;
+  border-width: 2px;
+}
+
+.amath-tile.tile-swap-selected {
+  outline: 3px solid #dc2626;
+  outline-offset: 2px;
+  background: #fee2e2;
+  border-color: #dc2626;
+}
+
+.btn-tertiary {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #f59e0b;
+}
+
+.btn-tertiary:hover:not(:disabled) {
+  background: #fde68a;
+}
+
+/* Challenge button has a distinctive style */
+#btn-challenge {
+  background: #fbbf24;
+  color: #78350f;
+  border: 2px solid #f59e0b;
+  font-weight: 700;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+#btn-challenge:hover:not(:disabled) {
+  background: #f59e0b;
+  color: #ffffff;
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
+}
+
+/* Active toggle button (e.g., AI Takeover ON) */
+.btn.btn-active {
+  background: #16a34a;
+  color: #ffffff;
+  border-color: #15803d;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
+}
+
+.btn.btn-active:hover:not(:disabled) {
+  background: #15803d;
+}
+
+/* =============================================================================
+   AI vs AI MODE CONTROLS
+   ============================================================================= */
+
+.aivai-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  margin-top: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+
+.aivai-speed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.aivai-speed input[type="range"] {
+  width: 120px;
+}
+
+#aivai-speed-value {
+  min-width: 24px;
+  font-weight: 700;
+  color: var(--btn-primary-bg);
+}
+
+/* =============================================================================
+   MOBILE TWEAKS for Phase 8
+   ============================================================================= */
+
+@media (max-width: 600px) {
+  .button-bar {
+    gap: 6px;
+  }
+  .button-bar .btn {
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+  .button-bar .btn-icon {
+    width: 36px;
+    padding: 6px 0;
+  }
+  .aivai-speed input[type="range"] {
+    width: 80px;
+  }
+  .aivai-bar {
+    padding: 6px;
+    gap: 6px;
+  }
+}
+
+/* =============================================================================
+   GAME END POPUP
+   ============================================================================= */
+
+.game-end-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.game-end-dialog {
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+}
+
+.game-end-winner {
+  font-size: 36px;
+  font-weight: 800;
+  color: #2563eb;
+  margin-bottom: 24px;
+  letter-spacing: 1px;
+}
+
+.game-end-scores {
+  background: #f9fafb;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.game-end-scores .score-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.game-end-reason {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  font-style: italic;
+}
+
+.game-end-penalty {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 13px;
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.game-end-dialog .btn {
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+}
+
+/* =============================================================================
+   SETTINGS POPUP
+   ============================================================================= */
+
+.btn-icon {
+  background: var(--bg-card);
+  border: 1px solid var(--border-medium);
+  width: 42px;
+  padding: 8px 0;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.btn-icon:hover:not(:disabled) {
+  background: var(--btn-secondary-hover);
+}
+
+.settings-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1500;
+  padding: 20px;
+}
+
+.settings-dialog {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 460px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.settings-title {
+  margin: 0 0 20px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.settings-row {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.settings-row:last-of-type {
+  border-bottom: none;
+}
+
+.settings-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.settings-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.settings-hint {
+  margin: 4px 0 0 28px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.settings-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+/* =============================================================================
+   TILE TRACKER
+   ============================================================================= */
+
+.tile-tracker {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 8px;
+  width: 100%;
+  max-width: 600px;
+}
+
+.tracker-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.tracker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+  gap: 5px;
+}
+
+.tracker-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--cell-plain);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tracker-item-empty {
+  opacity: 0.35;
+  background: #f3f4f6;
+}
+
+.tracker-face {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.tracker-count {
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 18px;
+  text-align: center;
+}
+
+.tracker-item-empty .tracker-count {
+  background: var(--border-medium);
+  color: var(--text-secondary);
+}
+
+.tracker-info {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+@media (max-width: 600px) {
+  .tracker-grid {
+    grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+    gap: 3px;
+  }
+  .tracker-item {
+    padding: 3px 4px;
+    font-size: 11px;
+  }
+  .tracker-count {
+    padding: 1px 5px;
+    font-size: 10px;
+  }
+}
+
+/* =============================================================================
+   ANIMATIONS & VISUAL POLISH
+   ============================================================================= */
+
+/* Tile placement: pop in with bounce */
+@keyframes tile-pop-in {
+  0% { transform: scale(0.3); opacity: 0; }
+  60% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.amath-cell .amath-tile {
+  animation: tile-pop-in 0.3s ease-out;
+}
+
+/* Hover lift for rack tiles */
+.amath-rack-slot .amath-tile {
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.amath-rack-slot .amath-tile:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Cell pulse highlight (newly placed) */
+@keyframes cell-pulse-anim {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+  50% { box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.4); }
+}
+
+.amath-cell.cell-pulse {
+  animation: cell-pulse-anim 0.8s ease-out;
+  z-index: 5;
+}
+
+/* Confetti */
+.confetti-container {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  z-index: 5000;
+  overflow: hidden;
+}
+
+@keyframes confetti-fall {
+  0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+.confetti-piece {
+  position: absolute;
+  top: 0;
+  border-radius: 2px;
+  animation: confetti-fall linear forwards;
+}
+
+/* BINGO banner */
+@keyframes bingo-pop-in {
+  0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+  60% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+.bingo-banner {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.3);
+  opacity: 0;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #ffffff;
+  font-size: 64px;
+  font-weight: 900;
+  padding: 20px 50px;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  z-index: 4000;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  letter-spacing: 4px;
+  transition: opacity 0.3s, transform 0.3s;
+  pointer-events: none;
+}
+
+.bingo-banner.show {
+  animation: bingo-pop-in 0.5s ease-out forwards;
+}
+
+@media (max-width: 600px) {
+  .bingo-banner {
+    font-size: 40px;
+    padding: 14px 30px;
+    letter-spacing: 2px;
+  }
+}
+
+/* Game-end popup fade-in with scale */
+@keyframes popup-fade-in {
+  0% { opacity: 0; transform: scale(0.85); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.game-end-dialog,
+.settings-dialog,
+.score-sheet-dialog,
+.picker-dialog {
+  animation: popup-fade-in 0.25s ease-out;
+}
+
+/* Score value transition (subtle scale when it changes) */
+.score-value {
+  transition: color 0.2s;
+}
+
+/* Toast smooth transitions already in place */
+
+/* =============================================================================
+   THEMES
+   ============================================================================= */
+
+/* Physical Board theme — matches the actual A-Math board look */
+body.theme-physical {
+  --bg-page: #cbd5e1;
+  --cell-plain: #e0f2fe;
+  --cell-3E: #dc2626;
+  --cell-2E: #fde047;
+  --cell-2E-text: #1f2937;
+  --cell-3T: #1d4ed8;
+  --cell-2T: #fb923c;
+  --tile-bg: #fbbf24;
+  --tile-border: #d97706;
+}
+
+/* Dark theme */
+body.theme-dark {
+  --bg-page: #0f172a;
+  --bg-card: #1e293b;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --border-light: #334155;
+  --border-medium: #475569;
+  --cell-plain: #1e293b;
+  --cell-border: #334155;
+  --tile-bg: #fbbf24;
+  --tile-border: #f59e0b;
+  --tile-text: #1f2937;
+  --tile-points: #6b7280;
+  --score-bg: #1e293b;
+  --score-border: #334155;
+  --timer-normal: #f1f5f9;
+  --btn-secondary-bg: #334155;
+  --btn-secondary-text: #f1f5f9;
+  --btn-secondary-hover: #475569;
+  --btn-disabled-bg: #1e293b;
+  --btn-disabled-text: #475569;
+}
+
+/* Playful theme */
+body.theme-playful {
+  --bg-page: #fef3c7;
+  --bg-card: #fffbeb;
+  --text-primary: #7c2d12;
+  --cell-plain: #fef9c3;
+  --cell-3E: #ec4899;
+  --cell-2E: #a78bfa;
+  --cell-3T: #06b6d4;
+  --cell-2T: #f97316;
+  --tile-bg: #fef3c7;
+  --tile-border: #f59e0b;
+  --btn-primary-bg: #ec4899;
+  --btn-primary-hover: #db2777;
+}
+
+.settings-select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-medium);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+/* =============================================================================
+   TRASH-TALK TOAST
+   ============================================================================= */
+
+.trash-toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: rgba(17, 24, 39, 0.95);
+  color: #fef3c7;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  z-index: 3000;
+  max-width: 90%;
+  opacity: 0;
+  transition: opacity 0.3s, transform 0.3s;
+  pointer-events: none;
+  text-align: center;
+}
+
+.trash-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* =============================================================================
+   SCORE SHEET
+   ============================================================================= */
+
+.score-sheet-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1800;
+  padding: 20px;
+}
+
+.score-sheet-dialog {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 500px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.3);
+}
+
+.score-sheet-title {
+  margin: 0 0 16px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.score-sheet-totals {
+  display: flex;
+  justify-content: space-around;
+  background: #f9fafb;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 16px;
+}
+
+body.theme-dark .score-sheet-totals {
+  background: #0f172a;
+}
+
+.score-sheet-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.score-sheet-table th {
+  text-align: left;
+  padding: 8px;
+  background: #f3f4f6;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-medium);
+}
+
+body.theme-dark .score-sheet-table th {
+  background: #0f172a;
+}
+
+.score-sheet-table td {
+  padding: 8px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.amath-tile[draggable="true"] {
+  cursor: grab;
+}
+
+.amath-tile[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.amath-tile.tile-dragging {
+  opacity: 0.4;
+}
+
+.amath-rack-slot.drop-target {
+  background: #dbeafe;
+  border-color: #3b82f6;
+  border-style: solid;
+}
+
+.amath-rack-slot .amath-tile {
+  cursor: pointer;
+}
+
+.amath-cell {
+  cursor: pointer;
+}
+
+.amath-cell:hover {
+  filter: brightness(0.95);
+}
+
+/* =============================================================================
+   PHASE 5: PICKER POPUP
+   ============================================================================= */
+
+.picker-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.picker-dialog {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 400px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.picker-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  text-align: center;
+  color: var(--text-primary);
+}
+
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.picker-option {
+  padding: 14px 8px;
+  background: var(--tile-bg);
+  border: 1.5px solid var(--tile-border);
+  border-radius: 6px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--tile-text);
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.1s;
+}
+
+.picker-option:hover {
+  transform: scale(1.05);
+  border-color: var(--btn-primary-bg);
+}
+
+.picker-option:active {
+  transform: scale(0.95);
+}
+
+.picker-cancel {
+  width: 100%;
+  padding: 10px;
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-text);
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.picker-cancel:hover {
+  background: var(--btn-secondary-hover);
+}
+
+/* =============================================================================
+   TILE BACK (opponent rack — face-down)
+   ============================================================================= */
+
+.amath-tile.tile-back {
+  background: var(--tile-back-bg);
+  border-color: var(--tile-back-bg);
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--tile-back-bg),
+    var(--tile-back-bg) 4px,
+    var(--tile-back-pattern) 4px,
+    var(--tile-back-pattern) 8px
+  );
+}
+
+/* =============================================================================
+   RACK
+   ============================================================================= */
+
+.amath-rack {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  flex-grow: 1;
+  justify-content: center;
+  min-height: calc(var(--rack-tile-size) + 12px);
+}
+
+.amath-rack-slot {
+  width: var(--rack-tile-size);
+  height: var(--rack-tile-size);
+  background: #fafafa;
+  border: 1px dashed var(--border-medium);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.amath-rack-slot .amath-tile {
+  width: calc(var(--rack-tile-size) - 4px);
+  height: calc(var(--rack-tile-size) - 4px);
+}
+
+.amath-rack-slot .amath-tile .tile-face {
+  font-size: 20px;
+}
+
+.amath-rack-slot .amath-tile .tile-points {
+  font-size: 10px;
+}
+
+/* =============================================================================
+   BUTTONS
+   ============================================================================= */
+
+.button-bar {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.btn {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-family: inherit;
+}
+
+.btn-primary {
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--btn-primary-hover);
+}
+
+.btn-secondary {
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-text);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--btn-secondary-hover);
+}
+
+.btn:disabled {
+  background: var(--btn-disabled-bg);
+  color: var(--btn-disabled-text);
+  cursor: not-allowed;
+}
+
+/* =============================================================================
+   STATUS / DEBUG (from Phase 1-3)
+   ============================================================================= */
+
+#status {
+  font-size: 16px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: #f5f5f5;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+#debug-output {
+  background: #fafafa;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 14px;
+  margin-top: 16px;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-size: 12px;
+  display: none;
+}
+
+#debug-output.show {
+  display: block;
+}
+
+#debug-toggle {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  background: none;
+  border: 1px solid var(--border-light);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+/* =============================================================================
+   RESPONSIVE — TABLET
+   ============================================================================= */
+
+@media (max-width: 900px) {
+  :root {
+    --cell-size: 32px;
+    --tile-size: 30px;
+    --rack-tile-size: 44px;
+  }
+
+  .tile-face {
+    font-size: 14px;
+  }
+
+  .amath-rack-slot .amath-tile .tile-face {
+    font-size: 18px;
+  }
+}
+
+/* =============================================================================
+   RESPONSIVE — MOBILE PORTRAIT
+   ============================================================================= */
+
+@media (max-width: 600px) {
+  body {
+    padding: 6px;
+  }
+
+  :root {
+    --cell-size: 22px;
+    --tile-size: 21px;
+    --rack-tile-size: 36px;
+  }
+
+  .tile-face {
+    font-size: 11px;
+  }
+
+  .amath-cell .premium-label {
+    font-size: 7px;
+  }
+
+  .amath-cell.center-cell .center-star {
+    font-size: 14px;
+  }
+
+  .tile-points {
+    font-size: 7px;
+  }
+
+  .amath-rack-slot .amath-tile .tile-face {
+    font-size: 14px;
+  }
+
+  .score-box,
+  .timer-box {
+    min-width: 60px;
+    padding: 4px 8px;
+  }
+
+  .score-value {
+    font-size: 16px;
+  }
+
+  .timer-value {
+    font-size: 13px;
+  }
+
+  .btn {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+}
+
+/* =============================================================================
+   VERY SMALL PHONES
+   ============================================================================= */
+
+@media (max-width: 380px) {
+  :root {
+    --cell-size: 19px;
+    --tile-size: 18px;
+    --rack-tile-size: 32px;
+  }
+
+  .tile-face {
+    font-size: 10px;
+  }
+
+  .amath-rack-slot .amath-tile .tile-face {
+    font-size: 13px;
+  }
+}
