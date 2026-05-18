@@ -1,0 +1,563 @@
+/**
+ * A-Math Game — Interactions
+ *
+ * Handles all user input on the game UI:
+ *  - Tap/click rack tile → select
+ *  - Tap/click empty board cell → place selected tile (with picker popup for special tiles)
+ *  - Tap/click placed (uncommitted) tile → return to rack
+ *  - Drag tile from rack to board cell
+ *  - Drag tile from board cell back to rack
+ *
+ * Maintains a "tentative placements" list — tiles placed this turn but not yet submitted.
+ */
+
+(function () {
+  const C = window.AMath.constants;
+  const UI = window.AMath.ui;
+  const Board = window.AMath.board;
+  const Rack = window.AMath.rack;
+
+  // Interaction state (within a single turn)
+  let state = null;
+
+  /**
+   * Initializes interactions for a game session.
+   * @param sessionState: {
+   *   board, playerRack, aiRack, bag,
+   *   isPlayerTurn,
+   *   tentativePlacements,   // array of {row, col, tile, originalRackIndex}
+   *   selectedTileId,        // currently selected tile ID (null if none)
+   *   uiParts,
+   *   onSubmit, onReset, onPass, onSwap
+   * }
+   */
+  function init(sessionState) {
+    state = sessionState;
+    // Swap mode state
+    state.swapMode = false;
+    state.swapSelected = new Set(); // tile IDs selected for swap
+    attachBoardHandlers();
+    attachRackHandlers();
+    attachButtonHandlers();
+    refreshUI();
+  }
+
+  // ============================================================================
+  // CLICK HANDLERS
+  // ============================================================================
+
+  function attachBoardHandlers() {
+    const boardEl = document.getElementById('amath-board');
+    if (!boardEl) return;
+
+    boardEl.addEventListener('click', function (e) {
+      const cellEl = e.target.closest('.amath-cell');
+      if (!cellEl) return;
+      const row = parseInt(cellEl.dataset.row, 10);
+      const col = parseInt(cellEl.dataset.col, 10);
+      onBoardCellClick(row, col);
+    });
+
+    // Drag-over: allow drop
+    boardEl.addEventListener('dragover', function (e) {
+      const cellEl = e.target.closest('.amath-cell');
+      if (cellEl) {
+        e.preventDefault();
+      }
+    });
+
+    // Drop on board
+    boardEl.addEventListener('drop', function (e) {
+      e.preventDefault();
+      const cellEl = e.target.closest('.amath-cell');
+      if (!cellEl) return;
+      const row = parseInt(cellEl.dataset.row, 10);
+      const col = parseInt(cellEl.dataset.col, 10);
+      const tileId = e.dataTransfer.getData('text/plain');
+      if (tileId) {
+        onTileDroppedOnBoard(tileId, row, col);
+      }
+    });
+  }
+
+  function attachRackHandlers() {
+    const rackEl = state.uiParts.playerRack;
+    if (!rackEl) return;
+
+    rackEl.addEventListener('click', function (e) {
+      const tileEl = e.target.closest('.amath-tile');
+      if (!tileEl) return;
+      const tileId = tileEl.dataset.tileId;
+      if (tileId) onRackTileClick(tileId);
+    });
+
+    // Drop on rack:
+    //   - If tile came from board (tentative) → return to rack
+    //   - If tile came from rack → reorder
+    rackEl.addEventListener('dragover', function (e) {
+      e.preventDefault();
+    });
+    rackEl.addEventListener('drop', function (e) {
+      e.preventDefault();
+      const tileId = e.dataTransfer.getData('text/plain');
+      if (!tileId) return;
+
+      // Detect the slot being dropped on (for reordering)
+      const slotEl = e.target.closest('.amath-rack-slot');
+      const targetIndex = slotEl ? parseInt(slotEl.dataset.slotIndex, 10) : -1;
+
+      // Is the tile currently on the rack? (reorder)
+      const fromRackIdx = state.playerRack.tiles.findIndex((t) => t.id === tileId);
+      if (fromRackIdx !== -1) {
+        // Reorder within rack
+        if (targetIndex !== -1 && targetIndex !== fromRackIdx) {
+          reorderRackTile(fromRackIdx, targetIndex);
+        }
+        return;
+      }
+
+      // Otherwise it's a tile from the board (tentative) → return to rack
+      onTileDroppedOnRack(tileId);
+    });
+  }
+
+  /**
+   * Reorders tiles within the player's rack (purely cosmetic).
+   * @param fromIdx: current index of the tile being moved
+   * @param toIdx: target slot index (0-7)
+   */
+  function reorderRackTile(fromIdx, toIdx) {
+    if (!state.isPlayerTurn) return;
+    const tiles = state.playerRack.tiles;
+    if (fromIdx < 0 || fromIdx >= tiles.length) return;
+    if (toIdx < 0 || toIdx >= state.uiParts.playerRack.children.length) return;
+
+    // Remove tile from current position
+    const [tile] = tiles.splice(fromIdx, 1);
+
+    // Clamp target index to valid range after removal
+    const insertAt = Math.min(toIdx, tiles.length);
+    tiles.splice(insertAt, 0, tile);
+
+    refreshUI();
+  }
+
+  function attachButtonHandlers() {
+    const btnSubmit = document.getElementById('btn-submit');
+    const btnReset = document.getElementById('btn-reset');
+    const btnPass = document.getElementById('btn-pass');
+    const btnSwap = document.getElementById('btn-swap');
+
+    if (btnSubmit) btnSubmit.addEventListener('click', function () { state.onSubmit && state.onSubmit(); });
+    if (btnReset) btnReset.addEventListener('click', function () { state.onReset && state.onReset(); });
+    if (btnPass) btnPass.addEventListener('click', function () { state.onPass && state.onPass(); });
+    if (btnSwap) btnSwap.addEventListener('click', function () { state.onSwap && state.onSwap(); });
+  }
+
+  // ============================================================================
+  // CORE INTERACTION LOGIC
+  // ============================================================================
+
+  function onRackTileClick(tileId) {
+    if (!state.isPlayerTurn) return;
+
+    // Sound feedback
+    if (window.AMath.sounds) window.AMath.sounds.tileClick();
+
+    // If in swap mode, toggle tile in swap selection
+    if (state.swapMode) {
+      if (state.swapSelected.has(tileId)) {
+        state.swapSelected.delete(tileId);
+      } else {
+        state.swapSelected.add(tileId);
+      }
+      refreshUI();
+      return;
+    }
+
+    // Normal mode: toggle selection for placement
+    if (state.selectedTileId === tileId) {
+      state.selectedTileId = null;
+    } else {
+      state.selectedTileId = tileId;
+    }
+    refreshUI();
+  }
+
+  function onBoardCellClick(row, col) {
+    if (!state.isPlayerTurn) return;
+
+    const cell = Board.getCell(state.board, row, col);
+    if (!cell) return;
+
+    // If clicking a tile that's tentatively placed (newly placed this turn), return it to rack
+    const tentativeIdx = state.tentativePlacements.findIndex(
+      (p) => p.row === row && p.col === col
+    );
+    if (tentativeIdx !== -1) {
+      returnTileToRack(tentativeIdx);
+      return;
+    }
+
+    // If cell already has a tile (committed from previous turns), do nothing
+    if (cell.tile !== null) return;
+
+    // Empty cell + tile selected → place it
+    if (state.selectedTileId) {
+      placeTileFromRack(state.selectedTileId, row, col);
+    }
+  }
+
+  function placeTileFromRack(tileId, row, col) {
+    const tile = Rack.findTile(state.playerRack, tileId);
+    if (!tile) return;
+
+    // Check if this tile needs the picker (BLANK, +/-, ×/÷)
+    if (needsPicker(tile)) {
+      showPicker(tile, function (assignedValue) {
+        if (assignedValue === null) return; // user cancelled
+        // Clone tile with assigned value
+        const placedTile = Object.assign({}, tile, { assigned: assignedValue });
+        commitPlacement(tileId, placedTile, row, col);
+      });
+      return;
+    }
+
+    commitPlacement(tileId, tile, row, col);
+  }
+
+  function commitPlacement(tileId, tile, row, col) {
+    // Remove from rack
+    const removed = Rack.removeTile(state.playerRack, tileId);
+    if (!removed) return;
+
+    // Place on board (we use the original tile from rack but with assigned set if needed)
+    const placedTile = tile === removed ? removed : tile;
+    // If tile object has 'assigned' from picker, set it on the actual rack tile too
+    if (tile.assigned && tile !== removed) {
+      removed.assigned = tile.assigned;
+    }
+    Board.placeTile(state.board, row, col, removed);
+
+    // Record in tentative placements
+    state.tentativePlacements.push({
+      row: row,
+      col: col,
+      tile: removed,
+    });
+
+    // Play sound
+    if (window.AMath.sounds) window.AMath.sounds.tilePlace();
+
+    // Clear selection
+    state.selectedTileId = null;
+    refreshUI();
+  }
+
+  function returnTileToRack(tentativeIdx) {
+    const placement = state.tentativePlacements[tentativeIdx];
+    if (!placement) return;
+
+    // Remove from board
+    const tile = Board.removeTile(state.board, placement.row, placement.col);
+    if (!tile) return;
+
+    // Clear assigned value (so blank/choice can be re-chosen if needed)
+    tile.assigned = null;
+
+    // Return to rack
+    Rack.addTile(state.playerRack, tile);
+
+    // Remove from tentative list
+    state.tentativePlacements.splice(tentativeIdx, 1);
+
+    refreshUI();
+  }
+
+  // ============================================================================
+  // DRAG-AND-DROP
+  // ============================================================================
+
+  function onTileDroppedOnBoard(tileId, row, col) {
+    if (!state.isPlayerTurn) return;
+
+    const cell = Board.getCell(state.board, row, col);
+    if (!cell || cell.tile !== null) return; // can't drop on occupied cell
+
+    // Is tile from rack?
+    if (Rack.findTile(state.playerRack, tileId)) {
+      placeTileFromRack(tileId, row, col);
+      return;
+    }
+
+    // Is tile from board (tentatively placed)?
+    const fromIdx = state.tentativePlacements.findIndex((p) => p.tile.id === tileId);
+    if (fromIdx !== -1) {
+      // Move from one board cell to another
+      const placement = state.tentativePlacements[fromIdx];
+      const tile = Board.removeTile(state.board, placement.row, placement.col);
+      if (tile) {
+        Board.placeTile(state.board, row, col, tile);
+        placement.row = row;
+        placement.col = col;
+        refreshUI();
+      }
+    }
+  }
+
+  function onTileDroppedOnRack(tileId) {
+    if (!state.isPlayerTurn) return;
+
+    const tentativeIdx = state.tentativePlacements.findIndex((p) => p.tile.id === tileId);
+    if (tentativeIdx !== -1) {
+      returnTileToRack(tentativeIdx);
+    }
+  }
+
+  // ============================================================================
+  // PICKER POPUP (for BLANK and +/- ×/÷ tiles)
+  // ============================================================================
+
+  function needsPicker(tile) {
+    return tile.type === 'blank' || tile.type === 'choice';
+  }
+
+  function showPicker(tile, callback) {
+    // Build picker overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'picker-overlay';
+
+    const dialog = document.createElement('div');
+    dialog.className = 'picker-dialog';
+
+    const title = document.createElement('div');
+    title.className = 'picker-title';
+
+    let options;
+    if (tile.type === 'choice') {
+      title.textContent = 'Choose: ' + tile.face;
+      // Split "+/-" into ["+", "-"], etc.
+      options = tile.face.split('/');
+    } else {
+      // BLANK can be anything: 0-20, +, -, ×, ÷, =
+      title.textContent = 'BLANK tile — choose what it becomes:';
+      options = [];
+      for (let i = 0; i <= 20; i++) options.push(String(i));
+      options.push('+', '-', '×', '÷', '=');
+    }
+
+    dialog.appendChild(title);
+
+    const grid = document.createElement('div');
+    grid.className = 'picker-grid';
+
+    options.forEach(function (opt) {
+      const btn = document.createElement('button');
+      btn.className = 'picker-option';
+      btn.textContent = opt;
+      btn.addEventListener('click', function () {
+        document.body.removeChild(overlay);
+        callback(opt);
+      });
+      grid.appendChild(btn);
+    });
+
+    dialog.appendChild(grid);
+
+    const cancel = document.createElement('button');
+    cancel.className = 'picker-cancel';
+    cancel.textContent = 'Cancel';
+    cancel.addEventListener('click', function () {
+      document.body.removeChild(overlay);
+      callback(null);
+    });
+    dialog.appendChild(cancel);
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+  }
+
+  // ============================================================================
+  // UI REFRESH (call after any state change)
+  // ============================================================================
+
+  function refreshUI() {
+    // Re-render board, rack, and update selection highlight
+    UI.renderBoard(state.board, state.uiParts.boardArea);
+    UI.renderRack(state.playerRack, state.uiParts.playerRack, false);
+    UI.renderRack(state.aiRack, state.uiParts.opponentRack, true);
+
+    // Re-attach board handlers since we just re-rendered
+    attachBoardHandlers();
+
+    // Add draggable + dragstart to rack tiles and tentatively placed tiles
+    makeRackTilesDraggable();
+    makeTentativeTilesDraggable();
+
+    // Highlight selected tile (normal mode)
+    if (state.selectedTileId && !state.swapMode) {
+      const tileEl = state.uiParts.playerRack.querySelector(
+        '.amath-tile[data-tile-id="' + state.selectedTileId + '"]'
+      );
+      if (tileEl) tileEl.classList.add('tile-selected');
+    }
+
+    // Highlight tiles selected for swap (swap mode)
+    if (state.swapMode) {
+      for (const tileId of state.swapSelected) {
+        const tileEl = state.uiParts.playerRack.querySelector(
+          '.amath-tile[data-tile-id="' + tileId + '"]'
+        );
+        if (tileEl) tileEl.classList.add('tile-swap-selected');
+      }
+    }
+
+    // Mark tentative placements visually
+    for (const p of state.tentativePlacements) {
+      const cellEl = document.querySelector(
+        '.amath-cell[data-row="' + p.row + '"][data-col="' + p.col + '"]'
+      );
+      if (cellEl) {
+        const tileEl = cellEl.querySelector('.amath-tile');
+        if (tileEl) tileEl.classList.add('tile-tentative');
+      }
+    }
+
+    // Update button states
+    updateButtonStates();
+  }
+
+  function makeRackTilesDraggable() {
+    const tiles = state.uiParts.playerRack.querySelectorAll('.amath-tile');
+    tiles.forEach(function (tileEl) {
+      tileEl.setAttribute('draggable', 'true');
+      tileEl.addEventListener('dragstart', function (e) {
+        e.dataTransfer.setData('text/plain', tileEl.dataset.tileId);
+        e.dataTransfer.effectAllowed = 'move';
+        tileEl.classList.add('tile-dragging');
+      });
+      tileEl.addEventListener('dragend', function () {
+        tileEl.classList.remove('tile-dragging');
+      });
+    });
+  }
+
+  function makeTentativeTilesDraggable() {
+    for (const p of state.tentativePlacements) {
+      const cellEl = document.querySelector(
+        '.amath-cell[data-row="' + p.row + '"][data-col="' + p.col + '"]'
+      );
+      if (!cellEl) continue;
+      const tileEl = cellEl.querySelector('.amath-tile');
+      if (!tileEl) continue;
+      tileEl.setAttribute('draggable', 'true');
+      tileEl.addEventListener('dragstart', function (e) {
+        e.dataTransfer.setData('text/plain', tileEl.dataset.tileId);
+        e.dataTransfer.effectAllowed = 'move';
+        tileEl.classList.add('tile-dragging');
+      });
+      tileEl.addEventListener('dragend', function () {
+        tileEl.classList.remove('tile-dragging');
+      });
+    }
+  }
+
+  function updateButtonStates() {
+    const btnSubmit = document.getElementById('btn-submit');
+    const btnReset = document.getElementById('btn-reset');
+    const btnPass = document.getElementById('btn-pass');
+    const btnSwap = document.getElementById('btn-swap');
+
+    if (!state.isPlayerTurn) {
+      if (btnSubmit) btnSubmit.disabled = true;
+      if (btnReset) btnReset.disabled = true;
+      if (btnPass) btnPass.disabled = true;
+      if (btnSwap) btnSwap.disabled = true;
+      return;
+    }
+
+    // Swap mode: Submit = confirm swap, Reset = cancel swap mode
+    if (state.swapMode) {
+      if (btnSubmit) {
+        btnSubmit.disabled = state.swapSelected.size === 0;
+        btnSubmit.textContent = 'Confirm Swap (' + state.swapSelected.size + ')';
+      }
+      if (btnReset) {
+        btnReset.disabled = false;
+        btnReset.textContent = 'Cancel';
+      }
+      if (btnPass) btnPass.disabled = true;
+      if (btnSwap) btnSwap.disabled = true;
+      return;
+    }
+
+    // Normal mode
+    if (btnSubmit) {
+      btnSubmit.textContent = 'Submit';
+      btnSubmit.disabled = state.tentativePlacements.length === 0;
+    }
+    if (btnReset) {
+      btnReset.textContent = 'Reset';
+      btnReset.disabled = state.tentativePlacements.length === 0;
+    }
+    if (btnPass) btnPass.disabled = false;
+
+    if (btnSwap) {
+      const bagSize = state.bag.tiles.length;
+      btnSwap.disabled =
+        state.tentativePlacements.length > 0 || bagSize <= C.SWAP_FORBIDDEN_BAG_THRESHOLD;
+    }
+  }
+
+  // ============================================================================
+  // EXTERNAL ACCESSORS (so main.js can read/update interaction state)
+  // ============================================================================
+
+  function getTentativePlacements() {
+    return state.tentativePlacements;
+  }
+
+  function clearTentativePlacements() {
+    state.tentativePlacements = [];
+  }
+
+  function setPlayerTurn(isPlayerTurn) {
+    state.isPlayerTurn = isPlayerTurn;
+    state.selectedTileId = null;
+    refreshUI();
+  }
+
+  function getState() {
+    return state;
+  }
+
+  function enterSwapMode() {
+    state.swapMode = true;
+    state.swapSelected = new Set();
+    state.selectedTileId = null;
+    refreshUI();
+  }
+
+  function exitSwapMode() {
+    state.swapMode = false;
+    state.swapSelected = new Set();
+    refreshUI();
+  }
+
+  function getSwapSelection() {
+    return Array.from(state.swapSelected);
+  }
+
+  window.AMath = window.AMath || {};
+  window.AMath.interactions = {
+    init: init,
+    refreshUI: refreshUI,
+    getTentativePlacements: getTentativePlacements,
+    clearTentativePlacements: clearTentativePlacements,
+    setPlayerTurn: setPlayerTurn,
+    getState: getState,
+    enterSwapMode: enterSwapMode,
+    exitSwapMode: exitSwapMode,
+    getSwapSelection: getSwapSelection,
+  };
+})();
