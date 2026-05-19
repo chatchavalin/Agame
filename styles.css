@@ -98,6 +98,152 @@ h1 {
 }
 
 /* =============================================================================
+   DESKTOP 3-COLUMN LAYOUT
+   Hides side panels by default (mobile-first). Activates on wide viewports.
+   ============================================================================= */
+
+#desktop-grid {
+  display: block; /* default: single column, just game container */
+}
+
+.desktop-side-panel {
+  display: none; /* hidden on mobile/narrow screens */
+}
+
+@media (min-width: 1100px) {
+  /* Widen app container so side panels have room */
+  #app {
+    max-width: 1280px;
+  }
+
+  #desktop-grid {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr) 280px;
+    gap: 16px;
+    align-items: start;
+  }
+
+  .desktop-side-panel {
+    display: block;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    padding: 10px 12px;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+    position: sticky;
+    top: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+
+  body.theme-dark .desktop-side-panel {
+    background: var(--bg-card);
+    border-color: var(--border-medium);
+  }
+
+  .side-panel-header {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border-light);
+    letter-spacing: 0.3px;
+  }
+
+  .side-panel-body {
+    font-size: 13px;
+  }
+
+  /* Live score sheet — compact 3-column table */
+  .live-score-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .live-score-table th {
+    text-align: center;
+    padding: 4px 2px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    background: var(--bg-elevated, rgba(0,0,0,0.02));
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .live-score-table td {
+    padding: 4px 4px;
+    text-align: center;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .live-score-table .col-turn {
+    color: var(--text-secondary);
+    font-weight: 600;
+    width: 26px;
+  }
+
+  .live-score-table .row-bingo {
+    font-weight: 700;
+    color: #059669;
+  }
+
+  .live-score-empty {
+    color: var(--text-secondary);
+    font-style: italic;
+    text-align: center;
+    padding: 8px 0;
+  }
+
+  .live-score-totals {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 4px;
+    margin-bottom: 6px;
+    background: var(--bg-elevated, rgba(0,0,0,0.03));
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .live-score-totals span:last-child {
+    color: var(--text-primary);
+  }
+
+  /* Tile tracker compact mode for side panel */
+  .side-panel-body .tile-tracker {
+    padding: 0;
+    margin: 0;
+  }
+  .side-panel-body .tracker-title {
+    display: none; /* header already shows it */
+  }
+  .side-panel-body .tracker-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+  }
+  .side-panel-body .tracker-item {
+    padding: 4px 6px;
+    font-size: 12px;
+  }
+  .side-panel-body .tracker-info {
+    margin-top: 8px;
+    font-size: 11px;
+    text-align: center;
+    color: var(--text-secondary);
+  }
+
+  /* Hint to the user: side panels live-update */
+  .side-panel-hint {
+    font-size: 10px;
+    color: var(--text-secondary);
+    text-align: center;
+    margin-top: 6px;
+    font-style: italic;
+  }
+}
+
+/* =============================================================================
    APP LAYOUT
    ============================================================================= */
 
@@ -146,6 +292,31 @@ h1 {
   font-size: 20px;
   font-weight: 700;
   color: var(--text-primary);
+}
+
+/* Feature M: Paused-timer indicator on score box */
+.score-box.timer-paused {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  position: relative;
+}
+
+.score-box.timer-paused::after {
+  content: "⏸";
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 12px;
+  color: #b45309;
+}
+
+body.theme-dark .score-box.timer-paused {
+  background: #422006;
+  border-color: #b45309;
+}
+
+body.theme-dark .score-box.timer-paused::after {
+  color: #fbbf24;
 }
 
 /* =============================================================================
@@ -471,10 +642,12 @@ h1 {
 }
 
 .game-end-scores {
-  background: #f9fafb;
+  background: var(--bg-elevated, var(--bg-card));
+  color: var(--text-primary);
   padding: 16px;
   border-radius: 8px;
   margin-bottom: 16px;
+  border: 1px solid var(--border-medium, #e5e7eb);
 }
 
 .game-end-scores .score-row {
@@ -483,6 +656,7 @@ h1 {
   padding: 6px 0;
   font-size: 18px;
   font-weight: 600;
+  color: var(--text-primary);
 }
 
 .game-end-reason {
@@ -967,6 +1141,24 @@ body.theme-dark .score-sheet-table th {
   border-bottom: 1px solid var(--border-light);
 }
 
+/* Feature O: 3-column score sheet (AI | # | Player) */
+.score-sheet-3col th,
+.score-sheet-3col td {
+  text-align: center;
+}
+
+.score-sheet-3col .col-turn {
+  width: 50px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  background: var(--bg-elevated, rgba(0,0,0,0.03));
+}
+
+.score-sheet-3col .col-ai,
+.score-sheet-3col .col-player {
+  width: calc((100% - 50px) / 2);
+}
+
 .amath-tile[draggable="true"] {
   cursor: grab;
 }
@@ -1241,6 +1433,11 @@ body.theme-dark .score-sheet-table th {
 
 /* =============================================================================
    RESPONSIVE — MOBILE PORTRAIT
+   Use viewport-relative units so board fills available screen width.
+   Formula: 15 cells + 14 gaps + 4px padding should equal viewport width minus body padding.
+   With body padding 6px each side (12px total) and 1px gap × 14 = 14px:
+   cell-size = (100vw - 12px body - 4px padding - 14px gaps) / 15
+   ≈ (100vw - 30px) / 15
    ============================================================================= */
 
 @media (max-width: 600px) {
@@ -1249,25 +1446,25 @@ body.theme-dark .score-sheet-table th {
   }
 
   :root {
-    --cell-size: 22px;
-    --tile-size: 21px;
+    --cell-size: calc((100vw - 30px) / 15);
+    --tile-size: calc((100vw - 30px) / 15 - 2px);
     --rack-tile-size: 36px;
   }
 
   .tile-face {
-    font-size: 11px;
+    font-size: calc((100vw - 30px) / 15 * 0.5);
   }
 
   .amath-cell .premium-label {
-    font-size: 7px;
+    font-size: calc((100vw - 30px) / 15 * 0.32);
   }
 
   .amath-cell.center-cell .center-star {
-    font-size: 14px;
+    font-size: calc((100vw - 30px) / 15 * 0.65);
   }
 
   .tile-points {
-    font-size: 7px;
+    font-size: calc((100vw - 30px) / 15 * 0.32);
   }
 
   .amath-rack-slot .amath-tile .tile-face {
@@ -1292,21 +1489,30 @@ body.theme-dark .score-sheet-table th {
     padding: 8px 14px;
     font-size: 13px;
   }
+
+  /* Override main-area max-width so board can fill */
+  .main-area, .board-area, .amath-board-wrapper {
+    max-width: 100%;
+  }
 }
 
 /* =============================================================================
-   VERY SMALL PHONES
+   VERY SMALL PHONES — keep dynamic sizing but with even less padding
    ============================================================================= */
 
 @media (max-width: 380px) {
+  body {
+    padding: 4px;
+  }
+
   :root {
-    --cell-size: 19px;
-    --tile-size: 18px;
+    --cell-size: calc((100vw - 22px) / 15);
+    --tile-size: calc((100vw - 22px) / 15 - 2px);
     --rack-tile-size: 32px;
   }
 
   .tile-face {
-    font-size: 10px;
+    font-size: calc((100vw - 22px) / 15 * 0.5);
   }
 
   .amath-rack-slot .amath-tile .tile-face {

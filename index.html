@@ -10,7 +10,17 @@
   <div id="app">
     <h1>A-Math</h1>
     <p id="status">Loading...</p>
-    <div id="game-container"></div>
+    <div id="desktop-grid">
+      <aside id="desktop-left-panel" class="desktop-side-panel">
+        <div class="side-panel-header">📋 Score Sheet</div>
+        <div id="live-score-sheet" class="side-panel-body"></div>
+      </aside>
+      <div id="game-container"></div>
+      <aside id="desktop-right-panel" class="desktop-side-panel">
+        <div class="side-panel-header">🔍 Tile Tracker</div>
+        <div id="live-tile-tracker" class="side-panel-body"></div>
+      </aside>
+    </div>
     <button id="debug-toggle">Show/Hide verification details</button>
     <div id="debug-output"></div>
   </div>
@@ -24,6 +34,10 @@
   <script src="js/board.js"></script>
   <script src="js/scoring.js"></script>
   <script src="js/placement.js"></script>
+  <script src="js/ai-yoyo.js"></script>
+  <script src="js/ai-x9.js"></script>
+  <script src="js/ai-swap.js"></script>
+  <script src="js/ai-swap-brain2.js"></script>
   <script src="js/ai-player.js"></script>
   <script src="js/sounds.js"></script>
   <script src="js/animations.js"></script>
