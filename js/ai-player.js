@@ -218,6 +218,23 @@
           equations: bestPlay.equations,
         };
       }
+
+      // EXCEPTION: Rack has 2+ BLANKs and we found a decent non-Bingo play.
+      // Brute-force search likely couldn't explore all BLANK combinations within
+      // the time budget. Better to play a good non-Bingo than waste turns swapping.
+      const blanksInRack = state.aiRack.tiles.filter(t => t.type === 'blank').length;
+      if (bestPlay && blanksInRack >= 2 && bestPlay.score >= 10) {
+        console.log('[AI] Bingo-only override: ' + blanksInRack + ' BLANKs in rack, playing ' +
+                    bestPlay.score + '-pt fallback (search couldn\'t find Bingo in budget)');
+        recordPlay(rackOwner);
+        return {
+          type: 'play',
+          placements: bestPlay.placements,
+          score: bestPlay.score,
+          equations: bestPlay.equations,
+        };
+      }
+
       // No Bingo/YoYo found — swap if possible, otherwise pass (skip normal-play fallthrough)
       if (bagSize > C.SWAP_FORBIDDEN_BAG_THRESHOLD) {
         return smartSwap(state);
@@ -347,6 +364,14 @@
     const counter = { count: 0, abort: false };
     const maxTiles = Math.min(rack.length, 8);
 
+    // Count BLANKs — boost candidate budget when many BLANKs present
+    const blankCount = rack.filter(t => t.type === 'blank').length;
+    const candidateMultiplier = blankCount >= 3 ? 3 : (blankCount >= 2 ? 1.5 : 1);
+    const maxCandidatesThisRack = Math.floor(MAX_CANDIDATES_PER_STAGE * candidateMultiplier);
+    if (blankCount >= 2) {
+      console.log('[AI] Rack has ' + blankCount + ' BLANKs — boosting candidate limit to ' + maxCandidatesThisRack);
+    }
+
     const onValidPlay = (play) => {
       if (!bestPlay || play.score > bestPlay.score) bestPlay = play;
 
@@ -405,7 +430,7 @@
           }
           searchAtAnchor(
             board, aiRack, anchor, direction, stage.size, isFirstMove,
-            onValidPlay, counter, stageStart, stage.budgetMs
+            onValidPlay, counter, stageStart, stage.budgetMs, maxCandidatesThisRack
           );
         }
       }
@@ -591,7 +616,7 @@
 
   function searchAtAnchor(
     board, aiRack, anchor, direction, numTiles, isFirstMove,
-    onValidPlay, counter, stageStart, stageBudgetMs
+    onValidPlay, counter, stageStart, stageBudgetMs, maxCandidates
   ) {
     const cellPositions = collectPlacementCells(board, anchor, direction, numTiles);
     if (!cellPositions) return;
@@ -602,7 +627,7 @@
 
     permuteAndTry(
       rack, used, sequence, cellPositions, numTiles, board,
-      isFirstMove, onValidPlay, counter, stageStart, stageBudgetMs
+      isFirstMove, onValidPlay, counter, stageStart, stageBudgetMs, maxCandidates
     );
   }
 
@@ -626,10 +651,11 @@
 
   function permuteAndTry(
     rack, used, sequence, cellPositions, numTiles, board,
-    isFirstMove, onValidPlay, counter, stageStart, stageBudgetMs
+    isFirstMove, onValidPlay, counter, stageStart, stageBudgetMs, maxCandidates
   ) {
     if (counter.abort) return;
-    if (counter.count >= MAX_CANDIDATES_PER_STAGE) {
+    const limit = maxCandidates || MAX_CANDIDATES_PER_STAGE;
+    if (counter.count >= limit) {
       counter.abort = true;
       return;
     }
@@ -655,7 +681,7 @@
       if (counter.abort) return;
       if (used[i]) continue;
       const tile = rack[i];
-      const assignedValues = getCandidateAssignments(tile);
+      const assignedValues = getCandidateAssignments(tile, rack);
 
       for (const assigned of assignedValues) {
         if (counter.abort) return;
@@ -666,7 +692,7 @@
 
         permuteAndTry(
           rack, used, sequence, cellPositions, numTiles, board,
-          isFirstMove, onValidPlay, counter, stageStart, stageBudgetMs
+          isFirstMove, onValidPlay, counter, stageStart, stageBudgetMs, maxCandidates
         );
 
         sequence.pop();
@@ -676,10 +702,78 @@
     }
   }
 
-  function getCandidateAssignments(tile) {
+  function getCandidateAssignments(tile, rack) {
     if (tile.type === 'choice') return tile.face.split('/');
     if (tile.type === 'blank') {
-      return (C.getBlankChoices ? C.getBlankChoices() : C.BLANK_CHOICES);
+      const fullChoices = (C.getBlankChoices ? C.getBlankChoices() : C.BLANK_CHOICES);
+
+      // Smart BLANK assignment: prune choices to reduce combinatorial explosion.
+      // 1 BLANK: try all ~15 choices
+      // 2 BLANKs: try ~10 (skip duplicates of rack faces)
+      // 3+ BLANKs: try ~6 most useful (skip dups, prioritize structural symbols)
+      if (!rack) return fullChoices;
+
+      const rackBlankCount = rack.filter(t => t && t.type === 'blank').length;
+      if (rackBlankCount <= 1) return fullChoices;
+
+      const rackFaces = new Set();
+      for (const t of rack) {
+        if (!t || t.type === 'blank') continue;
+        rackFaces.add(t.assigned || t.face);
+      }
+
+      // Has = already?
+      const hasEquals = rackFaces.has('=');
+      // Has operator?
+      const hasOp = ['+', '-', '×', '÷'].some(o => rackFaces.has(o));
+
+      // Build pruned set based on what the rack needs
+      const needed = [];
+      // Top priority: = if missing
+      if (!hasEquals) needed.push('=');
+      // Operators if missing or only one
+      if (!hasOp) needed.push('+', '-');
+      // Always useful: 0, 1 (small numbers, common in equations)
+      if (!rackFaces.has('0')) needed.push('0');
+      if (!rackFaces.has('1')) needed.push('1');
+      if (!rackFaces.has('5')) needed.push('5');
+
+      // For 2 BLANKs: add more variety
+      if (rackBlankCount === 2) {
+        // Add all operators if not present
+        for (const op of ['+', '-', '×', '÷']) {
+          if (!needed.includes(op) && !rackFaces.has(op)) needed.push(op);
+        }
+        // Add small digits not in rack
+        for (const d of ['2', '3', '4', '6', '7', '8', '9']) {
+          if (!rackFaces.has(d) && needed.length < 12) needed.push(d);
+        }
+        // Always include = for safety
+        if (!needed.includes('=')) needed.push('=');
+      }
+
+      // For 3+ BLANKs: keep it lean — only 4 most useful choices
+      // (combinatorial: 4^3 = 64 × permutations, manageable)
+      if (rackBlankCount >= 3) {
+        // Most useful 4: =, +, 0, 1 — these enable most patterns
+        const top4 = [];
+        if (!hasEquals) top4.push('=');
+        if (!hasOp) top4.push('+');
+        if (!rackFaces.has('0')) top4.push('0');
+        if (!rackFaces.has('1')) top4.push('1');
+        // If we have everything, pick 4 generally useful
+        while (top4.length < 4) {
+          for (const c of ['=', '+', '-', '0', '1', '2', '5']) {
+            if (!top4.includes(c)) { top4.push(c); break; }
+          }
+        }
+        return top4.slice(0, 4);
+      }
+
+      // Filter to valid faces in active inventory
+      const valid = new Set(fullChoices);
+      const result = needed.filter(c => valid.has(c));
+      return result.length > 0 ? result : fullChoices.slice(0, 5); // safety floor
     }
     return [null];
   }
