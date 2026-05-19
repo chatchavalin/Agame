@@ -84,6 +84,7 @@ body {
   color: var(--text-primary);
   line-height: 1.4;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
 h1 {
@@ -110,10 +111,32 @@ h1 {
   display: none; /* hidden on mobile/narrow screens */
 }
 
-@media (min-width: 1100px) {
-  /* Widen app container so side panels have room */
+@media (min-width: 1300px) {
+  /* Use most of the screen width on desktop */
   #app {
-    max-width: 1280px;
+    max-width: 1600px;
+    padding: 0 16px;
+  }
+
+  /* Constrain page to viewport height so no scrolling needed */
+  html, body {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    padding: 6px 12px;
+  }
+
+  h1 {
+    font-size: 16px;
+    margin: 0 0 4px;
+  }
+
+  #status {
+    font-size: 13px;
+    padding: 4px 10px;
+    margin: 2px 0;
   }
 
   #desktop-grid {
@@ -123,16 +146,91 @@ h1 {
     align-items: start;
   }
 
+  /* Dynamic cell sizing: pick the SMALLER of width-budget and height-budget.
+   * Width budget: (viewport_w - 642px) / 15
+   * Height budget: (viewport_h - 200px) / 15
+   *   Reserved: ~30px H1, ~60px each rack row (×2), ~30px margins, ~20px gaps
+   *   Total reserve ≈ 200px → board can use viewport_h - 200px
+   * Min 28px, max 40px.
+   */
+  :root {
+    --cell-size: clamp(28px,
+      min(
+        calc((100vw - 642px) / 15),
+        calc((100vh - 200px) / 15)
+      ),
+      40px);
+    --tile-size: clamp(26px,
+      min(
+        calc((100vw - 642px) / 15 - 2px),
+        calc((100vh - 200px) / 15 - 2px)
+      ),
+      38px);
+    --rack-tile-size: 38px;
+  }
+
+  .tile-face {
+    font-size: clamp(15px, calc(var(--cell-size) * 0.45), 20px);
+  }
+
+  .amath-cell .premium-label {
+    font-size: clamp(8px, calc(var(--cell-size) * 0.22), 11px);
+  }
+
+  .amath-cell.center-cell .center-star {
+    font-size: clamp(18px, calc(var(--cell-size) * 0.6), 26px);
+  }
+
+  .tile-points {
+    font-size: clamp(8px, calc(var(--cell-size) * 0.2), 10px);
+  }
+
+  /* Score boxes + timers — compact */
+  .score-box,
+  .timer-box {
+    min-width: 60px;
+    padding: 4px 10px;
+  }
+
+  .score-value {
+    font-size: 18px;
+  }
+
+  .timer-value {
+    font-size: 13px;
+  }
+
+  /* Compact buttons */
+  .btn {
+    padding: 5px 10px;
+    font-size: 13px;
+  }
+
+  .button-bar {
+    margin-top: 6px;
+    gap: 6px;
+  }
+
+  /* Tighter amath-app spacing */
+  .amath-app {
+    gap: 6px;
+  }
+
+  .opponent-area, .player-area {
+    gap: 6px;
+  }
+
+  /* Side panel constrained to viewport */
   .desktop-side-panel {
     display: block;
     background: var(--bg-card);
     border: 1px solid var(--border-light);
     border-radius: 10px;
-    padding: 10px 12px;
-    max-height: calc(100vh - 100px);
+    padding: 8px 12px;
+    max-height: calc(100vh - 80px);
     overflow-y: auto;
     position: sticky;
-    top: 12px;
+    top: 6px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   }
 
@@ -153,6 +251,113 @@ h1 {
 
   .side-panel-body {
     font-size: 13px;
+  }
+
+  /* ─── Status card (left panel, replaces top status bar on desktop) ─── */
+  .status-card {
+    background: linear-gradient(135deg, rgba(252, 232, 178, 0.4) 0%, rgba(255, 248, 220, 0.6) 100%);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 12px;
+    transition: box-shadow 0.3s ease;
+  }
+
+  .status-card.pulse {
+    animation: statusPulse 0.6s ease;
+  }
+
+  @keyframes statusPulse {
+    0% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(217, 119, 6, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0); }
+  }
+
+  body.theme-dark .status-card {
+    background: linear-gradient(135deg, rgba(60, 50, 30, 0.5) 0%, rgba(50, 45, 30, 0.6) 100%);
+    border-color: var(--border-medium);
+  }
+
+  .status-card-header {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+
+  .status-card-body {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.4;
+    min-height: 18px;
+    word-wrap: break-word;
+  }
+
+  /* Hide the top status bar — its content lives in the status card */
+  #status {
+    display: none !important;
+  }
+
+  /* ─── Actions card (button bar in left panel) ─── */
+  #desktop-actions-slot {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-light);
+  }
+
+  #desktop-actions-slot::before {
+    content: '⚡ Actions';
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+
+  /* When buttons are inside the side panel, lay them out in a 2-column grid */
+  .button-bar.button-bar-side {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 0;
+    justify-content: stretch;
+  }
+
+  .button-bar.button-bar-side .btn {
+    padding: 6px 8px;
+    font-size: 12px;
+    width: 100%;
+  }
+
+  /* Primary action (Submit) spans full width */
+  .button-bar.button-bar-side #btn-submit {
+    grid-column: 1 / -1;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  /* Reset and Pass on same row */
+  .button-bar.button-bar-side #btn-reset,
+  .button-bar.button-bar-side #btn-pass {
+    /* default grid placement is fine */
+  }
+
+  /* Icon buttons grouped at the bottom, smaller, in a row */
+  .button-bar.button-bar-side .btn-icon {
+    grid-column: span 1;
+    padding: 5px;
+    font-size: 14px;
+  }
+
+  /* Tertiary (Auto, New Game) — full row */
+  .button-bar.button-bar-side .btn-tertiary {
+    grid-column: 1 / -1;
+    font-size: 12px;
   }
 
   /* Live score sheet — compact 3-column table */
@@ -240,6 +445,94 @@ h1 {
     text-align: center;
     margin-top: 6px;
     font-style: italic;
+  }
+
+  /* Hide debug controls on desktop — saves vertical space */
+  #debug-toggle, #debug-output {
+    display: none !important;
+  }
+}
+
+/* =============================================================================
+   ULTRA-WIDE SCREENS (1600px+)
+   Wider side panels for high-res monitors.
+   ============================================================================= */
+
+@media (min-width: 1600px) {
+  #app {
+    max-width: 1800px;
+  }
+
+  #desktop-grid {
+    grid-template-columns: 320px minmax(0, 1fr) 320px;
+    gap: 20px;
+  }
+
+  /* Recalculate center column for wider panels:
+   * = viewport - 32 padding - 640 panels - 40 gaps = viewport - 712 */
+  :root {
+    --cell-size: clamp(28px,
+      min(
+        calc((100vw - 712px) / 15),
+        calc((100vh - 200px) / 15)
+      ),
+      42px);
+    --tile-size: clamp(26px,
+      min(
+        calc((100vw - 712px) / 15 - 2px),
+        calc((100vh - 200px) / 15 - 2px)
+      ),
+      40px);
+  }
+
+  .tile-face {
+    font-size: clamp(13px, calc(var(--cell-size) * 0.45), 20px);
+  }
+
+  .amath-cell .premium-label {
+    font-size: clamp(8px, calc(var(--cell-size) * 0.22), 11px);
+  }
+
+  .amath-cell.center-cell .center-star {
+    font-size: clamp(16px, calc(var(--cell-size) * 0.6), 25px);
+  }
+
+  .tile-points {
+    font-size: clamp(7px, calc(var(--cell-size) * 0.2), 10px);
+  }
+}
+
+/* =============================================================================
+   FULL HD AND BIGGER (1900px+)
+   ============================================================================= */
+
+@media (min-width: 1900px) {
+  #app {
+    max-width: 2100px;
+  }
+
+  /* Max cell size cap — kept reasonable so board doesn't dominate */
+  :root {
+    --cell-size: clamp(28px,
+      min(
+        calc((100vw - 712px) / 15),
+        calc((100vh - 200px) / 15)
+      ),
+      44px);
+    --tile-size: clamp(26px,
+      min(
+        calc((100vw - 712px) / 15 - 2px),
+        calc((100vh - 200px) / 15 - 2px)
+      ),
+      42px);
+  }
+
+  .tile-face {
+    font-size: clamp(15px, calc(var(--cell-size) * 0.45), 24px);
+  }
+
+  .amath-cell.center-cell .center-star {
+    font-size: clamp(18px, calc(var(--cell-size) * 0.6), 30px);
   }
 }
 
@@ -1457,26 +1750,32 @@ body.theme-dark .score-sheet-table th {
   }
 
   :root {
-    /* Board uses (100vw - 8px) / 15: 4px padding each side, ~1px slack */
-    --cell-size: calc((100vw - 8px) / 15);
-    --tile-size: calc((100vw - 8px) / 15 - 2px);
+    /* Cell sizing budget (15 cells fit in viewport width):
+     *   100vw
+     *   - 8px body padding (4px × 2)
+     *   - 4px board outer padding (2px × 2)
+     *   - 14px gaps (1px × 14 between 15 cells)
+     *   = (100vw - 26px) / 15 per cell
+     */
+    --cell-size: calc((100vw - 26px) / 15);
+    --tile-size: calc((100vw - 26px) / 15 - 2px);
     --rack-tile-size: 36px;
   }
 
   .tile-face {
-    font-size: calc((100vw - 8px) / 15 * 0.5);
+    font-size: calc((100vw - 26px) / 15 * 0.5);
   }
 
   .amath-cell .premium-label {
-    font-size: calc((100vw - 8px) / 15 * 0.32);
+    font-size: calc((100vw - 26px) / 15 * 0.32);
   }
 
   .amath-cell.center-cell .center-star {
-    font-size: calc((100vw - 8px) / 15 * 0.65);
+    font-size: calc((100vw - 26px) / 15 * 0.65);
   }
 
   .tile-points {
-    font-size: calc((100vw - 8px) / 15 * 0.32);
+    font-size: calc((100vw - 26px) / 15 * 0.32);
   }
 
   .amath-rack-slot .amath-tile .tile-face {
@@ -1533,13 +1832,14 @@ body.theme-dark .score-sheet-table th {
   }
 
   :root {
-    --cell-size: calc((100vw - 4px) / 15);
-    --tile-size: calc((100vw - 4px) / 15 - 2px);
+    /* Even tighter: 4px body + 4px board padding + 14px gaps = 22px */
+    --cell-size: calc((100vw - 22px) / 15);
+    --tile-size: calc((100vw - 22px) / 15 - 2px);
     --rack-tile-size: 32px;
   }
 
   .tile-face {
-    font-size: calc((100vw - 4px) / 15 * 0.5);
+    font-size: calc((100vw - 22px) / 15 * 0.5);
   }
 
   .amath-rack-slot .amath-tile .tile-face {
