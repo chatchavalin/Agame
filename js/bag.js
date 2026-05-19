@@ -11,12 +11,14 @@
   const U = window.AMath.utils;
 
   /**
-   * Creates a fresh, shuffled bag containing all 100 tiles per the inventory.
+   * Creates a fresh, shuffled bag containing tiles per the active inventory
+   * (ประถม = 70 tiles, มัธยม = 100 tiles).
    * Each tile gets a unique ID.
    */
   function createBag() {
+    const inventory = C.getActiveInventory ? C.getActiveInventory() : C.TILE_INVENTORY;
     const tiles = [];
-    for (const def of C.TILE_INVENTORY) {
+    for (const def of inventory) {
       for (let i = 0; i < def.count; i++) {
         tiles.push({
           id: U.generateId('tile'),

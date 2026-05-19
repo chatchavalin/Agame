@@ -231,9 +231,7 @@
     const removed = Rack.removeTile(state.playerRack, tileId);
     if (!removed) return;
 
-    // Place on board (we use the original tile from rack but with assigned set if needed)
-    const placedTile = tile === removed ? removed : tile;
-    // If tile object has 'assigned' from picker, set it on the actual rack tile too
+    // If tile object has 'assigned' from picker, copy to the actual rack tile
     if (tile.assigned && tile !== removed) {
       removed.assigned = tile.assigned;
     }
@@ -340,9 +338,25 @@
       options = tile.face.split('/');
     } else {
       // BLANK can be anything: 0-20, +, -, ×, ÷, =
+      // But in ประถม edition: 0-16 + 20 only (no 17, 18, 19)
+      // And no standalone ×, ÷ (only ×/÷ choice tile, but BLANK assignment still allows them)
       title.textContent = 'BLANK tile — choose what it becomes:';
       options = [];
-      for (let i = 0; i <= 20; i++) options.push(String(i));
+      // Determine which numbers are allowed based on tile set
+      let tileSet = 'prathom';
+      try {
+        if (window.AMath && window.AMath.settings && window.AMath.settings.get) {
+          tileSet = window.AMath.settings.get('tileSet') || 'prathom';
+        }
+      } catch (e) {}
+      if (tileSet === 'prathom') {
+        // 0-16 + 20 (skip 17, 18, 19)
+        for (let i = 0; i <= 16; i++) options.push(String(i));
+        options.push('20');
+      } else {
+        // มัธยม: 0-20 full range
+        for (let i = 0; i <= 20; i++) options.push(String(i));
+      }
       options.push('+', '-', '×', '÷', '=');
     }
 

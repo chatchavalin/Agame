@@ -16,6 +16,9 @@
     trashTalkEnabled: true,     // AI shows trash-talk messages
     gameMode: 'player_vs_ai',   // 'player_vs_ai' | 'ai_vs_ai'
     soundEnabled: true,         // Play sound effects
+    tileSet: 'prathom',         // 'prathom' (70 tiles) | 'mathayom' (100 tiles)
+    showAiHand: true,           // Show AI rack faces (debugging/learning aid)
+    aiSwapBrain: 'brain1',      // 'brain1' (seed-keeping, stable) | 'brain2' (probability, experimental)
   };
 
   let current = null;
@@ -134,6 +137,18 @@
       '</select>';
     dialog.appendChild(themeRow);
 
+    // Setting: Tile Set (ประถม vs มัธยม)
+    const tileSetRow = document.createElement('div');
+    tileSetRow.className = 'settings-row';
+    tileSetRow.innerHTML =
+      '<div class="settings-label" style="display:block;margin-bottom:6px"><span>Tile Set Edition</span></div>' +
+      '<select id="setting-tile-set" class="settings-select">' +
+      '<option value="prathom"' + (current.tileSet === 'prathom' ? ' selected' : '') + '>ประถม Prathom (70 tiles — child-friendly)</option>' +
+      '<option value="mathayom"' + (current.tileSet === 'mathayom' ? ' selected' : '') + '>มัธยม Mathayom (100 tiles — standard)</option>' +
+      '</select>' +
+      '<p class="settings-hint">ประถม: fewer tiles, no 17/18/19, simpler operators. มัธยม: full 100-tile standard set.</p>';
+    dialog.appendChild(tileSetRow);
+
     // Setting: Trash-talk
     const ttRow = document.createElement('div');
     ttRow.className = 'settings-row';
@@ -160,6 +175,33 @@
       '<p class="settings-hint">Tile click, submit, bingo fanfare, etc.</p>';
     dialog.appendChild(soundRow);
 
+    // Setting: Show AI Hand
+    const showAiHandRow = document.createElement('div');
+    showAiHandRow.className = 'settings-row';
+    showAiHandRow.innerHTML =
+      '<label class="settings-label">' +
+      '<input type="checkbox" id="setting-show-ai-hand"' +
+      (current.showAiHand ? ' checked' : '') +
+      '>' +
+      '<span>Show AI hand (for learning/debugging)</span>' +
+      '</label>' +
+      '<p class="settings-hint">When ON, AI rack faces are visible. In AI vs AI mode, both AI racks visible.</p>';
+    dialog.appendChild(showAiHandRow);
+
+    // Setting: AI Swap Strategy (Brain selector)
+    const brainRow = document.createElement('div');
+    brainRow.className = 'settings-row';
+    brainRow.innerHTML =
+      '<label class="settings-label" for="setting-ai-swap-brain">' +
+      '<span>AI Swap Strategy</span>' +
+      '</label>' +
+      '<select id="setting-ai-swap-brain" class="settings-select">' +
+      '<option value="brain1"' + (current.aiSwapBrain === 'brain1' ? ' selected' : '') + '>Brain 1 — Seed Keeping (stable)</option>' +
+      '<option value="brain2"' + (current.aiSwapBrain === 'brain2' ? ' selected' : '') + '>Brain 2 — Probability (experimental)</option>' +
+      '</select>' +
+      '<p class="settings-hint">Brain 1 keeps a fixed seed template. Brain 2 computes expected score for many candidates. Brain 2 is experimental.</p>';
+    dialog.appendChild(brainRow);
+
     // Save + Close buttons
     const btnRow = document.createElement('div');
     btnRow.className = 'settings-buttons';
@@ -172,13 +214,19 @@
       const modeSelect = document.getElementById('setting-game-mode');
       const clockCheckbox = document.getElementById('setting-chess-clock');
       const themeSelect = document.getElementById('setting-theme');
+      const tileSetSelect = document.getElementById('setting-tile-set');
       const ttCheckbox = document.getElementById('setting-trash-talk');
       const soundCheckbox = document.getElementById('setting-sound');
+      const showAiHandCheckbox = document.getElementById('setting-show-ai-hand');
+      const brainSelect = document.getElementById('setting-ai-swap-brain');
       current.gameMode = modeSelect.value;
       current.chessClockEnabled = clockCheckbox.checked;
       current.theme = themeSelect.value;
+      current.tileSet = tileSetSelect.value;
       current.trashTalkEnabled = ttCheckbox.checked;
       current.soundEnabled = soundCheckbox.checked;
+      current.showAiHand = showAiHandCheckbox.checked;
+      if (brainSelect) current.aiSwapBrain = brainSelect.value;
       save();
       applyTheme(current.theme);
       // Apply sound setting immediately

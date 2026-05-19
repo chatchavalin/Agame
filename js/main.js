@@ -89,6 +89,11 @@
     // Reset AI takeover toggle
     if (window.AMath.modes) window.AMath.modes.setAiTakeover(false);
 
+    // Reset AI play count for first-4-turns Bingo mode (all racks)
+    if (window.AMath.aiPlayer && window.AMath.aiPlayer.resetPlayCount) {
+      window.AMath.aiPlayer.resetPlayCount(); // reset all
+    }
+
     const existingPopup = document.querySelector('.game-end-overlay');
     if (existingPopup) existingPopup.remove();
 
@@ -140,11 +145,17 @@
       aiTimeSeconds: startTimeSeconds,
       chessClockEnabled: chessClockEnabled,
       lastAiPlay: null,    // For challenge: record the most recent AI play
+      playerTimerPaused: false,  // Feature M: double-click pause
+      aiTimerPaused: false,
       onSubmit: handleSubmit,
       onReset: handleReset,
       onPass: handlePass,
       onSwap: handleSwap,
     };
+
+    // Clear any leftover pause-indicator from previous game
+    if (parts.playerScoreBox) parts.playerScoreBox.classList.remove('timer-paused');
+    if (parts.opponentScoreBox) parts.opponentScoreBox.classList.remove('timer-paused');
 
     Interactions.init(session);
 
@@ -223,6 +234,9 @@
       startChessClock();
     }
 
+    wireScorePauseHandlers();
+    refreshDesktopSidePanels();
+
     if (playerGoesFirst) {
       showStatus(
         '🎲 You go first! Tap a tile, then tap a board cell. First move must pass through the center ★.'
@@ -256,6 +270,8 @@
           isFirstMove: session.isFirstMove,
           playerScore: session.aiScore,    // role-flipped for evaluation
           aiScore: session.playerScore,
+          consecutiveNonScoringTurns: session.consecutiveNonScoringTurns || 0,
+          opponentRack: session.aiRack,  // for tile-penalty calc
         });
 
         showThinking(false);
@@ -374,7 +390,13 @@
       chessClockEnabled: false,
       lastAiPlay: null,
       isAiVsAi: true,
+      playerTimerPaused: false,
+      aiTimerPaused: false,
     };
+
+    // Clear any leftover pause-indicator from previous game
+    if (parts.playerScoreBox) parts.playerScoreBox.classList.remove('timer-paused');
+    if (parts.opponentScoreBox) parts.opponentScoreBox.classList.remove('timer-paused');
 
     // Render BOTH racks face-up
     UI.renderRack(ai1Rack, parts.playerRack, false);
@@ -464,6 +486,7 @@
     }
 
     showStatus(session.isPlayerTurn ? '🤖 AI 1 thinking...' : '🤖 AI 2 thinking...');
+    refreshDesktopSidePanels();
     setTimeout(runAiVsAiTurn, 1000);
   }
 
@@ -498,6 +521,8 @@
           isFirstMove: session.isFirstMove,
           playerScore: isAi1 ? session.aiScore : session.playerScore,
           aiScore: isAi1 ? session.playerScore : session.aiScore,
+          consecutiveNonScoringTurns: session.consecutiveNonScoringTurns || 0,
+          opponentRack: isAi1 ? session.aiRack : session.playerRack,
         });
 
         // Execute decision
@@ -552,6 +577,7 @@
         UI.renderScore(session.uiParts.opponentScoreBox, 'AI 2', session.aiScore);
 
         refreshTileTracker();
+        refreshDesktopSidePanels();
 
         if (checkGameEnd()) return;
 
@@ -616,11 +642,17 @@
       aiTimeSeconds: saved.aiTimeSeconds,
       chessClockEnabled: chessClockEnabled,
       lastAiPlay: null,
+      playerTimerPaused: false,
+      aiTimerPaused: false,
       onSubmit: handleSubmit,
       onReset: handleReset,
       onPass: handlePass,
       onSwap: handleSwap,
     };
+
+    // Clear any leftover pause-indicator from previous game
+    if (parts.playerScoreBox) parts.playerScoreBox.classList.remove('timer-paused');
+    if (parts.opponentScoreBox) parts.opponentScoreBox.classList.remove('timer-paused');
 
     // Restore score sheet
     if (window.AMath.scoreSheet) {
@@ -705,6 +737,9 @@
       startChessClock();
     }
 
+    wireScorePauseHandlers();
+    refreshDesktopSidePanels();
+
     showStatus('Resumed game. ' + (session.isPlayerTurn ? 'Your turn.' : 'AI is thinking...'));
 
     if (!session.isPlayerTurn) {
@@ -719,8 +754,10 @@
     if (!session || session.gameOver) return;
     const SaveResume = window.AMath.saveResume;
     if (SaveResume) SaveResume.save(session);
-    // Also refresh tile tracker if it's visible
+    // Refresh tile tracker if it's visible
     refreshTileTracker();
+    // Refresh desktop side panels (score sheet + tile tracker)
+    refreshDesktopSidePanels();
   }
 
   /**
@@ -803,6 +840,29 @@
     if (panel) Tracker.render(panel, session);
   }
 
+  /**
+   * Refresh the desktop side panels (live score sheet + live tile tracker).
+   * Called after every turn / state change. Safe to call when panels hidden.
+   */
+  function refreshDesktopSidePanels() {
+    if (!session) return;
+
+    // Live score sheet (left panel)
+    const sheetEl = document.getElementById('live-score-sheet');
+    if (sheetEl && window.AMath.scoreSheet && window.AMath.scoreSheet.renderLive) {
+      window.AMath.scoreSheet.renderLive(sheetEl, session.playerScore, session.aiScore);
+    }
+
+    // Live tile tracker (right panel) — only in player vs AI
+    const trackerEl = document.getElementById('live-tile-tracker');
+    if (trackerEl && window.AMath.tileTracker && !session.isAiVsAi) {
+      window.AMath.tileTracker.render(trackerEl, session);
+    } else if (trackerEl && session.isAiVsAi) {
+      // In AI vs AI mode, the tracker is meaningless since both racks are visible
+      trackerEl.innerHTML = '<div class="live-score-empty">N/A in AI vs AI mode</div>';
+    }
+  }
+
   // ============================================================================
   // CHESS CLOCK
   // ============================================================================
@@ -812,6 +872,7 @@
       if (!session || session.gameOver) return;
 
       if (session.isPlayerTurn) {
+        if (session.playerTimerPaused) return; // pause-by-double-click
         session.playerTimeSeconds--;
         window.AMath.ui.renderTimer(
           session.uiParts.playerTimer,
@@ -819,6 +880,7 @@
           session.playerTimeSeconds
         );
       } else {
+        if (session.aiTimerPaused) return; // pause-by-double-click
         session.aiTimeSeconds--;
         window.AMath.ui.renderTimer(
           session.uiParts.opponentTimer,
@@ -834,6 +896,42 @@
     const secondsOver = Math.abs(seconds);
     const minutesOver = Math.ceil(secondsOver / 60);
     return minutesOver * 10;
+  }
+
+  /**
+   * Wire up double-click handlers on score boxes to pause/resume timers.
+   * Feature M: Double-click on player score pauses player's timer; same for AI.
+   */
+  function wireScorePauseHandlers() {
+    if (!session || !session.uiParts) return;
+    const playerBox = session.uiParts.playerScoreBox;
+    const aiBox = session.uiParts.opponentScoreBox;
+
+    if (playerBox && !playerBox._pauseHandlerWired) {
+      playerBox._pauseHandlerWired = true;
+      playerBox.style.cursor = 'pointer';
+      playerBox.title = 'Double-click to pause/resume timer';
+      playerBox.addEventListener('dblclick', function () {
+        if (!session || session.gameOver) return;
+        if (session.isAiVsAi) return;  // no pausing in AI vs AI mode
+        session.playerTimerPaused = !session.playerTimerPaused;
+        playerBox.classList.toggle('timer-paused', session.playerTimerPaused);
+        console.log('[Pause] Player timer:', session.playerTimerPaused ? 'PAUSED' : 'RESUMED');
+      });
+    }
+
+    if (aiBox && !aiBox._pauseHandlerWired) {
+      aiBox._pauseHandlerWired = true;
+      aiBox.style.cursor = 'pointer';
+      aiBox.title = 'Double-click to pause/resume timer';
+      aiBox.addEventListener('dblclick', function () {
+        if (!session || session.gameOver) return;
+        if (session.isAiVsAi) return;  // no pausing in AI vs AI mode
+        session.aiTimerPaused = !session.aiTimerPaused;
+        aiBox.classList.toggle('timer-paused', session.aiTimerPaused);
+        console.log('[Pause] AI timer:', session.aiTimerPaused ? 'PAUSED' : 'RESUMED');
+      });
+    }
   }
 
   // ============================================================================
@@ -1062,6 +1160,8 @@
           isFirstMove: session.isFirstMove,
           playerScore: session.playerScore,
           aiScore: session.aiScore,
+          consecutiveNonScoringTurns: session.consecutiveNonScoringTurns || 0,
+          opponentRack: session.playerRack,
         });
 
         executeAiDecision(aiDecision);
@@ -1168,7 +1268,7 @@
 
       showStatus('🤖 AI swapped ' + swapped.length + ' tiles. Your turn!');
       fireTrashTalk('ai_swap', {});
-    } else {
+    } else if (decision.type === 'pass') {
       session.consecutiveNonScoringTurns++;
       session.lastAiPlay = null;
 
@@ -1178,6 +1278,17 @@
 
       showStatus('🤖 AI passed. Your turn!');
       fireTrashTalk('ai_pass', {});
+    } else {
+      // Unknown decision type — treat as pass for safety
+      console.warn('[AI] Unknown decision type:', decision.type, '— treating as pass');
+      session.consecutiveNonScoringTurns++;
+      session.lastAiPlay = null;
+
+      if (window.AMath.scoreSheet) {
+        window.AMath.scoreSheet.recordTurn('ai', 'pass', 0, false, session.aiScore);
+      }
+
+      showStatus('🤖 AI passed (unknown action). Your turn!');
     }
 
     autoSave();

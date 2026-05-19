@@ -15,9 +15,10 @@
    * Returns { '0': 3, '1': 5, ..., '=': 7, 'BLANK': 2 }
    */
   function computeUnseenCounts(state) {
+    const inventory = C.getActiveInventory ? C.getActiveInventory() : C.TILE_INVENTORY;
     // Start with total inventory counts
     const counts = {};
-    for (const def of C.TILE_INVENTORY) {
+    for (const def of inventory) {
       counts[def.face] = def.count;
     }
 
@@ -59,7 +60,8 @@
     grid.className = 'tracker-grid';
 
     // Build entries in the order of the inventory
-    for (const def of C.TILE_INVENTORY) {
+    const inventory = C.getActiveInventory ? C.getActiveInventory() : C.TILE_INVENTORY;
+    for (const def of inventory) {
       const count = counts[def.face] || 0;
       const item = document.createElement('div');
       item.className = 'tracker-item';

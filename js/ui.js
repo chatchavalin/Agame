@@ -230,6 +230,17 @@
     container.classList.add('amath-rack');
     container.classList.add(isOpponent ? 'rack-opponent' : 'rack-player');
 
+    // Check if Show AI Hand setting is ON
+    let showAiHand = false;
+    try {
+      if (window.AMath && window.AMath.settings && window.AMath.settings.get) {
+        showAiHand = window.AMath.settings.get('showAiHand') === true;
+      }
+    } catch (e) {}
+
+    // If isOpponent (AI rack) AND showAiHand is ON, render face-up
+    const faceDown = isOpponent && !showAiHand;
+
     // Always render 8 slots — empty slots are visible too
     for (let i = 0; i < C.RACK_SIZE; i++) {
       const slot = document.createElement('div');
@@ -238,7 +249,7 @@
 
       if (i < rack.tiles.length) {
         const tile = rack.tiles[i];
-        const tileEl = renderTile(tile, isOpponent);
+        const tileEl = renderTile(tile, faceDown);
         slot.appendChild(tileEl);
       }
 

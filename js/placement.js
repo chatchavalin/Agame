@@ -49,6 +49,32 @@
       direction === 'horizontal' ? a.col - b.col : a.row - b.row
     );
 
+    // === Step 2b: Check no gaps between NEW tiles ===
+    // (existing tiles in the gap are OK — bridges between new tiles)
+    if (sorted.length >= 2) {
+      const first = sorted[0];
+      const last = sorted[sorted.length - 1];
+      const start = direction === 'horizontal' ? first.col : first.row;
+      const end = direction === 'horizontal' ? last.col : last.row;
+      const fixedAxis = direction === 'horizontal' ? first.row : first.col;
+      const newCellSet = new Set(sorted.map(p => p.row + ',' + p.col));
+
+      for (let i = start; i <= end; i++) {
+        const r = direction === 'horizontal' ? fixedAxis : i;
+        const c = direction === 'horizontal' ? i : fixedAxis;
+        const cellKey = r + ',' + c;
+        const isNewCell = newCellSet.has(cellKey);
+        const isExistingTile = board.cells[r][c].tile !== null && !isNewCell;
+        // Every cell between first and last new tile must be either new or existing tile (no empty)
+        if (!isNewCell && !isExistingTile) {
+          return {
+            ok: false,
+            reason: 'New tiles must connect — cannot have empty cells between them',
+          };
+        }
+      }
+    }
+
     // === Step 3: First move must include center (7,7) ===
     if (isFirstMove) {
       const includesCenter = sorted.some(
