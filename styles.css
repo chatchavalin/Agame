@@ -1442,29 +1442,41 @@ body.theme-dark .score-sheet-table th {
 
 @media (max-width: 600px) {
   body {
-    padding: 6px;
+    padding: 4px;
+  }
+
+  /* Tighter app container on mobile — squeeze every pixel for board */
+  #app {
+    padding: 0;
+    margin: 0;
+  }
+
+  h1 {
+    font-size: 20px;
+    margin: 0 0 6px;
   }
 
   :root {
-    --cell-size: calc((100vw - 30px) / 15);
-    --tile-size: calc((100vw - 30px) / 15 - 2px);
+    /* Board uses (100vw - 8px) / 15: 4px padding each side, ~1px slack */
+    --cell-size: calc((100vw - 8px) / 15);
+    --tile-size: calc((100vw - 8px) / 15 - 2px);
     --rack-tile-size: 36px;
   }
 
   .tile-face {
-    font-size: calc((100vw - 30px) / 15 * 0.5);
+    font-size: calc((100vw - 8px) / 15 * 0.5);
   }
 
   .amath-cell .premium-label {
-    font-size: calc((100vw - 30px) / 15 * 0.32);
+    font-size: calc((100vw - 8px) / 15 * 0.32);
   }
 
   .amath-cell.center-cell .center-star {
-    font-size: calc((100vw - 30px) / 15 * 0.65);
+    font-size: calc((100vw - 8px) / 15 * 0.65);
   }
 
   .tile-points {
-    font-size: calc((100vw - 30px) / 15 * 0.32);
+    font-size: calc((100vw - 8px) / 15 * 0.32);
   }
 
   .amath-rack-slot .amath-tile .tile-face {
@@ -1494,6 +1506,21 @@ body.theme-dark .score-sheet-table th {
   .main-area, .board-area, .amath-board-wrapper {
     max-width: 100%;
   }
+
+  /* Status box: narrower margins */
+  #status {
+    margin: 4px 0;
+  }
+
+  /* Amath-app gap: tighter spacing on mobile */
+  .amath-app {
+    gap: 6px;
+  }
+
+  /* Opponent/player areas: tight spacing */
+  .opponent-area, .player-area {
+    gap: 6px;
+  }
 }
 
 /* =============================================================================
@@ -1502,17 +1529,17 @@ body.theme-dark .score-sheet-table th {
 
 @media (max-width: 380px) {
   body {
-    padding: 4px;
+    padding: 2px;
   }
 
   :root {
-    --cell-size: calc((100vw - 22px) / 15);
-    --tile-size: calc((100vw - 22px) / 15 - 2px);
+    --cell-size: calc((100vw - 4px) / 15);
+    --tile-size: calc((100vw - 4px) / 15 - 2px);
     --rack-tile-size: 32px;
   }
 
   .tile-face {
-    font-size: calc((100vw - 22px) / 15 * 0.5);
+    font-size: calc((100vw - 4px) / 15 * 0.5);
   }
 
   .amath-rack-slot .amath-tile .tile-face {
