@@ -273,6 +273,55 @@ h1 {
     100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0); }
   }
 
+  /* ─── Thinking progress bar (CSS-animated, runs even when JS is busy) ─── */
+  .status-card.thinking {
+    border-color: #d97706;
+  }
+
+  .thinking-bar {
+    margin-top: 8px;
+    height: 4px;
+    background: rgba(217, 119, 6, 0.15);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .thinking-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #d97706 0%, #f59e0b 100%);
+    border-radius: 2px;
+    transform-origin: left center;
+    animation-name: thinkingProgress;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
+  }
+
+  @keyframes thinkingProgress {
+    from { width: 0%; }
+    to { width: 100%; }
+  }
+
+  /* Indeterminate shimmer overlay — moves continuously even when JS is busy */
+  .thinking-bar::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.4) 50%,
+      transparent 100%
+    );
+    animation: thinkingShimmer 1.5s linear infinite;
+    pointer-events: none;
+  }
+
+  @keyframes thinkingShimmer {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(100%); }
+  }
+
   body.theme-dark .status-card {
     background: linear-gradient(135deg, rgba(60, 50, 30, 0.5) 0%, rgba(50, 45, 30, 0.6) 100%);
     border-color: var(--border-medium);
