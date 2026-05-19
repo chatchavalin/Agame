@@ -260,6 +260,79 @@
     return false;
   }
 
+  /**
+   * Detects "easy hook" threats: empty 3E squares that the opponent can reach
+   * with a small number of tiles by using an existing nearby tile as a hook.
+   *
+   * This is a lighter-weight threat than ×9 — it covers the case where the
+   * opponent can hit a SINGLE 3E (×3 multiplier) cheaply, not just the double-3E ×9 case.
+   *
+   * @param board   The board to analyze
+   * @param maxGap  How few empty cells between the nearest tile and the 3E to flag (default 4)
+   * @returns array of threats: { row, col, hookRow, hookCol, gap }
+   */
+  function detectEasy3EHookThreats(board, maxGap) {
+    if (typeof maxGap !== 'number') maxGap = 4;
+    const threats = [];
+
+    for (const [tr, tc] of C.THREE_E_SQUARES) {
+      // Skip if the 3E square is already occupied
+      const cell = Board.getCell(board, tr, tc);
+      if (!cell || cell.tile) continue;
+
+      // Skip the center (7,7) — it's not really a "corner hook" risk in the same way
+      if (tr === 7 && tc === 7) continue;
+
+      // Check along the row: any tile within maxGap cells to left or right?
+      for (let dc = 1; dc <= maxGap; dc++) {
+        for (const sign of [-1, 1]) {
+          const r = tr;
+          const c = tc + sign * dc;
+          if (c < 0 || c >= C.BOARD_SIZE) continue;
+          const adj = Board.getCell(board, r, c);
+          if (adj && adj.tile) {
+            // Found a hook tile. Check that ALL cells between (tr,tc) and (r,c) are empty
+            // (so opponent can place a contiguous line of tiles to extend the equation)
+            let allEmpty = true;
+            const lo = Math.min(tc, c) + 1;
+            const hi = Math.max(tc, c) - 1;
+            for (let i = lo; i <= hi; i++) {
+              const m = Board.getCell(board, r, i);
+              if (m && m.tile) { allEmpty = false; break; }
+            }
+            if (allEmpty) {
+              threats.push({ row: tr, col: tc, hookRow: r, hookCol: c, gap: dc, direction: 'row' });
+            }
+          }
+        }
+      }
+
+      // Check along the column: any tile within maxGap cells up or down?
+      for (let dr = 1; dr <= maxGap; dr++) {
+        for (const sign of [-1, 1]) {
+          const r = tr + sign * dr;
+          const c = tc;
+          if (r < 0 || r >= C.BOARD_SIZE) continue;
+          const adj = Board.getCell(board, r, c);
+          if (adj && adj.tile) {
+            let allEmpty = true;
+            const lo = Math.min(tr, r) + 1;
+            const hi = Math.max(tr, r) - 1;
+            for (let i = lo; i <= hi; i++) {
+              const m = Board.getCell(board, i, c);
+              if (m && m.tile) { allEmpty = false; break; }
+            }
+            if (allEmpty) {
+              threats.push({ row: tr, col: tc, hookRow: r, hookCol: c, gap: dr, direction: 'col' });
+            }
+          }
+        }
+      }
+    }
+
+    return threats;
+  }
+
   window.AMath = window.AMath || {};
   window.AMath.aiX9 = {
     detectAllThreats: detectAllThreats,
@@ -267,5 +340,6 @@
     playBlocksThreat: playBlocksThreat,
     findOffensiveX9: findOffensiveX9,
     findDefensivePlay: findDefensivePlay,
+    detectEasy3EHookThreats: detectEasy3EHookThreats,
   };
 })();

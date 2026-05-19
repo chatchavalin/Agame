@@ -19,6 +19,7 @@
     tileSet: 'prathom',         // 'prathom' (70 tiles) | 'mathayom' (100 tiles)
     showAiHand: true,           // Show AI rack faces (debugging/learning aid)
     aiSwapBrain: 'brain1',      // 'brain1' (seed-keeping, stable) | 'brain2' (probability, experimental)
+    aiThinkSeconds: 180,        // AI thinking time per turn in seconds (30, 60, 120, 180, 300)
   };
 
   let current = null;
@@ -202,6 +203,23 @@
       '<p class="settings-hint">Brain 1 keeps a fixed seed template. Brain 2 computes expected score for many candidates. Brain 2 is experimental.</p>';
     dialog.appendChild(brainRow);
 
+    // Setting: AI Think Time
+    const thinkRow = document.createElement('div');
+    thinkRow.className = 'settings-row';
+    thinkRow.innerHTML =
+      '<label class="settings-label" for="setting-ai-think-time">' +
+      '<span>AI Thinking Time</span>' +
+      '</label>' +
+      '<select id="setting-ai-think-time" class="settings-select">' +
+      '<option value="30"' + (current.aiThinkSeconds === 30 ? ' selected' : '') + '>30 seconds (fastest)</option>' +
+      '<option value="60"' + (current.aiThinkSeconds === 60 ? ' selected' : '') + '>1 minute</option>' +
+      '<option value="120"' + (current.aiThinkSeconds === 120 ? ' selected' : '') + '>2 minutes</option>' +
+      '<option value="180"' + (current.aiThinkSeconds === 180 ? ' selected' : '') + '>3 minutes (default — best for Bingo finding)</option>' +
+      '<option value="300"' + (current.aiThinkSeconds === 300 ? ' selected' : '') + '>5 minutes (extremely thorough)</option>' +
+      '</select>' +
+      '<p class="settings-hint">How long the AI can think per turn. More time = better Bingos, especially with BLANKs.</p>';
+    dialog.appendChild(thinkRow);
+
     // Save + Close buttons
     const btnRow = document.createElement('div');
     btnRow.className = 'settings-buttons';
@@ -219,6 +237,7 @@
       const soundCheckbox = document.getElementById('setting-sound');
       const showAiHandCheckbox = document.getElementById('setting-show-ai-hand');
       const brainSelect = document.getElementById('setting-ai-swap-brain');
+      const thinkSelect = document.getElementById('setting-ai-think-time');
       current.gameMode = modeSelect.value;
       current.chessClockEnabled = clockCheckbox.checked;
       current.theme = themeSelect.value;
@@ -227,6 +246,7 @@
       current.soundEnabled = soundCheckbox.checked;
       current.showAiHand = showAiHandCheckbox.checked;
       if (brainSelect) current.aiSwapBrain = brainSelect.value;
+      if (thinkSelect) current.aiThinkSeconds = parseInt(thinkSelect.value, 10);
       save();
       applyTheme(current.theme);
       // Apply sound setting immediately

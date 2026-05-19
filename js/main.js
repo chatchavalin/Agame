@@ -512,6 +512,9 @@
 
     showStatus('🤖 ' + label + ' is thinking...');
 
+    // Capture start time so we can deduct from the AI's chess clock
+    const aiTurnStartTime = Date.now();
+
     setTimeout(function () {
       try {
         const decision = AI.decideMove({
@@ -524,6 +527,20 @@
           consecutiveNonScoringTurns: session.consecutiveNonScoringTurns || 0,
           opponentRack: isAi1 ? session.aiRack : session.playerRack,
         });
+
+        // Deduct AI's think time from its chess clock (sync search freezes setInterval)
+        if (session.chessClockEnabled) {
+          const elapsedSeconds = Math.floor((Date.now() - aiTurnStartTime) / 1000);
+          if (elapsedSeconds > 0) {
+            if (isAi1) {
+              session.playerTimeSeconds -= elapsedSeconds;
+              UI.renderTimer(session.uiParts.playerTimer, 'AI 1 Time', session.playerTimeSeconds);
+            } else {
+              session.aiTimeSeconds -= elapsedSeconds;
+              UI.renderTimer(session.uiParts.opponentTimer, 'AI 2 Time', session.aiTimeSeconds);
+            }
+          }
+        }
 
         // Execute decision
         if (decision.type === 'play') {
@@ -861,6 +878,43 @@
       // In AI vs AI mode, the tracker is meaningless since both racks are visible
       trackerEl.innerHTML = '<div class="live-score-empty">N/A in AI vs AI mode</div>';
     }
+
+    // Move the action button bar into the left panel on desktop
+    moveButtonBarToSidePanel();
+  }
+
+  // On desktop (≥1300px), move the action buttons from the game container
+  // into the left side panel. This keeps the buttons visible without
+  // requiring page scrolling. On mobile, leave buttons in their original
+  // location (under the player rack).
+  function moveButtonBarToSidePanel() {
+    const isDesktop = window.matchMedia('(min-width: 1300px)').matches;
+    const buttonBar = document.querySelector('.button-bar');
+    const slot = document.getElementById('desktop-actions-slot');
+    if (!buttonBar || !slot) return;
+
+    if (isDesktop) {
+      // Move into the slot if not already there
+      if (buttonBar.parentElement !== slot) {
+        slot.appendChild(buttonBar);
+        buttonBar.classList.add('button-bar-side');
+      }
+    } else {
+      // Mobile: move back to the game container (if it was moved)
+      if (buttonBar.classList.contains('button-bar-side')) {
+        const gameContainer = document.getElementById('game-container');
+        if (gameContainer) gameContainer.appendChild(buttonBar);
+        buttonBar.classList.remove('button-bar-side');
+      }
+    }
+  }
+
+  // Re-evaluate on viewport resize (e.g., user resizes window)
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', function () {
+      // Debounce — only reparent when crossing the breakpoint
+      moveButtonBarToSidePanel();
+    });
   }
 
   // ============================================================================
@@ -1151,6 +1205,10 @@
 
     showThinking(true);
 
+    // Capture the AI's start time so we can deduct from its timer afterward.
+    // (AI search is synchronous and blocks the JS thread — chess clock can't tick during it.)
+    const aiTurnStartTime = Date.now();
+
     setTimeout(function () {
       try {
         const aiDecision = AI.decideMove({
@@ -1163,6 +1221,21 @@
           consecutiveNonScoringTurns: session.consecutiveNonScoringTurns || 0,
           opponentRack: session.playerRack,
         });
+
+        // Deduct actual think time from AI's chess clock (compensating for the
+        // synchronous freeze during search — setInterval can't fire while JS is busy).
+        if (session.chessClockEnabled && !session.aiTimerPaused) {
+          const elapsedMs = Date.now() - aiTurnStartTime;
+          const elapsedSeconds = Math.floor(elapsedMs / 1000);
+          if (elapsedSeconds > 0) {
+            session.aiTimeSeconds -= elapsedSeconds;
+            window.AMath.ui.renderTimer(
+              session.uiParts.opponentTimer,
+              'AI Time',
+              session.aiTimeSeconds
+            );
+          }
+        }
 
         executeAiDecision(aiDecision);
       } catch (err) {
@@ -1495,21 +1568,77 @@
   // STATUS
   // ============================================================================
 
-  function showThinking(on) {
+  // Write status to BOTH the top #status and the desktop #status-card-body.
+  // On desktop, the top #status is hidden via CSS and the card is visible.
+  // On mobile, the top #status is visible and the card is hidden via CSS.
+  function setStatusText(text, color, fontWeight) {
     const status = document.getElementById('status');
-    if (!status) return;
-    if (on) {
-      status.textContent = '🤖 AI is thinking...';
-      status.style.color = '#6b7280';
-      status.style.fontWeight = '500';
+    const cardBody = document.getElementById('status-card-body');
+    const card = document.getElementById('status-card');
+    if (status) {
+      status.textContent = text;
+      status.style.color = color;
+      status.style.fontWeight = fontWeight;
+    }
+    if (cardBody) {
+      const prev = cardBody.textContent;
+      cardBody.textContent = text;
+      cardBody.style.color = color;
+      cardBody.style.fontWeight = fontWeight;
+      // Pulse animation when status text changes (but not on initial load)
+      if (card && prev && prev !== text && prev !== 'Loading...') {
+        card.classList.remove('pulse');
+        // Force reflow so the animation can restart
+        void card.offsetWidth;
+        card.classList.add('pulse');
+      }
     }
   }
 
+  function showThinking(on) {
+    const card = document.getElementById('status-card');
+
+    if (!on) {
+      // Hide the progress bar
+      if (card) {
+        const bar = card.querySelector('.thinking-bar');
+        if (bar) bar.remove();
+        card.classList.remove('thinking');
+      }
+      return;
+    }
+
+    // Read configured think time so we can inform the user
+    const seconds = (window.AMath.settings && window.AMath.settings.get)
+      ? (window.AMath.settings.get('aiThinkSeconds') || 180)
+      : 180;
+    const budgetText = seconds >= 60 ? Math.round(seconds / 60) + ' min' : seconds + 's';
+    setStatusText('🤖 AI is thinking... (up to ' + budgetText + ')', '#6b7280', '500');
+
+    // Add a CSS-animated progress bar.
+    // CSS animations run on the browser's compositor thread, NOT the JS thread,
+    // so this bar keeps animating even while AI's synchronous search has the
+    // JS thread blocked. Gives the user visual confirmation that the game
+    // isn't crashed — just thinking.
+    if (card) {
+      // Remove any old bar
+      const old = card.querySelector('.thinking-bar');
+      if (old) old.remove();
+
+      const bar = document.createElement('div');
+      bar.className = 'thinking-bar';
+      bar.innerHTML = '<div class="thinking-bar-fill" style="animation-duration: ' + seconds + 's"></div>';
+      card.appendChild(bar);
+      card.classList.add('thinking');
+    }
+
+    // Force a paint BEFORE the synchronous search starts blocking the thread.
+    // (The setTimeout in runAiTurn provides the actual yielding moment.)
+  }
+
   function showStatus(text, kind) {
-    const status = document.getElementById('status');
-    if (!status) return;
-    status.textContent = text;
-    status.style.color = kind === 'error' ? '#dc2626' : kind === 'success' ? '#059669' : '#1f2937';
-    status.style.fontWeight = kind === 'success' || kind === 'error' ? '600' : 'normal';
+    const color = kind === 'error' ? '#dc2626' : kind === 'success' ? '#059669' : '#1f2937';
+    const fontWeight = (kind === 'success' || kind === 'error') ? '600' : 'normal';
+    setStatusText(text, color, fontWeight);
   }
 })();

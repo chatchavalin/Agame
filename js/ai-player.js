@@ -16,8 +16,20 @@
   const Placement = window.AMath.placement;
   const Scoring = window.AMath.scoring;
 
-  const TIME_BUDGET_MS = 60000;            // 1 minute hard cap per spec
-  const MAX_CANDIDATES_PER_STAGE = 200000;
+  // AI thinking time per turn. Read from settings (default 180s = 3 min).
+  // Settings allows: 30, 60, 120, 180, 300 seconds.
+  function getTimeBudgetMs() {
+    try {
+      if (window.AMath && window.AMath.settings && window.AMath.settings.get) {
+        const seconds = window.AMath.settings.get('aiThinkSeconds');
+        if (typeof seconds === 'number' && seconds >= 10 && seconds <= 600) {
+          return seconds * 1000;
+        }
+      }
+    } catch (e) { /* fallback below */ }
+    return 180000; // 3 min default
+  }
+  const MAX_CANDIDATES_PER_STAGE = 1000000;  // Per-stage cap; multiplied by complexity
 
   // Track how many actual plays each AI rack has made (per-rack counters)
   // Key = rack.owner (e.g., 'ai', 'ai1', 'ai2', 'player' for takeover)
@@ -140,10 +152,26 @@
       }
     }
 
+    // === 2b. Fast Bingo Pattern Search ===
+    // Try pattern-based Bingo BEFORE expensive brute force.
+    // This handles 3-BLANK racks that brute force can't solve in time.
+    // Skip on first move — fast Bingo's tryFirstMoveBingo isn't implemented yet,
+    // and there are no anchor tiles on an empty board anyway.
+    let fastBingoPlay = null;
+    if (window.AMath.aiBingoFast && state.aiRack.tiles.length === 8 && !state.isFirstMove) {
+      const fastStart = Date.now();
+      // Give pattern search at most 5 seconds (it usually finishes in ms)
+      fastBingoPlay = window.AMath.aiBingoFast.findFastBingo(state, 5000);
+      if (fastBingoPlay) {
+        console.log('[AI] Fast Bingo found in ' + (Date.now() - fastStart) + 'ms, score=' + fastBingoPlay.score);
+      }
+    }
+
     // === 3. Search Bingo + YoYo + Regular plays ===
     const bingoPlay = findBestPlay(state.board, state.aiRack, state.isFirstMove, startTime);
+    const timeBudget = getTimeBudgetMs();
     let yoyoPlay = null;
-    if (window.AMath.aiYoyo && (Date.now() - startTime) < TIME_BUDGET_MS - 5000) {
+    if (window.AMath.aiYoyo && (Date.now() - startTime) < timeBudget - 5000) {
       yoyoPlay = window.AMath.aiYoyo.findBestYoYo({
         board: state.board,
         aiRack: state.aiRack,
@@ -151,8 +179,12 @@
       });
     }
 
-    // Identify the "best non-defense play"
+    // Identify the "best non-defense play" — compare brute force result with fast pattern result
     let bestPlay = pickBetterPlay(bingoPlay, yoyoPlay);
+    if (fastBingoPlay && (!bestPlay || fastBingoPlay.score > bestPlay.score)) {
+      console.log('[AI] Using fast pattern Bingo (' + fastBingoPlay.score + ' pts) over brute force result (' + (bestPlay ? bestPlay.score : 'none') + ')');
+      bestPlay = fastBingoPlay;
+    }
 
     // === Apply Rim Rule (Feature F) ===
     // Don't play on rim (row 0/14, col 0/14) unless:
@@ -205,6 +237,54 @@
       }
     }
 
+    // === 4b. ×4 threat avoidance ===
+    // Don't create plays that LEAVE two 2E squares reachable by a short opponent equation
+    // (opponent needs ≤7 tiles to hit both 2Es → ×4 multiplier on their equation).
+    //
+    // Risk/reward: AI scores N pts but gives opponent a chance for 30-80+ pts via ×4.
+    // We avoid creating such threats unless the AI's play scores VERY high (≥80 pts).
+    if (window.AMath.aiX4 && bestPlay && bestPlay.score < 80) {
+      const createsX4 = window.AMath.aiX4.wouldCreateX4Threat(state.board, bestPlay.placements);
+      if (createsX4) {
+        // Look for an alternative play that doesn't create a ×4 threat.
+        // Search through bingoPlay alternatives and yoyoPlay.
+        const altCandidates = [];
+        if (bingoPlay && bingoPlay !== bestPlay) altCandidates.push(bingoPlay);
+        if (bingoPlay && bingoPlay._bestNonRim) altCandidates.push(bingoPlay._bestNonRim);
+        if (yoyoPlay && yoyoPlay !== bestPlay) altCandidates.push(yoyoPlay);
+
+        let safeAlt = null;
+        for (const alt of altCandidates) {
+          if (!alt || !alt.placements) continue;
+          // Require alternative to score reasonably (at least half of bestPlay, or 8+ pts)
+          if (alt.score < Math.max(8, bestPlay.score * 0.5)) continue;
+          const altCreatesX4 = window.AMath.aiX4.wouldCreateX4Threat(state.board, alt.placements);
+          if (!altCreatesX4) {
+            safeAlt = alt;
+            break;
+          }
+        }
+
+        if (safeAlt) {
+          console.log('[AI] ×4 avoidance: switching from ' + bestPlay.score + '-pt play (creates ×4 threat) to ' +
+                      safeAlt.score + '-pt safe play');
+          bestPlay = safeAlt;
+        } else {
+          // No safe alternative. Decision based on score:
+          //   - Score < 40 AND can swap: swap instead (giving opponent ×4 isn't worth a small play)
+          //   - Score 40-79: play it (the points are worth the risk)
+          //   - Score ≥80: handled by outer condition (skip this block entirely)
+          if (bestPlay.score < 40 && bagSize > C.SWAP_FORBIDDEN_BAG_THRESHOLD) {
+            console.log('[AI] ×4 avoidance: best play scores only ' + bestPlay.score +
+                        ' pts AND creates ×4 threat — swapping instead (opponent could score 30+ with ×4)');
+            return smartSwap(state);
+          }
+          console.log('[AI] ×4 avoidance: best play creates ×4 threat (' + bestPlay.score +
+                      ' pts) but no safe alternative — playing anyway since score is decent');
+        }
+      }
+    }
+
     // === 5. Bingo/YoYo-only mode ===
     if (bingoYoyoOnlyMode) {
       // Only allow Bingo or YoYo plays
@@ -219,13 +299,57 @@
         };
       }
 
-      // EXCEPTION: Rack has 2+ BLANKs and we found a decent non-Bingo play.
-      // Brute-force search likely couldn't explore all BLANK combinations within
-      // the time budget. Better to play a good non-Bingo than waste turns swapping.
-      const blanksInRack = state.aiRack.tiles.filter(t => t.type === 'blank').length;
-      if (bestPlay && blanksInRack >= 2 && bestPlay.score >= 10) {
-        console.log('[AI] Bingo-only override: ' + blanksInRack + ' BLANKs in rack, playing ' +
-                    bestPlay.score + '-pt fallback (search couldn\'t find Bingo in budget)');
+      // EXCEPTIONS to bingo-only rule — when bingo is unlikely or impossible.
+      //
+      // CRITICAL: Never waste BLANKs on low-value plays.
+      // BLANKs are the most valuable tiles (any value, worth 0 points).
+      // Playing a 12-pt equation that uses 3 BLANKs is a strategic disaster.
+      //
+      // Rules:
+      // - If the best play USES BLANK(s), score must be MUCH higher to justify it:
+      //     1 BLANK used: requires 40+ pts
+      //     2 BLANKs used: requires 60+ pts
+      //     3+ BLANKs used: requires 80+ pts (essentially must be a Bingo)
+      // - If best play uses NO BLANKs, the original 10-pt threshold applies.
+      // - If rack has BLANKs but the best play doesn't use them, that's fine (BLANKs preserved).
+      const rackTiles = state.aiRack.tiles;
+      const blanksInRack = rackTiles.filter(t => t.type === 'blank').length;
+      const opsInRack = rackTiles.filter(t => t.type === 'op' || t.type === 'choice').length;
+      const equalsInRack = rackTiles.filter(t => t.type === 'equals').length;
+      const numbersInRack = rackTiles.filter(t => t.type === 'digit' || t.type === 'twodigit').length;
+
+      // Count BLANKs USED in best play
+      const blanksUsedInPlay = bestPlay
+        ? bestPlay.placements.filter(p => p.tile && p.tile.type === 'blank').length
+        : 0;
+
+      // Score threshold required for a non-Bingo play, scaled by BLANKs used
+      let scoreThreshold = 10;
+      if (blanksUsedInPlay === 1) scoreThreshold = 40;
+      else if (blanksUsedInPlay === 2) scoreThreshold = 60;
+      else if (blanksUsedInPlay >= 3) scoreThreshold = 80;
+
+      // A Bingo needs roughly: 4 numbers + 3 ops + 1 equals (or 5 numbers + 2 ops + 1 equals).
+      const flexNumbers = numbersInRack + blanksInRack;
+      const tooManyOps = opsInRack > 3;
+      const notEnoughNumbers = flexNumbers < 4;
+      const noEqualsAvailable = equalsInRack === 0 && blanksInRack === 0;
+      const bingoInfeasible = tooManyOps || notEnoughNumbers || noEqualsAvailable;
+
+      // Trigger override when:
+      //   (a) 2+ BLANKs in rack (search budget likely incomplete), OR
+      //   (b) Bingo composition infeasible
+      // AND the best play is worth its BLANK cost
+      const shouldOverride = bestPlay && bestPlay.score >= scoreThreshold &&
+                             (blanksInRack >= 2 || bingoInfeasible);
+
+      if (shouldOverride) {
+        const reason = blanksInRack >= 2
+          ? blanksInRack + ' BLANKs in rack'
+          : 'Bingo infeasible (ops=' + opsInRack + ' nums+blanks=' + flexNumbers + ' eq=' + equalsInRack + ')';
+        console.log('[AI] Bingo-only override: ' + reason +
+                    ', playing ' + bestPlay.score + '-pt fallback' +
+                    ' (used ' + blanksUsedInPlay + ' BLANKs, threshold was ' + scoreThreshold + ')');
         recordPlay(rackOwner);
         return {
           type: 'play',
@@ -235,7 +359,14 @@
         };
       }
 
-      // No Bingo/YoYo found — swap if possible, otherwise pass (skip normal-play fallthrough)
+      // Did not meet threshold — log why and fall through to swap
+      if (bestPlay && blanksInRack >= 2) {
+        console.log('[AI] Bingo-only mode: best play scored ' + bestPlay.score +
+                    ' pts using ' + blanksUsedInPlay + ' BLANKs — below threshold ' + scoreThreshold +
+                    '. Swapping non-BLANKs to preserve BLANKs.');
+      }
+
+      // No Bingo/YoYo found — swap if possible, otherwise pass
       if (bagSize > C.SWAP_FORBIDDEN_BAG_THRESHOLD) {
         return smartSwap(state);
       }
@@ -255,16 +386,21 @@
 
     // === 6. Lead 150+ closing mode (Feature G) ===
     // Goal: maintain the lead by playing safe + offload hard tiles.
-    // Priority: Score > Safety (no new ×9) > Rack management > Bag prediction
+    // Priority: Score > Safety (no new ×9 or ×4) > Rack management > Bag prediction
     if (isLead150 && bestPlay) {
       // Check if best play creates a new ×9 threat (Safety check)
       const createsNewX9 = wouldCreateX9Threat(state.board, bestPlay.placements);
+      const createsNewX4 = wouldCreateX4Threat(state.board, bestPlay.placements);
 
-      if (createsNewX9) {
+      if (createsNewX9 || createsNewX4) {
         // Try non-rim alternative from bingoPlay's tracking, or fallback to yoyoPlay
         const nonRimAlt = bingoPlay ? bingoPlay._bestNonRim : null;
         const safeAlt = pickBetterPlay(nonRimAlt, yoyoPlay);
-        if (safeAlt && !wouldCreateX9Threat(state.board, safeAlt.placements)) {
+        if (safeAlt &&
+            !wouldCreateX9Threat(state.board, safeAlt.placements) &&
+            !wouldCreateX4Threat(state.board, safeAlt.placements)) {
+          console.log('[AI] Lead-150 mode: switched to safer alt (avoiding ' +
+                      (createsNewX9 ? '×9' : '×4') + ' threat)');
           bestPlay = safeAlt;
         }
         // If still unsafe, play anyway — score matters most per user priority
@@ -295,6 +431,64 @@
 
     // === 7. Normal mode ===
     if (bestPlay) {
+      // ×4 threat avoidance: check if this play opens up a 2E+2E line for opponent
+      // Try alternatives if so.
+      if (!state.isFirstMove && wouldCreateX4Threat(state.board, bestPlay.placements)) {
+        console.log('[AI] ×4 threat detected: best play opens 2E+2E line for opponent');
+        const alternatives = [
+          bingoPlay && bingoPlay._bestNonRim,
+          yoyoPlay,
+        ].filter(Boolean);
+        const safePlay = pickSafePlay(bestPlay, alternatives, state.board);
+        if (safePlay !== bestPlay) {
+          console.log('[AI] Switched to safer alternative: ' + safePlay.score + ' pts (vs ' + bestPlay.score + ' pts)');
+          bestPlay = safePlay;
+        } else {
+          console.log('[AI] No safe alternative found — accepting ×4 risk');
+        }
+      }
+
+      // BLANK preservation check — never burn BLANKs on low-value plays
+      const blanksUsed = bestPlay.placements.filter(p => p.tile && p.tile.type === 'blank').length;
+      const blanksLeftInRack = state.aiRack.tiles.filter(t => t.type === 'blank').length;
+
+      let minScoreForBlanks = 0;
+      if (blanksUsed === 1) minScoreForBlanks = 20;       // 1 BLANK: needs 20+ pts
+      else if (blanksUsed === 2) minScoreForBlanks = 45;  // 2 BLANKs: needs 45+ pts
+      else if (blanksUsed >= 3) minScoreForBlanks = 75;   // 3+ BLANKs: nearly Bingo only
+
+      if (blanksUsed > 0 && bestPlay.score < minScoreForBlanks) {
+        // Best play wastes BLANKs. Consider alternatives:
+        // 1. If we have a non-BLANK alternative, use it
+        // 2. Otherwise, swap non-BLANKs to find better tiles next turn
+        console.log('[AI] BLANK protection: best play uses ' + blanksUsed + ' BLANK(s) for only ' +
+                    bestPlay.score + ' pts (threshold ' + minScoreForBlanks + ').');
+
+        // Try the non-rim alternative if it doesn't use BLANKs heavily
+        const nonRimAlt = bingoPlay && bingoPlay._bestNonRim;
+        if (nonRimAlt) {
+          const altBlanks = nonRimAlt.placements.filter(p => p.tile && p.tile.type === 'blank').length;
+          if (altBlanks < blanksUsed && nonRimAlt.score >= 5) {
+            console.log('[AI] Using alternative play with fewer BLANKs: ' + nonRimAlt.score + ' pts, ' + altBlanks + ' BLANKs');
+            recordPlay(rackOwner);
+            return {
+              type: 'play',
+              placements: nonRimAlt.placements,
+              score: nonRimAlt.score,
+              equations: nonRimAlt.equations,
+            };
+          }
+        }
+
+        // No good alternative — swap non-BLANK tiles if bag allows, keeping BLANKs
+        if (bagSize > C.SWAP_FORBIDDEN_BAG_THRESHOLD) {
+          console.log('[AI] Swapping non-BLANKs to preserve BLANKs for a future Bingo');
+          return smartSwap(state);  // smart swap already protects BLANKs
+        }
+        // Bag too small — must play the bestPlay anyway
+        console.log('[AI] Bag too small to swap, playing the BLANK-heavy play anyway');
+      }
+
       recordPlay(rackOwner);
       return {
         type: 'play',
@@ -357,6 +551,7 @@
   function findBestPlay(board, aiRack, isFirstMove, startTime) {
     let bestPlay = null;
     let bestNonRimPlay = null;  // Best play that doesn't violate rim rule
+    let bestSafePlay = null;    // Best play by adjusted score (penalizing rim hooks)
     const rack = aiRack.tiles;
     if (rack.length === 0) return null;
 
@@ -366,10 +561,23 @@
 
     // Count BLANKs — boost candidate budget when many BLANKs present
     const blankCount = rack.filter(t => t.type === 'blank').length;
-    const candidateMultiplier = blankCount >= 3 ? 3 : (blankCount >= 2 ? 1.5 : 1);
+    const choiceCount = rack.filter(t => t.type === 'choice').length;
+
+    // Candidate budget multiplier scales with combinatorial complexity:
+    //   - Each BLANK: 4-15× search space (depending on pruning)
+    //   - Each choice (+/-, ×/÷): 2× search space
+    //   - First move (only 1 anchor): needs more thorough search
+    let candidateMultiplier = 1;
+    if (blankCount >= 3) candidateMultiplier = 5;
+    else if (blankCount >= 2) candidateMultiplier = 3;
+    else if (blankCount >= 1) candidateMultiplier = 2;
+    if (choiceCount >= 2) candidateMultiplier *= 1.5;
+    if (isFirstMove) candidateMultiplier *= 1.5;
+
     const maxCandidatesThisRack = Math.floor(MAX_CANDIDATES_PER_STAGE * candidateMultiplier);
-    if (blankCount >= 2) {
-      console.log('[AI] Rack has ' + blankCount + ' BLANKs — boosting candidate limit to ' + maxCandidatesThisRack);
+    if (candidateMultiplier > 1) {
+      console.log('[AI] Rack: ' + blankCount + ' BLANKs, ' + choiceCount + ' choices, isFirstMove=' + isFirstMove +
+                  ' — budget multiplier ' + candidateMultiplier + ' → ' + maxCandidatesThisRack);
     }
 
     const onValidPlay = (play) => {
@@ -383,6 +591,22 @@
           bestNonRimPlay = play;
         }
       }
+
+      // Track best "safe" play that doesn't create rim hooks for opponent.
+      // A "rim hook" = a tile placed on row 0/14 or col 0/14 (the rim itself).
+      // Each rim tile gives opponent an easy hook to corner 3X / 2X premium squares
+      // on the perpendicular row/col. We score plays by adjusted score:
+      //   adjustedScore = score - (rimTileCount × RIM_HOOK_PENALTY)
+      // and pick the highest. Penalty is set so a 30-pt safety gain typically
+      // outweighs a single rim hook.
+      const rimTilesPlaced = countRimTilesInPlay(play.placements);
+      const RIM_HOOK_PENALTY = 25;  // pts forfeited per rim tile
+      const adjustedScore = play.score - (rimTilesPlaced * RIM_HOOK_PENALTY);
+      play._adjustedScore = adjustedScore;
+      play._rimTilesPlaced = rimTilesPlaced;
+      if (!bestSafePlay || adjustedScore > bestSafePlay._adjustedScore) {
+        bestSafePlay = play;
+      }
     };
 
     // Search plan: each stage gets an ABSOLUTE time budget in ms (not fractions),
@@ -391,16 +615,29 @@
     // Bingo: 1500ms (1.5s) — give it a real chance but don't starve smaller sizes
     // Each smaller size: 500ms guaranteed
     // Single tile: 200ms (rare)
+    // Time budget per stage scales with rack complexity AND user-configured total budget.
+    // The total budget is divided among stages, weighted toward Bingo (size 8).
+    //
+    // Default split for 180s total:
+    //   Size 8 (Bingo): 60s
+    //   Size 7-2: 15s each (90s total)
+    //   Size 1: 10s
+    //   Total: ~160s, leaving slack for YoYo + scoring
+    const totalBudgetMs = getTimeBudgetMs();
+    const bingoStageMs = Math.floor(totalBudgetMs * 0.33 * Math.min(candidateMultiplier, 1.5));
+    const otherStageMs = Math.floor(totalBudgetMs * 0.08 * Math.min(candidateMultiplier, 1.5));
+    const singleTileMs = Math.floor(totalBudgetMs * 0.05);
+
     const searchPlan = [];
 
     if (maxTiles === 8) {
-      searchPlan.push({ size: 8, budgetMs: 6000 }); // 6 seconds for Bingo search
+      searchPlan.push({ size: 8, budgetMs: bingoStageMs });
     }
     for (let n = 7; n >= 2; n--) {
-      if (n <= maxTiles) searchPlan.push({ size: n, budgetMs: 1200 });
+      if (n <= maxTiles) searchPlan.push({ size: n, budgetMs: otherStageMs });
     }
     if (!isFirstMove && maxTiles >= 1) {
-      searchPlan.push({ size: 1, budgetMs: 400 });
+      searchPlan.push({ size: 1, budgetMs: singleTileMs });
     }
 
     // Execute search plan
@@ -447,7 +684,7 @@
       );
 
       // Hard total time cap — safety net
-      if (Date.now() - startTime > TIME_BUDGET_MS + 1000) {
+      if (Date.now() - startTime > getTimeBudgetMs() + 1000) {
         console.log('[AI] Hard total time cap reached');
         break;
       }
@@ -479,6 +716,17 @@
       }
     }
     return false;
+  }
+
+  /** Counts how many NEW tiles in the play land on row 0/14 or col 0/14. */
+  function countRimTilesInPlay(placements) {
+    let count = 0;
+    for (const p of placements) {
+      if (p.row === 0 || p.row === 14 || p.col === 0 || p.col === 14) {
+        count++;
+      }
+    }
+    return count;
   }
 
   /** Returns true if any placement is on a 3E square. */
@@ -598,6 +846,125 @@
         window.AMath.board.removeTile(board, pa.row, pa.col);
       }
     }
+  }
+
+  /**
+   * Detects ×4 (2E + 2E) threats — when a line has two unused 2E squares
+   * close enough that the opponent could place a single equation crossing both.
+   *
+   * Returns true if AFTER placing `placements`, a NEW ×4 threat exists that
+   * did not exist BEFORE. (Pre-existing threats aren't AI's fault.)
+   *
+   * Heuristic:
+   *   - Both 2E cells empty + not premium-used
+   *   - Distance ≤ 9 cells (so 1 play, 8 rack tiles + 1 hook, can span them)
+   *   - At least one occupied cell exists in the row/col within reach
+   *     to serve as a hook/anchor
+   */
+  function wouldCreateX4Threat(board, placements) {
+    const SIZE = C.BOARD_SIZE;
+
+    function isUnused2E(cell) {
+      return cell && cell.premium === '2E' && !cell.premiumUsed && cell.tile === null;
+    }
+
+    // Enumerate all ×4 threats currently on the board (lines with 2E+2E reachable)
+    function findThreats() {
+      const threats = [];
+
+      // Rows
+      for (let r = 0; r < SIZE; r++) {
+        const twoE = [], tiles = [];
+        for (let c = 0; c < SIZE; c++) {
+          const cell = board.cells[r][c];
+          if (isUnused2E(cell)) twoE.push(c);
+          if (cell.tile !== null) tiles.push(c);
+        }
+        if (twoE.length < 2) continue;
+        for (let i = 0; i < twoE.length; i++) {
+          for (let j = i + 1; j < twoE.length; j++) {
+            const ca = twoE[i], cb = twoE[j];
+            if (cb - ca + 1 > 9) continue;
+            let hasHook = false;
+            for (const tc of tiles) {
+              if (tc >= ca && tc <= cb) { hasHook = true; break; }
+              if (tc === ca - 1 || tc === cb + 1) { hasHook = true; break; }
+            }
+            if (hasHook) threats.push('r' + r + ':' + ca + '-' + cb);
+          }
+        }
+      }
+
+      // Columns
+      for (let c = 0; c < SIZE; c++) {
+        const twoE = [], tiles = [];
+        for (let r = 0; r < SIZE; r++) {
+          const cell = board.cells[r][c];
+          if (isUnused2E(cell)) twoE.push(r);
+          if (cell.tile !== null) tiles.push(r);
+        }
+        if (twoE.length < 2) continue;
+        for (let i = 0; i < twoE.length; i++) {
+          for (let j = i + 1; j < twoE.length; j++) {
+            const ra = twoE[i], rb = twoE[j];
+            if (rb - ra + 1 > 9) continue;
+            let hasHook = false;
+            for (const tr of tiles) {
+              if (tr >= ra && tr <= rb) { hasHook = true; break; }
+              if (tr === ra - 1 || tr === rb + 1) { hasHook = true; break; }
+            }
+            if (hasHook) threats.push('c' + c + ':' + ra + '-' + rb);
+          }
+        }
+      }
+      return threats;
+    }
+
+    // Count threats BEFORE placement
+    const threatsBefore = new Set(findThreats());
+
+    // Simulate placement, count threats AFTER, undo
+    const placedAt = [];
+    try {
+      for (const p of placements) {
+        if (p.tile && !board.cells[p.row][p.col].tile) {
+          window.AMath.board.placeTile(board, p.row, p.col, p.tile);
+          placedAt.push({ row: p.row, col: p.col });
+        }
+      }
+      const threatsAfter = findThreats();
+      // Find threats that are NEW (didn't exist before)
+      for (const t of threatsAfter) {
+        if (!threatsBefore.has(t)) return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('[AI] wouldCreateX4Threat error:', err);
+      return false;
+    } finally {
+      for (const pa of placedAt) {
+        window.AMath.board.removeTile(board, pa.row, pa.col);
+      }
+    }
+  }
+
+  /**
+   * Compares two plays and returns the one that's safer + still high-scoring.
+   * Prefers plays that don't create ×4 threats.
+   */
+  function pickSafePlay(primary, alternatives, board) {
+    if (!primary) return null;
+    // If primary is safe, use it
+    if (!wouldCreateX4Threat(board, primary.placements)) return primary;
+    // Primary creates threat — try alternatives
+    for (const alt of alternatives) {
+      if (!alt) continue;
+      if (!wouldCreateX4Threat(board, alt.placements)) {
+        // Only swap if alternative score is reasonable (within 60% of primary)
+        if (alt.score >= primary.score * 0.6) return alt;
+      }
+    }
+    return primary;  // No safe alternative — accept the threat
   }
 
   function findAnchorCells(board, isFirstMove) {
