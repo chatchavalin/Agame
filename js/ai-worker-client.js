@@ -86,7 +86,6 @@
         settings.aiThinkSeconds = window.AMath.settings.get('aiThinkSeconds');
         settings.aiSwapBrain = window.AMath.settings.get('aiSwapBrain');
         settings.tileSet = window.AMath.settings.get('tileSet');
-        settings.disableSixPassEnd = window.AMath.settings.get('disableSixPassEnd');
       }
     } catch (e) {/* */}
 

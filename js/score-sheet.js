@@ -36,20 +36,7 @@
    * Format: 3-column (AI | Turn # | Player) — each row shows only one player's action.
    * Bingo plays shown in bold.
    */
-  /**
-   * Show the score sheet as a modal popup.
-   *
-   * @param playerScore current player score
-   * @param aiScore current AI score
-   * @param onClose optional callback fired AFTER the popup is dismissed
-   *   (via Close button OR backdrop click). Use this when the popup was
-   *   layered on top of another modal (e.g., game-end overlay) and you
-   *   need to restore that one when the user dismisses the score sheet.
-   * @param onNewGame optional callback. When provided, a "🔄 New Game"
-   *   button is rendered alongside Close so the user can start a fresh
-   *   game directly from the score sheet (useful at game end).
-   */
-  function showPopup(playerScore, aiScore, onClose, onNewGame) {
+  function showPopup(playerScore, aiScore) {
     const existing = document.querySelector('.score-sheet-overlay');
     if (existing) existing.remove();
 
@@ -102,10 +89,6 @@
           actionText = 'Pass';
         } else if (e.action === 'swap') {
           actionText = 'Swap';
-        } else if (e.action === 'challenged') {
-          actionText = '⚠️ Challenged';
-        } else if (e.action === 'play-uncontested-invalid') {
-          actionText = '+0 (let slide)';
         } else {
           actionText = String(e.score || '');
         }
@@ -129,36 +112,8 @@
     closeBtn.className = 'btn btn-primary';
     closeBtn.textContent = 'Close';
     closeBtn.style.marginTop = '16px';
-    closeBtn.addEventListener('click', function () {
-      overlay.remove();
-      if (typeof onClose === 'function') onClose();
-    });
+    closeBtn.addEventListener('click', () => overlay.remove());
     dialog.appendChild(closeBtn);
-
-    // Optional: New Game button (only when onNewGame is supplied — typically
-    // at end-of-game). Gives the user a direct route to start over without
-    // having to close this popup and find the button on the underlying
-    // game-end overlay.
-    if (typeof onNewGame === 'function') {
-      const newGameBtn = document.createElement('button');
-      newGameBtn.className = 'btn btn-secondary';
-      newGameBtn.textContent = '🔄 New Game';
-      newGameBtn.style.marginTop = '8px';
-      newGameBtn.style.width = '100%';
-      newGameBtn.addEventListener('click', function () {
-        overlay.remove();
-        onNewGame();
-      });
-      dialog.appendChild(newGameBtn);
-    }
-
-    // Backdrop click also dismisses (consistent with other modals)
-    overlay.addEventListener('click', function (e) {
-      if (e.target === overlay) {
-        overlay.remove();
-        if (typeof onClose === 'function') onClose();
-      }
-    });
 
     overlay.appendChild(dialog);
     document.body.appendChild(overlay);
@@ -223,10 +178,6 @@
         actionText = '—';
       } else if (e.action === 'swap') {
         actionText = '↻';
-      } else if (e.action === 'challenged') {
-        actionText = '⚠️';
-      } else if (e.action === 'play-uncontested-invalid') {
-        actionText = '+0';
       } else {
         actionText = '';
       }

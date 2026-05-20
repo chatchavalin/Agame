@@ -19,12 +19,6 @@
     soundEnabled: true,         // Play sound effects
     tileSet: 'prathom',         // 'prathom' (70 tiles) | 'mathayom' (100 tiles)
     showAiHand: true,           // Show AI rack faces (debugging/learning aid)
-    showBoardTilePoints: false, // Show point values on tiles placed on the board (off by default — cleaner board)
-    disableSixPassEnd: false,   // If true, game does NOT auto-end after 6 consecutive non-scoring turns
-                                // (the official rule). Default false → rule remains ACTIVE.
-    hideBlankFaceOnBoard: false,// If true, blank tiles placed on the board render with no text
-                                // and no dashed marker — visually identical to regular tiles.
-                                // Default false → current behavior (show assigned face + dashed orange border).
     aiSwapBrain: 'brain1',      // 'brain1' (seed-keeping, stable) | 'brain2' (probability, experimental)
     aiThinkSeconds: 180,        // AI thinking time per turn in seconds (30, 60, 120, 180, 300)
   };
@@ -154,20 +148,6 @@
       '</label>';
     dialog.appendChild(clockRow);
 
-    // Disable the 6-consecutive-passes auto-end rule — when ON, the game
-    // will NOT end after 6 non-scoring turns. Default OFF → the official
-    // A-Math rule remains active. Lives in the Game section as it changes
-    // game-end behavior, not visual prefs.
-    const disableSixPassRow = document.createElement('div');
-    disableSixPassRow.className = 'settings-row';
-    disableSixPassRow.innerHTML =
-      '<label class="settings-label">' +
-      '<input type="checkbox" id="setting-disable-six-pass-end"' +
-      (current.disableSixPassEnd ? ' checked' : '') +
-      '><span>Disable 6-consecutive-passes game end</span>' +
-      '</label>';
-    dialog.appendChild(disableSixPassRow);
-
     // ──────────────────────────────────────────────────────────────────
     // SECTION B — 🎨 Display
     // ──────────────────────────────────────────────────────────────────
@@ -197,30 +177,6 @@
       '><span>Show AI hand</span>' +
       '</label>';
     dialog.appendChild(showAiHandRow);
-
-    // Show tile points on board
-    const showPointsRow = document.createElement('div');
-    showPointsRow.className = 'settings-row';
-    showPointsRow.innerHTML =
-      '<label class="settings-label">' +
-      '<input type="checkbox" id="setting-show-board-points"' +
-      (current.showBoardTilePoints ? ' checked' : '') +
-      '><span>Show tile points on board</span>' +
-      '</label>';
-    dialog.appendChild(showPointsRow);
-
-    // Hide blank tile face on board — when ON, blanks placed on the board
-    // look exactly like regular tiles (no text, no dashed marker).
-    // Default OFF → keep the current behavior (assigned letter + dashed orange).
-    const hideBlankFaceRow = document.createElement('div');
-    hideBlankFaceRow.className = 'settings-row';
-    hideBlankFaceRow.innerHTML =
-      '<label class="settings-label">' +
-      '<input type="checkbox" id="setting-hide-blank-face"' +
-      (current.hideBlankFaceOnBoard ? ' checked' : '') +
-      '><span>Hide BLANK face</span>' +
-      '</label>';
-    dialog.appendChild(hideBlankFaceRow);
 
     // ──────────────────────────────────────────────────────────────────
     // SECTION C — 🤖 AI Behavior
@@ -307,9 +263,6 @@
       const ttCheckbox = document.getElementById('setting-trash-talk');
       const soundCheckbox = document.getElementById('setting-sound');
       const showAiHandCheckbox = document.getElementById('setting-show-ai-hand');
-      const showPointsCheckbox = document.getElementById('setting-show-board-points');
-      const hideBlankFaceCheckbox = document.getElementById('setting-hide-blank-face');
-      const disableSixPassCheckbox = document.getElementById('setting-disable-six-pass-end');
       const brainSelect = document.getElementById('setting-ai-swap-brain');
       const thinkSelect = document.getElementById('setting-ai-think-time');
       const ttLangSelect = document.getElementById('setting-trash-talk-lang');
@@ -325,9 +278,6 @@
       current.trashTalkEnabled = ttCheckbox.checked;
       current.soundEnabled = soundCheckbox.checked;
       current.showAiHand = showAiHandCheckbox.checked;
-      if (showPointsCheckbox) current.showBoardTilePoints = showPointsCheckbox.checked;
-      if (hideBlankFaceCheckbox) current.hideBlankFaceOnBoard = hideBlankFaceCheckbox.checked;
-      if (disableSixPassCheckbox) current.disableSixPassEnd = disableSixPassCheckbox.checked;
       if (brainSelect) current.aiSwapBrain = brainSelect.value;
       if (thinkSelect) current.aiThinkSeconds = parseInt(thinkSelect.value, 10);
       if (ttLangSelect) current.trashTalkLanguage = ttLangSelect.value;
