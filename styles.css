@@ -1077,9 +1077,9 @@ body.theme-dark .score-box.timer-paused::after {
 }
 
 .settings-row {
-  margin-bottom: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 12px;
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
 .settings-row:last-of-type {
@@ -1093,8 +1093,8 @@ body.theme-dark .score-box.timer-paused::after {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 24px 0 12px;
-  padding: 6px 10px;
+  margin: 18px 0 8px;
+  padding: 4px 10px;
   font-size: 13px;
   font-weight: 700;
   text-transform: uppercase;
@@ -1122,6 +1122,16 @@ body.theme-dark .score-box.timer-paused::after {
   font-weight: 500;
   color: var(--text-primary);
   cursor: pointer;
+}
+
+/* Label that sits as a block above its associated <select>. Used in the
+   minimal settings layout (no badges, no hint text). */
+.settings-label-block {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
 }
 
 .settings-label input[type="checkbox"] {
@@ -2013,6 +2023,14 @@ body.theme-dark .score-sheet-table th {
   display: none;
 }
 
+/* Inline tile tracker panel (visible on mobile under the action buttons).
+   Hidden on desktop because the right side panel already shows the tracker
+   live — having both would be duplicative. The mobile media query later
+   re-shows it via `display: block`. */
+#tile-tracker-panel {
+  display: none;
+}
+
 /* =============================================================================
    RESPONSIVE — MOBILE PORTRAIT
    Use viewport-relative units so board fills available screen width.
@@ -2107,6 +2125,13 @@ body.theme-dark .score-sheet-table th {
   .timer-bar .timer-bar-slot {
     flex: 1 1 50%;
     text-align: center;
+  }
+
+  /* Show the inline tile tracker on mobile (it's hidden on desktop where the
+     side panel already displays it). Keep it compact. */
+  #tile-tracker-panel {
+    display: block;
+    margin-top: 8px;
   }
 }
 
