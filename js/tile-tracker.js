@@ -1,17 +1,26 @@
 /**
  * A-Math Game — Tile Tracker
  *
- * Shows the player how many tiles of each face are still unseen
- * (in the bag + opponent's rack). Helps with strategic planning.
+ * Shows the player how many tiles of each face are STILL IN PLAY —
+ * i.e., not yet placed on the board.
  *
- * "Unseen tiles" = TOTAL inventory − (your rack) − (tiles on board)
+ * "Tiles in play" = TOTAL inventory − (tiles on board)
+ *
+ * Includes tiles in: the bag, the opponent's rack, AND your own rack.
+ * On turn 1 with no board tiles placed yet, this shows the full inventory
+ * (70 for ประถม, 100 for มัธยม). As the game progresses and tiles get
+ * locked onto the board, those counts go down.
+ *
+ * Why include your own rack? Your rack tiles are still in play — they
+ * haven't been placed yet, and from a "what tiles still exist" standpoint
+ * they're equivalent to tiles in the bag or opponent's rack.
  */
 
 (function () {
   const C = window.AMath.constants;
 
   /**
-   * Compute the count of unseen tiles by face.
+   * Compute the count of tiles still in play (not on board) by face.
    * Returns { '0': 3, '1': 5, ..., '=': 7, 'BLANK': 2 }
    */
   function computeUnseenCounts(state) {
@@ -22,17 +31,13 @@
       counts[def.face] = def.count;
     }
 
-    // Subtract tiles in player rack
-    for (const t of state.playerRack.tiles) {
-      counts[t.face] = (counts[t.face] || 0) - 1;
-    }
-
-    // Subtract tiles on board
+    // Subtract only tiles ON THE BOARD. Tiles in either rack (yours OR the
+    // opponent's) are still in play and remain counted.
     for (let r = 0; r < C.BOARD_SIZE; r++) {
       for (let c = 0; c < C.BOARD_SIZE; c++) {
         const cell = state.board.cells[r][c];
         if (cell.tile) {
-          // For blanks placed with assigned value, the original face is BLANK
+          // For blanks placed with an assigned value, the original face is BLANK
           counts[cell.tile.face] = (counts[cell.tile.face] || 0) - 1;
         }
       }
@@ -53,7 +58,7 @@
 
     const title = document.createElement('div');
     title.className = 'tracker-title';
-    title.textContent = 'Tiles Remaining (in bag + opponent)';
+    title.textContent = 'Tiles Remaining (in bag + opponent + your rack)';
     container.appendChild(title);
 
     const grid = document.createElement('div');

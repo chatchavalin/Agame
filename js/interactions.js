@@ -159,13 +159,19 @@
   // ============================================================================
 
   function onRackTileClick(tileId) {
-    if (!state.isPlayerTurn) return;
+    // NOTE: we do NOT gate on isPlayerTurn here. Rack rearrangement
+    // (click-to-swap two rack tiles) is allowed at any time, including
+    // while the AI is thinking — so the player can organize tiles while
+    // waiting. Placement on the board is still gated by turn (see
+    // onBoardCellClick).
 
     // Sound feedback
     if (window.AMath.sounds) window.AMath.sounds.tileClick();
 
-    // If in swap mode, toggle tile in swap selection
+    // SWAP MODE (entered via the Swap button): toggle inclusion in swap-set
     if (state.swapMode) {
+      // Only allow during player's turn (swap is a turn action, requires bag tiles)
+      if (!state.isPlayerTurn) return;
       if (state.swapSelected.has(tileId)) {
         state.swapSelected.delete(tileId);
       } else {
@@ -175,13 +181,35 @@
       return;
     }
 
-    // Normal mode: toggle selection for placement
-    if (state.selectedTileId === tileId) {
-      state.selectedTileId = null;
-    } else {
+    // NORMAL MODE
+    // - First click selects a rack tile.
+    // - Second click on a DIFFERENT rack tile → swap their positions.
+    // - Second click on the SAME tile → deselect.
+    if (state.selectedTileId === null) {
+      // Nothing selected → select this tile.
+      // (During AI's turn we still allow this so the player can begin a
+      // rearrangement; the second click does the swap.)
       state.selectedTileId = tileId;
+      refreshUI();
+      return;
     }
-    refreshUI();
+
+    if (state.selectedTileId === tileId) {
+      // Click the same tile again → deselect.
+      state.selectedTileId = null;
+      refreshUI();
+      return;
+    }
+
+    // Different tile clicked while one is already selected → SWAP positions
+    // in the rack. Works regardless of whose turn it is.
+    const Rack = window.AMath.rack;
+    const swapped = Rack.swapTiles(state.playerRack, state.selectedTileId, tileId);
+    state.selectedTileId = null;
+    if (swapped) {
+      refreshUI();
+      if (state.onRackChanged) state.onRackChanged();
+    }
   }
 
   function onBoardCellClick(row, col) {

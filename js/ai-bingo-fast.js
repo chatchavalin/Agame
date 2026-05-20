@@ -57,11 +57,23 @@
     const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
     let attemptsCount = 0;
     let skippedDead = 0;
+
+    // Cross-anchor optimization: after the first Bingo is found, keep
+    // exploring OTHER anchors for a short bonus window. Different anchors can
+    // place the same equation pattern in different positions, hitting
+    // different premium squares for a higher score.
+    let bestResult = null;
+    let bestScore = -1;
+    let bonusDeadline = null;
+    const ANCHOR_BONUS_MS = 1200;
+
     for (const anchor of anchors) {
-      if (Date.now() - startTime > timeLimitMs) {
+      const now = Date.now();
+      if (now - startTime > timeLimitMs) {
         console.log('[FastBingo] Time limit reached after ' + attemptsCount + ' anchor attempts');
-        return null;
+        break;
       }
+      if (bonusDeadline && now > bonusDeadline) break;
 
       // Syntactic pre-filter: skip anchors whose every adjacent empty cell is
       // syntactically dead (no tile of any type can legally fit).
@@ -78,11 +90,22 @@
       }
 
       const result = tryBingoAtAnchor(state, anchor, startTime, timeLimitMs);
-      if (result) {
-        console.log('[FastBingo] Found Bingo at anchor (' + anchor.row + ',' + anchor.col + ') in ' + (Date.now() - startTime) + 'ms');
-        return result;
-      }
       attemptsCount++;
+      if (result && (result.score || 0) > bestScore) {
+        bestScore = result.score || 0;
+        bestResult = result;
+        if (!bonusDeadline) {
+          bonusDeadline = Date.now() + ANCHOR_BONUS_MS;
+        }
+      }
+    }
+
+    if (bestResult) {
+      console.log('[FastBingo] Found Bingo (score=' + bestScore + ') in ' +
+                  (Date.now() - startTime) + 'ms after checking ' +
+                  attemptsCount + ' anchors' +
+                  (skippedDead > 0 ? ', ' + skippedDead + ' skipped as dead' : ''));
+      return bestResult;
     }
 
     console.log('[FastBingo] No pattern Bingo found after checking ' + attemptsCount + ' anchors (' + (Date.now() - startTime) + 'ms)' +

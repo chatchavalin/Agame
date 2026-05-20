@@ -950,6 +950,20 @@
     let anchorsTried = 0;
     let anchorsSkippedDead = 0;
 
+    // Cross-anchor exploration: after the FIRST anchor finds a Bingo, allow
+    // a bonus window of additional anchor scanning so the AI can compare
+    // arrangements across anchors and pick the highest-scoring one. Different
+    // anchors place the same equation in different lateral/vertical positions,
+    // so high-value tiles may land on different premium squares from anchor
+    // to anchor.
+    //
+    // Note: the inner shape-loop also has its own ~1500ms bonus window after
+    // each anchor's first hit. To ensure there's TIME LEFT for trying other
+    // anchors after the inner exhausts, we set ANCHOR_BONUS_WINDOW_MS to be
+    // distinctly LONGER than the per-anchor window.
+    let anchorBonusDeadline = null;
+    const ANCHOR_BONUS_WINDOW_MS = 3500;
+
     const aiX9 = window.AMath.aiX9;
     const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
 
@@ -998,11 +1012,11 @@
       // Empirically: sorting by simplicity caused 3-BLANK anchor cases to time out.
 
       // Top-K: instead of stopping at first found, give a short "bonus window"
-      // after first hit to look for higher-scoring Bingos. Empirically: most
-      // grammar hits cluster — finding 2-3 alternatives takes ~300-800ms more
-      // and often yields +5-15 points improvement.
+      // after first hit per anchor to look for higher-scoring shape variants.
+      // We keep this small (1000ms) so there's time left for the OUTER anchor
+      // loop to try other anchors entirely (ANCHOR_BONUS_WINDOW_MS = 3500ms).
       let firstFoundAt = null;
-      const BONUS_WINDOW_MS = 1500;
+      const BONUS_WINDOW_MS = 1000;
 
       // Try each shape
       for (const shape of shapesForAnchor) {
@@ -1017,35 +1031,82 @@
         const result = tryAssignShape(shape, rackCat, deadline);
         if (!result || result.timeout) continue;
 
-        // Verify anchor is used in result
-        const anchorTokenIdx = findAnchorInTokens(result.tokens, anchor.tile.id);
-        if (anchorTokenIdx === -1) continue;
+        // Verify anchor is used in result.
+        // The anchor's tile.id is what tryAssignShape used to fill ONE slot —
+        // but the anchor's FACE may appear at multiple slots in the shape.
+        // Try EACH such slot as a lateral position for the equation; each
+        // produces a different board layout and possibly a different score.
+        const anchorFace = anchorConcrete.face;
+        const candidatePositions = findAllAnchorFacePositions(result.tokens, anchorFace);
+        if (candidatePositions.length === 0) continue;
 
-        // Build board placements (anchor stays put, other tiles get placed around)
-        const placements = buildBoardPlacements(state.board, result.tokens, anchor, anchorTokenIdx);
-        if (!placements) continue;
+        // Find where tryAssignShape originally placed the anchor tile —
+        // we'll need to SWAP, not just overwrite, when trying other positions.
+        const originalAnchorIdx = findAnchorInTokens(result.tokens, anchor.tile.id);
+        if (originalAnchorIdx === -1) continue;
 
-        // Validate on board
-        const validation = validatePlacementsOnBoard(state.board, placements);
-        if (!validation.valid) continue;
+        for (const anchorTokenIdx of candidatePositions) {
+          if (Date.now() > deadline) break;
 
-        // Score
-        const score = scoreBingo(state.board, placements, validation.equations);
-        if (score > bestScore) {
-          bestScore = score;
-          bestResult = {
-            type: 'play',
-            placements: placements,
-            score: score,
-            equations: validation.equations || [],
-          };
-          if (firstFoundAt === null) firstFoundAt = Date.now();
+          // Shallow-clone tokens so each candidate has independent slot refs.
+          const tokensCopy = result.tokens.map(t => Object.assign({}, t));
+
+          if (anchorTokenIdx !== originalAnchorIdx) {
+            // Swap tile + assigned together. The "assigned" field belongs to
+            // the tile (it says "this BLANK/choice tile is acting as <face>
+            // in this position"), so it must travel WITH the tile when we
+            // move it between slots.
+            const tileAtNew = result.tokens[anchorTokenIdx].tile;
+            const assignedAtNew = result.tokens[anchorTokenIdx].assigned;
+            const tileAtOrig = result.tokens[originalAnchorIdx].tile; // = anchor.tile
+            const assignedAtOrig = result.tokens[originalAnchorIdx].assigned;
+
+            tokensCopy[originalAnchorIdx] = Object.assign({},
+              tokensCopy[originalAnchorIdx], {
+                tile: tileAtNew,
+                assigned: assignedAtNew,
+                isAnchor: false,
+              });
+            tokensCopy[anchorTokenIdx] = Object.assign({},
+              tokensCopy[anchorTokenIdx], {
+                tile: tileAtOrig,
+                assigned: assignedAtOrig,
+                isAnchor: true,
+              });
+          }
+
+          // Build board placements (anchor stays put, other tiles get placed around)
+          const placements = buildBoardPlacements(state.board, tokensCopy, anchor, anchorTokenIdx);
+          if (!placements) continue;
+
+          // Validate on board
+          const validation = validatePlacementsOnBoard(state.board, placements);
+          if (!validation.valid) continue;
+
+          // Score
+          const score = scoreBingo(state.board, placements, validation.equations);
+          if (score > bestScore) {
+            bestScore = score;
+            bestResult = {
+              type: 'play',
+              placements: placements,
+              score: score,
+              equations: validation.equations || [],
+            };
+            if (firstFoundAt === null) firstFoundAt = Date.now();
+          }
         }
       }
-      // Done with this anchor; if we found something, prefer to stop and let
-      // brute force evaluate other anchors too. (Could continue to other anchors
-      // but that multiplies time and other anchors rarely yield better.)
-      if (bestResult) break;
+      // Done with this anchor. UNLIKE the previous version, we do NOT break
+      // immediately after finding a result — instead we let the OUTER anchor
+      // loop continue for a bonus window (anchorBonusDeadline). This allows
+      // the AI to compare arrangements across multiple anchors and pick the
+      // highest-scoring one. Other anchors often DO yield better scores when
+      // the high-value tiles can hit premium squares from a different angle.
+      if (bestResult && !anchorBonusDeadline) {
+        anchorBonusDeadline = Date.now() + ANCHOR_BONUS_WINDOW_MS;
+      }
+      if (anchorBonusDeadline && Date.now() > anchorBonusDeadline) break;
     }
 
     // === T-SHAPE / CROSS-ANCHOR PASS ===
@@ -1540,6 +1601,25 @@
       if (tokens[i].tile && tokens[i].tile.id === anchorId) return i;
     }
     return -1;
+  }
+
+  /**
+   * Find ALL token indices whose token-face matches the anchor's face.
+   * Used to try multiple lateral positions of the same equation: if a shape
+   * like "X + Y = Z + W" has the anchor face `+` at two slot positions, we
+   * can place the equation in two different lateral offsets relative to the
+   * fixed anchor cell — possibly hitting different premium squares.
+   *
+   * Returns array of indices (may be empty).
+   */
+  function findAllAnchorFacePositions(tokens, anchorFace) {
+    const positions = [];
+    for (let i = 0; i < tokens.length; i++) {
+      const t = tokens[i];
+      const tokenFace = t.assigned || t.face;
+      if (tokenFace === anchorFace) positions.push(i);
+    }
+    return positions;
   }
 
   /**

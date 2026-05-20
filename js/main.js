@@ -117,6 +117,28 @@
     stallingFiredCount = 0;
   }
 
+  // Helper: renderTimer that also updates the mobile-mirror timer-box if present
+  function renderTimerWithMirror(parts, which, label, seconds) {
+    const UI = window.AMath.ui;
+    if (which === 'ai') {
+      UI.renderTimer(parts.opponentTimer, label, seconds);
+      if (parts.opponentTimerMobile) UI.renderTimer(parts.opponentTimerMobile, label, seconds);
+    } else if (which === 'player') {
+      UI.renderTimer(parts.playerTimer, label, seconds);
+      if (parts.playerTimerMobile) UI.renderTimer(parts.playerTimerMobile, label, seconds);
+    }
+  }
+  function setTimerNoClockText(parts, which, label) {
+    const html = '<div class="timer-label">' + label + '</div><div class="timer-value">—</div>';
+    if (which === 'ai') {
+      parts.opponentTimer.innerHTML = html;
+      if (parts.opponentTimerMobile) parts.opponentTimerMobile.innerHTML = html;
+    } else if (which === 'player') {
+      parts.playerTimer.innerHTML = html;
+      if (parts.playerTimerMobile) parts.playerTimerMobile.innerHTML = html;
+    }
+  }
+
   /**
    * Handle the result from Settings.showPopup.
    *
@@ -237,12 +259,12 @@
     const startTimeSeconds = clockMinutes * 60;
 
     if (chessClockEnabled) {
-      UI.renderTimer(parts.opponentTimer, 'AI Time', startTimeSeconds);
-      UI.renderTimer(parts.playerTimer, 'Your Time', startTimeSeconds);
+      renderTimerWithMirror(parts, 'ai', 'AI Time', startTimeSeconds);
+      renderTimerWithMirror(parts, 'player', 'Your Time', startTimeSeconds);
     } else {
       // Show "—" instead of time
-      parts.opponentTimer.innerHTML = '<div class="timer-label">AI Time</div><div class="timer-value">—</div>';
-      parts.playerTimer.innerHTML = '<div class="timer-label">Your Time</div><div class="timer-value">—</div>';
+      setTimerNoClockText(parts, 'ai', 'AI Time');
+      setTimerNoClockText(parts, 'player', 'Your Time');
     }
 
     const playerGoesFirst = Math.random() < 0.5;
@@ -488,8 +510,8 @@
     UI.renderScore(parts.playerScoreBox, 'AI 1', 0);
 
     // No chess clock in AI vs AI mode (just for fun watching)
-    parts.opponentTimer.innerHTML = '<div class="timer-label">AI 2</div><div class="timer-value">—</div>';
-    parts.playerTimer.innerHTML = '<div class="timer-label">AI 1</div><div class="timer-value">—</div>';
+    setTimerNoClockText(parts, 'ai', 'AI 2');
+    setTimerNoClockText(parts, 'player', 'AI 1');
 
     session = {
       board: board,
@@ -649,9 +671,9 @@
         // session state precisely).
         if (session.chessClockEnabled) {
           if (isAi1) {
-            UI.renderTimer(session.uiParts.playerTimer, 'AI 1 Time', session.playerTimeSeconds);
+            renderTimerWithMirror(session.uiParts, 'player', 'AI 1 Time', session.playerTimeSeconds);
           } else {
-            UI.renderTimer(session.uiParts.opponentTimer, 'AI 2 Time', session.aiTimeSeconds);
+            renderTimerWithMirror(session.uiParts, 'ai', 'AI 2 Time', session.aiTimeSeconds);
           }
         }
 
@@ -748,11 +770,11 @@
 
     const chessClockEnabled = saved.chessClockEnabled;
     if (chessClockEnabled) {
-      UI.renderTimer(parts.opponentTimer, 'AI Time', saved.aiTimeSeconds);
-      UI.renderTimer(parts.playerTimer, 'Your Time', saved.playerTimeSeconds);
+      renderTimerWithMirror(parts, 'ai', 'AI Time', saved.aiTimeSeconds);
+      renderTimerWithMirror(parts, 'player', 'Your Time', saved.playerTimeSeconds);
     } else {
-      parts.opponentTimer.innerHTML = '<div class="timer-label">AI Time</div><div class="timer-value">—</div>';
-      parts.playerTimer.innerHTML = '<div class="timer-label">Your Time</div><div class="timer-value">—</div>';
+      setTimerNoClockText(parts, 'ai', 'AI Time');
+      setTimerNoClockText(parts, 'player', 'Your Time');
     }
 
     session = {
@@ -1046,18 +1068,14 @@
       if (session.isPlayerTurn) {
         if (session.playerTimerPaused) return; // pause-by-double-click
         session.playerTimeSeconds -= elapsedSeconds;
-        window.AMath.ui.renderTimer(
-          session.uiParts.playerTimer,
-          'Your Time',
-          session.playerTimeSeconds
+        renderTimerWithMirror(
+          session.uiParts, 'player', 'Your Time', session.playerTimeSeconds
         );
       } else {
         if (session.aiTimerPaused) return; // pause-by-double-click
         session.aiTimeSeconds -= elapsedSeconds;
-        window.AMath.ui.renderTimer(
-          session.uiParts.opponentTimer,
-          'AI Time',
-          session.aiTimeSeconds
+        renderTimerWithMirror(
+          session.uiParts, 'ai', 'AI Time', session.aiTimeSeconds
         );
       }
     }, 1000);

@@ -398,6 +398,20 @@
 
     root.appendChild(playerArea);
 
+    // Mobile-only bottom timer bar. On desktop it's hidden via CSS
+    // (.timer-bar { display: none }). On mobile, the inline timers next to
+    // each rack are hidden and these mirrors are shown instead, so the racks
+    // can claim full row width — which lets the BOARD claim full screen width.
+    const timerBar = document.createElement('div');
+    timerBar.className = 'timer-bar';
+    const timerBarAi = document.createElement('div');
+    timerBarAi.className = 'timer-box timer-bar-slot opponent-timer-mobile';
+    const timerBarPlayer = document.createElement('div');
+    timerBarPlayer.className = 'timer-box timer-bar-slot player-timer-mobile';
+    timerBar.appendChild(timerBarAi);
+    timerBar.appendChild(timerBarPlayer);
+    root.appendChild(timerBar);
+
     // Action buttons
     const buttonBar = document.createElement('div');
     buttonBar.className = 'button-bar';
@@ -445,9 +459,11 @@
       opponentScoreBox: opponentScoreBox,
       opponentRack: opponentRack,
       opponentTimer: opponentTimer,
+      opponentTimerMobile: timerBarAi,
       playerScoreBox: playerScoreBox,
       playerRack: playerRack,
       playerTimer: playerTimer,
+      playerTimerMobile: timerBarPlayer,
       buttonBar: buttonBar,
     };
   }

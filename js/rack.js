@@ -48,6 +48,21 @@
   }
 
   /**
+   * Swap the positions of two tiles within the rack, identified by id.
+   * Returns true on success, false if either tile is missing.
+   */
+  function swapTiles(rack, tileIdA, tileIdB) {
+    if (tileIdA === tileIdB) return false;
+    const idxA = rack.tiles.findIndex((t) => t.id === tileIdA);
+    const idxB = rack.tiles.findIndex((t) => t.id === tileIdB);
+    if (idxA === -1 || idxB === -1) return false;
+    const tmp = rack.tiles[idxA];
+    rack.tiles[idxA] = rack.tiles[idxB];
+    rack.tiles[idxB] = tmp;
+    return true;
+  }
+
+  /**
    * Draws tiles from the bag until rack has 8 (or bag is empty).
    * Returns the number of tiles actually drawn.
    */
@@ -96,6 +111,7 @@
     addTile: addTile,
     removeTile: removeTile,
     findTile: findTile,
+    swapTiles: swapTiles,
     refillFromBag: refillFromBag,
     rackPoints: rackPoints,
     rackSize: rackSize,
