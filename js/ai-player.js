@@ -116,9 +116,17 @@
    * Per pass-rule, 6 consecutive non-scoring turns end the game.
    * Endgame scoring: each player's remaining tile points are subtracted from score.
    *
+   * If the user has disabled the 6-pass auto-end rule
+   * (settings.disableSixPassEnd === true), this check is moot — passing
+   * cannot end the game via this path, so we always return false. This
+   * prevents the AI from making panicky last-resort plays when there is
+   * no actual impending game end.
+   *
    * @returns true if AI would lose or tie by passing
    */
   function wouldPassLoseGame(state) {
+    if (getStateSetting('disableSixPassEnd', false) === true) return false;
+
     const consecutiveNonScoring = state.consecutiveNonScoringTurns || 0;
     // Pass causes 6th non-scoring turn → game ends
     if (consecutiveNonScoring < 5) return false;

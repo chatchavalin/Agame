@@ -158,22 +158,79 @@
 
     const faceEl = document.createElement('span');
     faceEl.className = 'tile-face';
-    faceEl.textContent = formatFace(displayFace);
+    // Choice tiles (×/÷ and +/-) look terrible as a single 3-character string
+    // in a small tile — the slash collides with the symbols. Render them as
+    // two stacked glyphs separated by a thin horizontal rule, the way the
+    // real physical A-Math choice tile is printed. This is purely visual;
+    // the underlying face value is unchanged.
+    if (displayFace === '×/÷' || displayFace === '+/-') {
+      faceEl.classList.add('tile-face-stacked');
+      const top = document.createElement('span');
+      top.className = 'tile-face-top';
+      top.textContent = (displayFace === '×/÷') ? '×' : '+';
+      const bot = document.createElement('span');
+      bot.className = 'tile-face-bot';
+      bot.textContent = (displayFace === '×/÷') ? '÷' : '-';
+      faceEl.appendChild(top);
+      faceEl.appendChild(bot);
+    } else {
+      faceEl.textContent = formatFace(displayFace);
+    }
     el.appendChild(faceEl);
 
-    // Show point value as small subscript — ONLY when tile is in a rack
-    // (not when placed on the board). Once placed, the score is already
-    // counted; the subscript becomes visual clutter.
-    if (!onBoard && tile.points > 0) {
+    // Show point value as a small subscript.
+    // - In a RACK: always show (existing behavior; helps players plan).
+    // - On the BOARD: show only when the "Show tile points on board"
+    //   setting is ON (off by default — keeps the board cleaner).
+    // Points of 0 (e.g., BLANK tiles) are also rendered when the board
+    // setting is on, so users can spot blanks via "X₀".
+    let showPoints = !onBoard && tile.points > 0;
+    if (onBoard) {
+      try {
+        const s = window.AMath && window.AMath.settings;
+        if (s && s.get && s.get('showBoardTilePoints')) {
+          showPoints = true;  // always render, even points=0
+        }
+      } catch (e) {}
+    }
+    if (showPoints) {
       const ptsEl = document.createElement('span');
       ptsEl.className = 'tile-points';
       ptsEl.textContent = tile.points;
       el.appendChild(ptsEl);
     }
 
-    // BLANK indicator (if not yet assigned)
+    // BLANK indicators:
+    // - Unassigned blank in the rack: existing `tile-blank-unassigned` class
+    //   (renders as a "?" with dashed border per existing CSS).
+    // - ASSIGNED blank on the board: new `tile-blank-on-board` class.
+    //   These look like regular tiles (the assigned face is shown) but
+    //   are visually marked with a dashed outline + faded face color so
+    //   the player can tell them apart from "real" tiles of the same face.
+    //   Critical info: blanks score 0 and may affect strategy.
+    //
+    // The "Hide blank tile face on board" setting overrides the on-board
+    // appearance: when ON, an assigned blank renders with NO face text and
+    // NO dashed marker — visually identical to any other tile. Used when
+    // the player wants to test memory / avoid the visual hint.
     if (tile.type === 'blank' && !tile.assigned) {
       el.classList.add('tile-blank-unassigned');
+    } else if (onBoard && tile.type === 'blank' && tile.assigned) {
+      let hideBlankFace = false;
+      try {
+        const s = window.AMath && window.AMath.settings;
+        if (s && s.get) hideBlankFace = s.get('hideBlankFaceOnBoard') === true;
+      } catch (e) {}
+      if (hideBlankFace) {
+        // Wipe any face text we built earlier (including stacked sub-spans)
+        // and the points subscript so the tile is fully blank.
+        faceEl.textContent = '';
+        const pts = el.querySelector('.tile-points');
+        if (pts) pts.remove();
+        // Do NOT add tile-blank-on-board — we want it indistinguishable.
+      } else {
+        el.classList.add('tile-blank-on-board');
+      }
     }
 
     return el;
@@ -275,9 +332,31 @@
     scoreSheetBtn.style.marginTop = '8px';
     scoreSheetBtn.style.width = '100%';
     scoreSheetBtn.addEventListener('click', function () {
-      if (window.AMath.scoreSheet) {
-        window.AMath.scoreSheet.showPopup(info.playerScore, info.aiScore);
-      }
+      if (!window.AMath.scoreSheet) return;
+      // Hide (don't remove) the game-end overlay so the score sheet popup
+      // shows on its own. We pass an onClose callback to the score sheet
+      // so that closing it RESTORES the game-end overlay — the user lands
+      // back here with the "New Game" button still available.
+      overlay.style.display = 'none';
+      window.AMath.scoreSheet.showPopup(
+        info.playerScore,
+        info.aiScore,
+        function onScoreSheetClose() {
+          // Re-show the game-end overlay if it's still in the DOM (it will
+          // be unless someone called New Game in the meantime, which can't
+          // happen because the score sheet is modal).
+          if (overlay.parentNode) {
+            overlay.style.display = '';
+          }
+        },
+        // Also pass onNewGame so the score sheet renders its own
+        // "🔄 New Game" button — gives the user a direct path to a fresh
+        // game without having to close the score sheet first.
+        function onScoreSheetNewGame() {
+          overlay.remove();
+          if (info.onNewGame) info.onNewGame();
+        }
+      );
     });
     dialog.appendChild(scoreSheetBtn);
 
@@ -300,14 +379,30 @@
     // If isOpponent (AI rack) AND showAiHand is ON, render face-up
     const faceDown = isOpponent && !showAiHand;
 
-    // Always render 8 slots — empty slots are visible too
+    // Render all RACK_SIZE slots in their physical positions. The rack's
+    // slotMap records each tile's assigned slot (0..7); tilesBySlot()
+    // returns an array indexed by slot, with null for empty slots.
+    // This keeps tiles in place when others are placed on the board —
+    // they no longer "shift left" to fill the gap.
+    const Rack = window.AMath.rack;
+    const slotTiles = Rack.tilesBySlot ? Rack.tilesBySlot(rack) : null;
+
     for (let i = 0; i < C.RACK_SIZE; i++) {
       const slot = document.createElement('div');
       slot.className = 'amath-rack-slot';
       slot.dataset.slotIndex = i;
 
-      if (i < rack.tiles.length) {
-        const tile = rack.tiles[i];
+      // Prefer slot-based rendering (position-stable). Fall back to packed
+      // rendering for any old rack object that lacks slotMap (e.g., from
+      // a saved game pre-update).
+      let tile;
+      if (slotTiles) {
+        tile = slotTiles[i];
+      } else if (i < rack.tiles.length) {
+        tile = rack.tiles[i];
+      }
+
+      if (tile) {
         const tileEl = renderTile(tile, faceDown);
         slot.appendChild(tileEl);
       }

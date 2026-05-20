@@ -170,6 +170,21 @@
       } catch (e) { console.warn('rack rerender failed', e); }
     }
 
+    // Re-render the BOARD if showBoardTilePoints toggled — board tile
+    // rendering reads this setting to decide whether to show the points
+    // subscript. Refresh via interactions.refreshUI() so tentative-tile
+    // and ai-last-play highlights are also reapplied.
+    // Same refresh path for hideBlankFaceOnBoard: it changes how assigned
+    // blank tiles render on the board.
+    if (result.liveChanged.indexOf('showBoardTilePoints') !== -1 ||
+        result.liveChanged.indexOf('hideBlankFaceOnBoard') !== -1) {
+      try {
+        if (window.AMath.interactions && window.AMath.interactions.refreshUI) {
+          window.AMath.interactions.refreshUI();
+        }
+      } catch (e) { console.warn('board rerender failed', e); }
+    }
+
     // If something needs a new game, ask.
     if (result.restartChanged.length > 0) {
       const list = result.restartChanged.map(function (k) {
@@ -1150,12 +1165,18 @@
       session.isFirstMove
     );
 
+    // === INVALID PLAY PATH ===
+    // We no longer block invalid plays at submit. Instead, we COMMIT the
+    // play (tiles stay on the board, score = 0 for now) and let the AI
+    // raise a challenge if it spots the error. This is the proper A-Math
+    // rule: you can submit any equation you claim is valid; your opponent
+    // decides whether to challenge.
     if (!result.ok) {
-      showStatus('❌ ' + result.reason, 'error');
-      if (window.AMath.sounds) window.AMath.sounds.submitFail();
+      handleInvalidPlaySubmission(result);
       return;
     }
 
+    // === VALID PLAY PATH (unchanged) ===
     const scoreResult = Scoring.scorePlay(
       result.equations,
       session.board,
@@ -1210,9 +1231,196 @@
 
     if (checkGameEnd()) return;
 
+    // Player committed their move — no need to keep the AI's last-play
+    // highlight glowing anymore.
+    clearLastAiPlayHighlight();
+
     Interactions.setPlayerTurn(false);
     resetStallingWatch();
     setTimeout(runAiTurn, 800);
+  }
+
+  /**
+   * Handle the case where the player submits an invalid play. The play is
+   * committed to the board (tiles stay; score is 0), and the AI decides
+   * whether to challenge.
+   *
+   * Sequence when AI challenges:
+   *   1. Brief pause (~600ms)
+   *   2. Trash-talk BUILDUP message — "เอ๊ะ... โค้ชตี๋ขอดูสมการนี้ก่อน"
+   *   3. Brief pause (~1500ms)
+   *   4. Second BUILDUP message (50% chance)
+   *   5. CHALLENGE_REVEAL message — "🚨 CHALLENGE!"
+   *   6. Revert the play (tiles return to rack, board restored)
+   *   7. AI's turn begins (no penalty per user choice)
+   *
+   * Sequence when AI MISSES (rare):
+   *   1. CHALLENGE_MISS message — AI pretends to verify, lets it slide
+   *   2. Play stands but with score 0 — player loses turn anyway
+   *   3. AI's turn begins
+   */
+  function handleInvalidPlaySubmission(validationResult) {
+    const Board = window.AMath.board;
+    const Rack = window.AMath.rack;
+    const Interactions = window.AMath.interactions;
+    const Challenge = window.AMath.challenge;
+    const Settings = window.AMath.settings;
+
+    // Commit tiles to board permanently (mark them no longer tentative).
+    // The placements stay; only the tentative flag is removed so they
+    // visually settle. Score is NOT awarded.
+    const submittedPlacements = session.tentativePlacements.slice();
+    Interactions.clearTentativePlacements();
+    Interactions.refreshUI();
+
+    // Decide if AI will challenge
+    const difficulty = (Settings && Settings.get && Settings.get('difficulty')) || 'HARD';
+    const decision = Challenge.decideAiChallenge(validationResult, difficulty);
+
+    // Disable player controls during the challenge animation
+    Interactions.setPlayerTurn(false);
+    resetStallingWatch();
+
+    if (decision.challenge) {
+      // === AI CHALLENGES ===
+      runChallengeSequence(submittedPlacements, validationResult);
+    } else {
+      // === AI MISSES (rare) — play stands, player gets 0 points ===
+      runChallengeMissSequence(submittedPlacements);
+    }
+  }
+
+  /**
+   * Animate the challenge sequence: 1-2 buildup taunts, then the reveal,
+   * then revert the play.
+   */
+  function runChallengeSequence(submittedPlacements, validationResult) {
+    const Challenge = window.AMath.challenge;
+    const Board = window.AMath.board;
+    const Rack = window.AMath.rack;
+    const Interactions = window.AMath.interactions;
+
+    // Capture the session reference. If the user starts a new game (or resumes
+    // a save) mid-animation, `session` will be reassigned to a fresh object;
+    // we must bail out of the sequence rather than mutate the new game.
+    const sess = session;
+    function stillCurrent() {
+      return session === sess && !sess.gameOver;
+    }
+
+    // showStatus only when we know AI is challenging — keep it suspenseful
+    showStatus('🤔 AI is examining your play...');
+
+    // Schedule: buildup1 → (optional buildup2) → reveal → revert
+    const include2nd = Math.random() < 0.6;  // 60% chance of 2 buildup messages
+
+    setTimeout(function () {
+      if (!stillCurrent()) return;
+      fireTrashTalk('challenge_buildup', { force: true });
+    }, 700);
+
+    if (include2nd) {
+      setTimeout(function () {
+        if (!stillCurrent()) return;
+        fireTrashTalk('challenge_buildup', { force: true });
+      }, 2400);
+    }
+
+    const revealDelay = include2nd ? 4100 : 2400;
+    setTimeout(function () {
+      if (!stillCurrent()) return;
+      fireTrashTalk('challenge_reveal', { force: true });
+      showStatus('❌ AI challenged: ' + (validationResult.reason || 'Invalid play'), 'error');
+    }, revealDelay);
+
+    // Revert the play 1.2s after the reveal
+    setTimeout(function () {
+      if (!stillCurrent()) return;
+      // Return tiles from board to rack
+      for (const p of submittedPlacements) {
+        const tile = Board.removeTile(sess.board, p.row, p.col);
+        if (tile) {
+          tile.assigned = null;
+          Rack.addTile(sess.playerRack, tile);
+        }
+      }
+      Interactions.refreshUI();
+      showStatus('🔄 Your tiles are back in your rack. AI\'s turn.');
+
+      // This counts as a non-scoring turn for end-of-game detection
+      // (same as a pass/swap — the player consumed a turn without points).
+      sess.consecutiveNonScoringTurns++;
+
+      // Record in score sheet
+      if (window.AMath.scoreSheet) {
+        window.AMath.scoreSheet.recordTurn('player', 'challenged', 0, false, sess.playerScore);
+      }
+      // Sound: a "failed" cue
+      if (window.AMath.sounds && window.AMath.sounds.submitFail) {
+        window.AMath.sounds.submitFail();
+      }
+
+      autoSave();
+      if (checkGameEnd()) return;
+      // Player's turn is effectively consumed; AI's previous play (if any)
+      // is no longer the most recent thing to highlight.
+      sess.lastAiPlay = null;
+      setTimeout(runAiTurn, 1000);
+    }, revealDelay + 1200);
+  }
+
+  /**
+   * AI failed to spot the invalid play. Play stays committed but scores 0.
+   * Player effectively loses their turn (since no points awarded), AI moves on.
+   */
+  function runChallengeMissSequence(submittedPlacements) {
+    const Board = window.AMath.board;
+    const Rack = window.AMath.rack;
+
+    // Capture the session reference (see comment in runChallengeSequence).
+    const sess = session;
+    function stillCurrent() { return session === sess && !sess.gameOver; }
+
+    // Show a "AI considered and accepted" toast
+    setTimeout(function () {
+      if (!stillCurrent()) return;
+      fireTrashTalk('challenge_miss', { force: true });
+    }, 800);
+
+    // Mark premium squares used (the tiles ARE on the board now, even though
+    // they didn't score — premium squares would normally consume on a real play)
+    for (const p of submittedPlacements) {
+      Board.markPremiumUsed(sess.board, p.row, p.col);
+    }
+    // The play stays on the board (AI missed the error), so this CAN'T be
+    // the first move anymore. Mark it as such, otherwise the AI's next
+    // turn would still require a play through the center — but the center
+    // may already be occupied.
+    sess.isFirstMove = false;
+
+    setTimeout(function () {
+      if (!stillCurrent()) return;
+      // Refill the player's rack now (not earlier) — keeps the rack visually
+      // empty during the suspense so the player sees the consequence of
+      // their gamble before fresh tiles arrive.
+      Rack.refillFromBag(sess.playerRack, sess.bag);
+
+      // This 0-point play counts as a non-scoring turn for end-of-game detection.
+      sess.consecutiveNonScoringTurns++;
+
+      showStatus('Play accepted (no points scored). AI\'s turn.', 'info');
+      window.AMath.interactions.refreshUI();
+      // Score sheet: record as 0-point play
+      if (window.AMath.scoreSheet) {
+        window.AMath.scoreSheet.recordTurn('player', 'play-uncontested-invalid', 0, false, sess.playerScore);
+      }
+      autoSave();
+      if (checkGameEnd()) return;
+      // Player's turn is over (even though they scored 0); clear the
+      // previous AI highlight so the next AI play stands alone.
+      sess.lastAiPlay = null;
+      setTimeout(runAiTurn, 800);
+    }, 2200);
   }
 
   function handleReset() {
@@ -1269,6 +1477,9 @@
 
     if (checkGameEnd()) return;
 
+    // Player committed their move (pass) — clear the AI's previous play highlight.
+    clearLastAiPlayHighlight();
+
     Interactions.setPlayerTurn(false);
     resetStallingWatch();
     setTimeout(runAiTurn, 800);
@@ -1323,6 +1534,9 @@
     autoSave();
 
     if (checkGameEnd()) return;
+
+    // Player committed their move (swap) — clear the AI's previous play highlight.
+    clearLastAiPlayHighlight();
 
     Interactions.setPlayerTurn(false);
     resetStallingWatch();
@@ -1468,8 +1682,23 @@
         Anim.confettiBurst();
       }
 
-      const event = isBingo ? 'ai_bingo' : 'ai_play';
+      // Detect ×9: a play with 2+ NEW tiles on 3E squares creates a 9× multiplier
+      // (3 × 3 = 9). This is dramatic and rare — fire the special gloat toast.
+      const wasX9 = isX9Play(decision.placements);
+
+      const event = isBingo ? 'ai_bingo' : (wasX9 ? 'ai_x9' : 'ai_play');
       fireTrashTalk(event, { lastScore: decision.score });
+
+      // If it's BOTH a Bingo and a ×9 (very rare), follow up with the ×9
+      // gloat after the Bingo banner — both moments deserve coverage.
+      if (isBingo && wasX9) {
+        setTimeout(function () {
+          // Only fire if session hasn't changed (player didn't reset mid-anim).
+          if (session && !session.gameOver) {
+            fireTrashTalk('ai_x9', { lastScore: decision.score });
+          }
+        }, 1800);
+      }
     } else if (decision.type === 'swap') {
       const swapped = [];
       for (const tileId of decision.tileIds) {
@@ -1546,6 +1775,46 @@
       lastScore: extras && extras.lastScore,
       force: extras && extras.force,
     });
+  }
+
+  /**
+   * Clear the "AI's last play" highlight (amber border around the AI's most
+   * recently placed tiles). Called when the player completes their own move
+   * (submit/pass/swap), since at that point they no longer need a reminder
+   * of what the AI did — they're moving on. Also called when the play is
+   * reverted via challenge so the highlight isn't pointing at empty cells.
+   *
+   * Note: this also clears the challenge-relevant data. That's fine in
+   * the player's-turn-ending path because by then the player has decided
+   * NOT to challenge.
+   */
+  function clearLastAiPlayHighlight() {
+    if (!session) return;
+    session.lastAiPlay = null;
+    // Refresh so the visual border goes away immediately
+    if (window.AMath.interactions && window.AMath.interactions.refreshUI) {
+      window.AMath.interactions.refreshUI();
+    }
+  }
+
+  /**
+   * Returns true if the given list of placements forms a ×9 play — i.e.,
+   * 2 or more NEW tiles land on 3E (Triple Equation) squares. With both
+   * activating, the equation multiplier is 3 × 3 = 9. The 9 three-E
+   * squares sit at the 4 corners, the 4 edge-midpoints, and the center,
+   * so this also captures unusual configurations like (0,0)+(0,14) on
+   * the same row — still ×9.
+   */
+  function isX9Play(placements) {
+    if (!placements || placements.length < 2) return false;
+    const C = window.AMath.constants;
+    const threeE = new Set(C.THREE_E_SQUARES.map(rc => rc[0] + ',' + rc[1]));
+    let count = 0;
+    for (const p of placements) {
+      if (threeE.has(p.row + ',' + p.col)) count++;
+      if (count >= 2) return true;
+    }
+    return false;
   }
 
   /**
@@ -1642,7 +1911,16 @@
       }
     }
 
-    if (session.consecutiveNonScoringTurns >= C.CONSECUTIVE_NON_SCORING_TURNS_TO_END) {
+    // 6-consecutive-passes auto-end rule. The official A-Math rule ends the
+    // game after 6 non-scoring turns (3 per player). Users can disable this
+    // via the "Disable 6-consecutive-passes game end" setting (default off).
+    let sixPassDisabled = false;
+    try {
+      const s = window.AMath && window.AMath.settings;
+      if (s && s.get) sixPassDisabled = s.get('disableSixPassEnd') === true;
+    } catch (e) {}
+    if (!sixPassDisabled &&
+        session.consecutiveNonScoringTurns >= C.CONSECUTIVE_NON_SCORING_TURNS_TO_END) {
       finalizeGame('consecutive_passes');
       return true;
     }

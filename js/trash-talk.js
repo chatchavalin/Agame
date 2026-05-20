@@ -261,6 +261,89 @@
       "เทียน1เทียน2 จับมือกันรอลุ้น 'เล่นซะทีเถอะ!'",
       "จิณตา: 'โค้ชตี๋คะ ขอเริ่มคาบใหม่ก่อนเลยมั้ย เด็กคนนี้คิดนาน'",
     ],
+
+    // ─────────────────────────────────────────────────────────────────
+    // CHALLENGE_BUILDUP: AI suspects an invalid play, taunts BEFORE the reveal.
+    // Fired 1-2 times to build suspense, then the REVEAL fires.
+    // ─────────────────────────────────────────────────────────────────
+    CHALLENGE_BUILDUP: [
+      "เอ๊ะ... โค้ชตี๋ขอดูสมการนี้ก่อนนะ 🤔",
+      "หึ่ม... แน่ใจนะว่าสมการนี้ถูก?",
+      "โค้ชตี๋เอียงคอมอง... ใช่หรอออ?",
+      "พีซแอบกระซิบ: 'นี่มันถูกจริงเหรอ?'",
+      "ฟ้าจ้องสมการนิ่ง... รอนานเลย",
+      "เทียน1: 'พี่ๆ ดูตรงนี้สิ ฉันว่ามันแปลกๆ'",
+      "เทียน2: 'หือ? 5+3=9?? ลองคิดอีกที'",
+      "จิณตา: 'โค้ชตี๋คะ ตรวจหน่อยค่ะ ดูแปลกๆ'",
+      "ปุณ: 'รอแป๊บ ขอใช้เครื่องคิดเลขก่อน 🤓'",
+      "เพลงรักร้อง: 'ผิดหรอออ ผิดหรอออ...' 🎵",
+      "หึหึ... โค้ชตี๋เริ่มสงสัยแล้วนะ",
+      "โค้ชตี๋ยิ้มมุมปาก... 'นี่มัน...'",
+      "โค้ชตี๋นั่งคำนวณในใจ... 1+1=2... 2+3...",
+      "ทั้งโต๊ะเริ่มหันมามอง... เกิดอะไรขึ้น?",
+      "โค้ชตี๋: 'รอแป๊บนึง... ขอคำนวณก่อน'",
+      "พีซเริ่มหัวเราะ: 'อ่าว... 5552'",
+      "เทียน1เทียน2: 'พี่ๆ ดูดิ๊ ดูดิ๊'",
+      "จิณตา ทำหน้านิ่ง... แอบยิ้มมุมปาก",
+    ],
+
+    // ─────────────────────────────────────────────────────────────────
+    // CHALLENGE_REVEAL: AI calls out the invalid play. The "gotcha" moment.
+    // ─────────────────────────────────────────────────────────────────
+    CHALLENGE_REVEAL: [
+      "🚨 CHALLENGE! โค้ชตี๋ขอท้าทาย สมการนี้ผิด!",
+      "🚨 จับได้แล้ว! สมการไม่ถูกต้องนะ",
+      "🚨 ไม่ผ่าน! โค้ชตี๋ขอ challenge",
+      "🚨 หึ่ม... สมการผิด! ฉันท้าทาย",
+      "🚨 Challenge! แบบนี้ไปแข่งแย่แน่ๆ จริงๆ",
+      "🚨 เห็นมั้ย! บอกแล้วว่าผิด — challenge!",
+      "🚨 โค้ชตี๋ challenge — ลืม pattern อีกแล้ว เฮ้อ! 🤦",
+      "🚨 พีซ: 'challenge ไปเลยโค้ช ผิดชัดๆ!'",
+      "🚨 ฟ้ากระซิบ: 'โค้ชคะ challenge เถอะ ผิดแน่ๆ'",
+      "🚨 challenge! ทั้งโต๊ะรู้ว่ามันผิด",
+      "🚨 ใช่หรออออออ ที่จะเล่นแบบนี้? challenge!",
+      "🚨 หึหึ จับได้คาหนังคาเขา — challenge!",
+    ],
+
+    // ─────────────────────────────────────────────────────────────────
+    // CHALLENGE_MISS: VERY rare — AI fails to spot an invalid play.
+    // Only fires when difficulty allows a miss AND error was hard to spot.
+    // ─────────────────────────────────────────────────────────────────
+    CHALLENGE_MISS: [
+      "เอ๊ะ... โค้ชตี๋ดูแล้ว... โอเค ผ่าน 🤔 (จริงๆนะ?)",
+      "หึม... โค้ชตี๋ปล่อยให้ผ่าน คราวนี้นะ 😏",
+      "พีซ: 'ดูเหมือนจะถูกนะโค้ช...' (โค้ชตี๋พยักหน้า)",
+      "โค้ชตี๋: 'เอาเป็นว่าผ่านไปก่อน...' 🙃",
+      "จิณตา: 'อืมม... น่าจะถูก' (ไม่แน่ใจเท่าไหร่)",
+    ],
+
+    // ─────────────────────────────────────────────────────────────────
+    // AI_X9_PLAY: AI just played a ×9 multiplier (two 3E squares on one
+    // equation = score × 9). Pure gloat material — fires 100% of the time
+    // because ×9 plays are rare and dramatic.
+    // ─────────────────────────────────────────────────────────────────
+    AI_X9_PLAY: [
+      "โดน x9 แน่นอน! 💥",
+      "เสร็จฉันละ x9 รัวๆ 🔥",
+      "หึหึ... x9 ของจริงนะ ลองทาน 😏",
+      "โค้ชตี๋: 'นี่แหละความหมายของ x9 ของจริง'",
+      "🚀 x9 รัวๆ ดูดีๆ นะ — แบบนี้แหละเทคนิค",
+      "x9 มาแล้วจ้าาาา 🎯 จับให้อยู่!",
+      "ใครว่ามุม 3E คุมยาก? โค้ชตี๋โชว์ให้ดู — x9!",
+      "พีซ: 'โอ้โห โค้ช x9 เลยเหรอ?!' โค้ชตี๋: 'แน่นอน 😎'",
+      "ฟ้า: 'นี่มัน x9 หรือเปล่า?' โค้ชตี๋: 'ใช่จ้ะ x9 จริงๆ'",
+      "เทียน1เทียน2: 'พี่ๆ ดูดิ๊ x9!!!' 😱",
+      "จิณตา: 'อย่าบอกนะว่า... x9?' โค้ชตี๋พยักหน้ายิ้ม 😏",
+      "เพลงรักร้อง: 'x9 รัวๆ... x9 รัวๆ...' 🎵",
+      "ปุณ: 'เครื่องคิดเลขยังไม่ทันคำนวณเลย — x9!'",
+      "x9 ของโค้ชตี๋... แบบนี้แพ้แน่ๆ 💪",
+      "🚨 x9 เข้าแล้ว! กดเสร็จฉันละ 💯",
+      "ตรงนี้แหละ pattern x9 — ลืม pattern อีกแล้ว เฮ้อ! 🤦",
+      "โค้ชตี๋กด x9 แบบสบายๆ — ฝึกมานานนะ",
+      "ใช่หรออออออ? นี่มัน x9 ของแท้! 😤",
+      "x9 แลนด์ดิ้งสำเร็จ — เป้าคะแนนเข้าทาง 🎯",
+      "ทั้งโต๊ะตะลึง — x9 รัวๆ ของจริง",
+    ],
   };
 
   // Avoid repetition: queue of last 5 messages shown
@@ -313,7 +396,14 @@
    * the feature is broken.
    */
   function selectMessage(context, force) {
-    const chance = (context === 'STALLING') ? 0.70 : FIRE_CHANCE;
+    // Challenge sequence messages MUST fire (drama interruption — no skipping).
+    // STALLING fires often (70%). Everything else uses the default FIRE_CHANCE.
+    let chance = FIRE_CHANCE;
+    if (context === 'STALLING') chance = 0.70;
+    else if (context === 'CHALLENGE_BUILDUP') chance = 1.0;
+    else if (context === 'CHALLENGE_REVEAL') chance = 1.0;
+    else if (context === 'CHALLENGE_MISS') chance = 1.0;
+    else if (context === 'AI_X9_PLAY') chance = 1.0;
     if (!force && Math.random() > chance) return null;
 
     const rawPool = LIBRARY[context] || LIBRARY.NEUTRAL;
@@ -353,6 +443,10 @@
     if (event === 'opp_pass') return 'OPP_PASS';
     if (event === 'opp_swap') return 'OPP_SWAP';
     if (event === 'stalling') return 'STALLING';
+    if (event === 'challenge_buildup') return 'CHALLENGE_BUILDUP';
+    if (event === 'challenge_reveal') return 'CHALLENGE_REVEAL';
+    if (event === 'challenge_miss') return 'CHALLENGE_MISS';
+    if (event === 'ai_x9') return 'AI_X9_PLAY';
     if (event === 'ai_play') {
       if (state.lastScore && state.lastScore >= 50) return 'HIGH_SCORE_PLAY';
       if (deficit > 200) return 'BEHIND_200';
