@@ -118,16 +118,13 @@ h1 {
     padding: 0 16px;
   }
 
-  /* Constrain page to viewport height; allow vertical scroll as a safety
-     net in case the height computation underestimates the chrome (e.g.
-     after we added the active-turn glow padding to the rack rows, the
-     status card, the tile tracker side panel header, etc.). Without
-     `overflow: auto`, any underestimate clips the player rack out of view. */
+  /* Constrain page to viewport height so no scrolling needed */
   html, body {
     height: 100%;
+    overflow: hidden;
   }
+
   body {
-    overflow: auto;
     padding: 6px 12px;
   }
 
@@ -151,30 +148,22 @@ h1 {
 
   /* Dynamic cell sizing: pick the SMALLER of width-budget and height-budget.
    * Width budget: (viewport_w - 642px) / 15
-   *   642 = 2 × 280 (side panels) + 16 × 2 (gaps) + 16 × 2 (page padding) + slack
-   * Height budget: (viewport_h - 260px) / 15
-   *   Reserved chrome (in vertical order):
-   *     ~30px H1
-   *     ~36px status bar
-   *     ~70px opponent row (score + rack + active-turn glow border/padding)
-   *     ~70px player row (same)
-   *     ~32px timer row (when chess clock active)
-   *     ~10px margins between rows
-   *     ~12px body padding
-   *   Total ≈ 260px reserve.
+   * Height budget: (viewport_h - 200px) / 15
+   *   Reserved: ~30px H1, ~60px each rack row (×2), ~30px margins, ~20px gaps
+   *   Total reserve ≈ 200px → board can use viewport_h - 200px
    * Min 28px, max 40px.
    */
   :root {
     --cell-size: clamp(28px,
       min(
         calc((100vw - 642px) / 15),
-        calc((100vh - 260px) / 15)
+        calc((100vh - 200px) / 15)
       ),
       40px);
     --tile-size: clamp(26px,
       min(
         calc((100vw - 642px) / 15 - 2px),
-        calc((100vh - 260px) / 15 - 2px)
+        calc((100vh - 200px) / 15 - 2px)
       ),
       38px);
     --rack-tile-size: 38px;
@@ -229,8 +218,6 @@ h1 {
 
   .opponent-area, .player-area {
     gap: 6px;
-    /* Tighter active-turn padding on desktop — height budget is tight here. */
-    padding: 2px;
   }
 
   /* Side panel constrained to viewport */
@@ -537,19 +524,18 @@ h1 {
   }
 
   /* Recalculate center column for wider panels:
-   * = viewport - 32 padding - 640 panels - 40 gaps = viewport - 712
-   * Height reserve 260px (same rationale as the 1300px breakpoint above). */
+   * = viewport - 32 padding - 640 panels - 40 gaps = viewport - 712 */
   :root {
     --cell-size: clamp(28px,
       min(
         calc((100vw - 712px) / 15),
-        calc((100vh - 260px) / 15)
+        calc((100vh - 200px) / 15)
       ),
       42px);
     --tile-size: clamp(26px,
       min(
         calc((100vw - 712px) / 15 - 2px),
-        calc((100vh - 260px) / 15 - 2px)
+        calc((100vh - 200px) / 15 - 2px)
       ),
       40px);
   }
@@ -580,19 +566,18 @@ h1 {
     max-width: 2100px;
   }
 
-  /* Max cell size cap — kept reasonable so board doesn't dominate.
-   * Height reserve 260px (consistent with smaller breakpoints). */
+  /* Max cell size cap — kept reasonable so board doesn't dominate */
   :root {
     --cell-size: clamp(28px,
       min(
         calc((100vw - 712px) / 15),
-        calc((100vh - 260px) / 15)
+        calc((100vh - 200px) / 15)
       ),
       44px);
     --tile-size: clamp(26px,
       min(
         calc((100vw - 712px) / 15 - 2px),
-        calc((100vh - 260px) / 15 - 2px)
+        calc((100vh - 200px) / 15 - 2px)
       ),
       42px);
   }
@@ -624,83 +609,6 @@ h1 {
   gap: 12px;
   width: 100%;
   justify-content: space-between;
-  /* Subtle transitions so the active-turn highlight fades in/out smoothly
-     instead of snapping on. */
-  border: 2px solid transparent;
-  border-radius: 10px;
-  padding: 4px;
-  transition: border-color 0.4s ease, box-shadow 0.4s ease, background-color 0.4s ease;
-}
-
-/* ──────────────────────────────────────────────────────────────────
-   ACTIVE-TURN HIGHLIGHT
-   When it's a player's turn, the row containing that player's score +
-   rack gets a colored border and glow so the user can see at a glance
-   whose turn it is. The two rows alternate as turns change.
-   ──────────────────────────────────────────────────────────────────  */
-
-/* Player's turn — green glow on their row */
-.player-area.is-active-turn {
-  border-color: #22c55e;                                /* green-500 */
-  background-color: rgba(34, 197, 94, 0.08);            /* faint green tint */
-  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.25),
-              0 0 18px rgba(34, 197, 94, 0.35);
-}
-
-/* AI's turn — blue glow on AI row, with a slow pulse to reinforce
-   the "thinking" state. The pulse is GPU-cheap (box-shadow only). */
-.opponent-area.is-active-turn {
-  border-color: #3b82f6;                                /* blue-500 */
-  background-color: rgba(59, 130, 246, 0.08);           /* faint blue tint */
-  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.25),
-              0 0 18px rgba(59, 130, 246, 0.35);
-  animation: ai-thinking-pulse 1.8s ease-in-out infinite;
-}
-
-@keyframes ai-thinking-pulse {
-  0%, 100% {
-    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.25),
-                0 0 18px rgba(59, 130, 246, 0.35);
-  }
-  50% {
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4),
-                0 0 26px rgba(59, 130, 246, 0.6);
-  }
-}
-
-/* Dark theme: brighten the glow so it's visible against the dark
-   background. Standard colors look weak on dark blue. */
-body.theme-dark .player-area.is-active-turn {
-  background-color: rgba(34, 197, 94, 0.12);
-  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.45),
-              0 0 24px rgba(34, 197, 94, 0.55);
-}
-body.theme-dark .opponent-area.is-active-turn {
-  background-color: rgba(59, 130, 246, 0.12);
-  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.45),
-              0 0 24px rgba(59, 130, 246, 0.55);
-}
-body.theme-dark .opponent-area.is-active-turn {
-  animation: ai-thinking-pulse-dark 1.8s ease-in-out infinite;
-}
-@keyframes ai-thinking-pulse-dark {
-  0%, 100% {
-    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.45),
-                0 0 24px rgba(59, 130, 246, 0.55);
-  }
-  50% {
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.6),
-                0 0 32px rgba(59, 130, 246, 0.8);
-  }
-}
-
-/* Users who prefer reduced motion (system setting) get the static
-   highlight without the pulse. */
-@media (prefers-reduced-motion: reduce) {
-  .opponent-area.is-active-turn,
-  body.theme-dark .opponent-area.is-active-turn {
-    animation: none;
-  }
 }
 
 .board-area {
@@ -913,48 +821,6 @@ body.theme-dark .score-box.timer-paused::after {
   font-size: 14px;
 }
 
-/* ──────────────────────────────────────────────────────────────────
-   CHOICE TILES — ×/÷  and  +/-
-   Rendered as two stacked glyphs separated by a thin horizontal
-   rule, mimicking the printed physical A-Math tile. Both glyphs
-   sit inside .tile-face (the same container we already position),
-   so existing point-subscript positioning is unaffected.
-   ────────────────────────────────────────────────────────────── */
-.tile-face.tile-face-stacked {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  /* Take the full inner height of the tile so the divider line is
-     visually centered between the two glyphs. The padding keeps the
-     symbols away from the tile's border. */
-  padding: 1px 0;
-  line-height: 1;
-}
-
-.tile-face.tile-face-stacked .tile-face-top,
-.tile-face.tile-face-stacked .tile-face-bot {
-  display: block;
-  line-height: 1;
-  /* The two glyphs share the parent font-size but are scaled down
-     a touch so they fit comfortably with the divider between them. */
-  font-size: 0.78em;
-}
-
-/* Thin horizontal rule between the two glyphs. Uses a border on
-   the bottom symbol so it scales with the font and stays crisp on
-   high-DPI displays. */
-.tile-face.tile-face-stacked .tile-face-bot {
-  border-top: 1px solid currentColor;
-  margin-top: 1px;
-  padding-top: 1px;
-  /* Keep the rule short — slightly wider than the widest glyph so
-     it reads as a fraction bar, not as a full-tile line. */
-  min-width: 0.9em;
-  text-align: center;
-}
-/* End choice-tile stacked rendering */
-
 .amath-tile.tile-blank-unassigned {
   background: #f3f4f6;
   border-style: dashed;
@@ -962,22 +828,6 @@ body.theme-dark .score-box.timer-paused::after {
 
 .amath-tile.tile-blank-unassigned .tile-face {
   color: var(--text-secondary);
-}
-
-/* ──────────────────────────────────────────────────────────────────
-   BLANK TILE ON BOARD (assigned)
-   Light background + dashed orange border. Face unchanged — full
-   opacity, no italic. The pale fill is the "scream". ─────────── */
-.amath-tile.tile-blank-on-board {
-  background: #fff7ed;              /* orange-50 — very light warm white */
-  border-style: dashed;
-  border-color: #f97316;            /* orange-500 */
-  border-width: 2.5px;
-}
-
-body.theme-dark .amath-tile.tile-blank-on-board {
-  background: #fef3c7;              /* amber-100 — pale on dark bg */
-  border-color: #fb923c;            /* orange-400 */
 }
 
 /* =============================================================================
@@ -1003,32 +853,6 @@ body.theme-dark .amath-tile.tile-blank-on-board {
   outline-offset: 2px;
   background: #fee2e2;
   border-color: #dc2626;
-}
-
-/* ──────────────────────────────────────────────────────────────────
-   AI LAST-PLAY HIGHLIGHT
-   Persistent colored border around every tile the AI placed on its
-   most recent turn. Stays visible for the entire duration of the
-   player's turn (cleared when the player submits/passes/swaps).
-   Lets the player see at a glance what the AI just played, without
-   needing to keep the brief cell-pulse animation onscreen.
-   Uses a warm amber color so it's distinct from the blue selection
-   border, the dashed-blue tentative border, and the red swap-selection
-   border. ────────────────────────────────────────────────────────── */
-.amath-tile.tile-ai-last-play {
-  outline: 3px solid #f59e0b;       /* amber-500 — warm, attention-grabbing */
-  outline-offset: -1px;             /* sit just inside the cell edge */
-  box-shadow: 0 0 0 1px #f59e0b,
-              0 0 10px rgba(245, 158, 11, 0.55);
-  position: relative;
-  z-index: 2;                       /* float above neighbouring tile borders */
-}
-
-/* Dark theme: brighter glow against dark background */
-body.theme-dark .amath-tile.tile-ai-last-play {
-  outline-color: #fbbf24;           /* amber-400 — punchier on dark */
-  box-shadow: 0 0 0 1px #fbbf24,
-              0 0 14px rgba(251, 191, 36, 0.7);
 }
 
 .btn-tertiary {
@@ -1844,9 +1668,7 @@ body.theme-capture .amath-board .amath-tile .tile-points {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Above the game-end overlay (z-index 2000) so the score sheet can be
-     viewed from the end-of-game flow without being hidden behind it. */
-  z-index: 2100;
+  z-index: 1800;
   padding: 20px;
 }
 
