@@ -295,6 +295,7 @@
       selectedTileId: null,
       playerScore: 0,
       aiScore: 0,
+      aiActualPlayCount: 0,        // actual AI plays (not swaps/passes) — for bingo-only enforcement
       isFirstMove: true,
       gameOver: false,
       consecutiveNonScoringTurns: 0,
@@ -539,6 +540,9 @@
       selectedTileId: null,
       playerScore: 0,
       aiScore: 0,
+      aiActualPlayCount: 0,
+      ai1ActualPlayCount: 0,       // AI vs AI: separate counters for each AI
+      ai2ActualPlayCount: 0,
       isFirstMove: true,
       gameOver: false,
       consecutiveNonScoringTurns: 0,
@@ -677,6 +681,7 @@
           isFirstMove: session.isFirstMove,
           playerScore: isAi1 ? session.aiScore : session.playerScore,
           aiScore: isAi1 ? session.playerScore : session.aiScore,
+          aiActualPlayCount: isAi1 ? (session.ai1ActualPlayCount || 0) : (session.ai2ActualPlayCount || 0),
           consecutiveNonScoringTurns: session.consecutiveNonScoringTurns || 0,
           opponentRack: isAi1 ? session.aiRack : session.playerRack,
         });
@@ -706,6 +711,8 @@
           else session.aiScore += decision.score;
           session.isFirstMove = false;
           session.consecutiveNonScoringTurns = 0;
+          if (isAi1) session.ai1ActualPlayCount = (session.ai1ActualPlayCount || 0) + 1;
+          else session.ai2ActualPlayCount = (session.ai2ActualPlayCount || 0) + 1;
           Rack.refillFromBag(currentRack, session.bag);
 
           if (window.AMath.scoreSheet) {
@@ -803,6 +810,7 @@
       selectedTileId: null,
       playerScore: saved.playerScore,
       aiScore: saved.aiScore,
+      aiActualPlayCount: saved.aiActualPlayCount || 0,
       isFirstMove: saved.isFirstMove,
       gameOver: false,
       consecutiveNonScoringTurns: saved.consecutiveNonScoringTurns || 0,
@@ -1572,6 +1580,7 @@
           isFirstMove: session.isFirstMove,
           playerScore: session.playerScore,
           aiScore: session.aiScore,
+          aiActualPlayCount: session.aiActualPlayCount || 0,
           consecutiveNonScoringTurns: session.consecutiveNonScoringTurns || 0,
           opponentRack: session.playerRack,
         });
@@ -1642,6 +1651,7 @@
       session.aiScore += decision.score;
       session.isFirstMove = false;
       session.consecutiveNonScoringTurns = 0;
+      session.aiActualPlayCount = (session.aiActualPlayCount || 0) + 1;
       Rack.refillFromBag(session.aiRack, session.bag);
 
       // Record this play for potential challenge

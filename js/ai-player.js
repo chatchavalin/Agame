@@ -155,7 +155,13 @@
     const deficit = oppScore - myScore;        // positive = AI behind
     const lead = -deficit;                     // positive = AI ahead
 
-    const isFirstFourPlays = getPlayCount(rackOwner) < C.AI_BINGO_MODE_TURNS;
+    // Use the authoritative play count from the game session if provided.
+    // This is ALWAYS correct (session resets on new game, saved/restored properly).
+    // Fall back to internal counter only as a legacy safety net.
+    const aiPlayCount = (state.aiActualPlayCount !== undefined)
+      ? state.aiActualPlayCount
+      : getPlayCount(rackOwner);
+    const isFirstFourPlays = aiPlayCount < C.AI_BINGO_MODE_TURNS;
     const isBehind100 = deficit > C.AI_BEHIND_FOR_BINGO_MODE;
     const isBehind140 = deficit >= C.AI_LEAD_FOR_OFFENSE;
     const isLead150 = lead >= C.AI_LEAD_FOR_CLOSE;

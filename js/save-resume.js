@@ -28,6 +28,7 @@
         isPlayerTurn: state.isPlayerTurn,
         isFirstMove: state.isFirstMove,
         consecutiveNonScoringTurns: state.consecutiveNonScoringTurns,
+        aiActualPlayCount: state.aiActualPlayCount || 0,
         playerTimeSeconds: state.playerTimeSeconds,
         aiTimeSeconds: state.aiTimeSeconds,
         chessClockEnabled: state.chessClockEnabled,
