@@ -425,17 +425,19 @@
       <button class="btn btn-tertiary" id="btn-new-game">New Game</button>
       <button class="btn btn-icon" id="btn-export" title="Save game as file">💾</button>
       <button class="btn btn-icon" id="btn-import" title="Load game from file">📂</button>
-      <button class="btn btn-icon" id="btn-tracker" title="Tile Tracker">🔍</button>
       <button class="btn btn-icon" id="btn-score-sheet" title="Score Sheet">📋</button>
       <button class="btn btn-icon" id="btn-settings" title="Settings">⚙️</button>
       <input type="file" id="file-import-input" accept=".json" style="display:none">
     `;
     root.appendChild(buttonBar);
 
-    // Tile tracker panel (hidden by default)
+    // Tile tracker panel — always shown on mobile, hidden on desktop where
+    // the right side panel already displays the tracker. Visibility is
+    // controlled entirely by CSS media queries; don't set an inline style
+    // here or it would override the desktop "display: none" rule and cause
+    // a duplicate tracker to appear.
     const trackerPanel = document.createElement('div');
     trackerPanel.id = 'tile-tracker-panel';
-    trackerPanel.style.display = 'none';
     root.appendChild(trackerPanel);
 
     // AI vs AI control bar (hidden by default)

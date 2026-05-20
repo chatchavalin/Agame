@@ -111,7 +111,7 @@
     }
 
     // ──────────────────────────────────────────────────────────────────
-    // SECTION A — 🎮 Game Setup (restart-required settings live here)
+    // SECTION A — 🎮 Game Setup
     // ──────────────────────────────────────────────────────────────────
     addSectionHeader('🎮', 'Game Setup');
 
@@ -119,45 +119,37 @@
     const modeRow = document.createElement('div');
     modeRow.className = 'settings-row';
     modeRow.innerHTML =
-      '<div class="settings-label" style="display:block;margin-bottom:6px">' +
-      '<span>Game Mode</span> <span class="settings-badge-restart">needs new game</span>' +
-      '</div>' +
+      '<div class="settings-label-block">Game Mode</div>' +
       '<select id="setting-game-mode" class="settings-select">' +
-      '<option value="player_vs_ai"' + (current.gameMode === 'player_vs_ai' ? ' selected' : '') + '>Player vs AI (default)</option>' +
+      '<option value="player_vs_ai"' + (current.gameMode === 'player_vs_ai' ? ' selected' : '') + '>Player vs AI</option>' +
       '<option value="ai_vs_ai"' + (current.gameMode === 'ai_vs_ai' ? ' selected' : '') + '>AI vs AI (spectator)</option>' +
-      '</select>' +
-      '<p class="settings-hint">AI vs AI: watch two AIs play. You can pause and control speed.</p>';
+      '</select>';
     dialog.appendChild(modeRow);
 
     // Tile Set
     const tileSetRow = document.createElement('div');
     tileSetRow.className = 'settings-row';
     tileSetRow.innerHTML =
-      '<div class="settings-label" style="display:block;margin-bottom:6px">' +
-      '<span>Tile Set Edition</span> <span class="settings-badge-restart">needs new game</span>' +
-      '</div>' +
+      '<div class="settings-label-block">Tile Set</div>' +
       '<select id="setting-tile-set" class="settings-select">' +
-      '<option value="prathom"' + (current.tileSet === 'prathom' ? ' selected' : '') + '>ประถม Prathom (70 tiles — child-friendly)</option>' +
-      '<option value="mathayom"' + (current.tileSet === 'mathayom' ? ' selected' : '') + '>มัธยม Mathayom (100 tiles — standard)</option>' +
-      '</select>' +
-      '<p class="settings-hint">ประถม: fewer tiles, no 17/18/19, simpler operators. มัธยม: full 100-tile standard set.</p>';
+      '<option value="prathom"' + (current.tileSet === 'prathom' ? ' selected' : '') + '>ประถม Prathom (70 tiles)</option>' +
+      '<option value="mathayom"' + (current.tileSet === 'mathayom' ? ' selected' : '') + '>มัธยม Mathayom (100 tiles)</option>' +
+      '</select>';
     dialog.appendChild(tileSetRow);
 
-    // Chess clock toggle
+    // Chess clock
     const clockRow = document.createElement('div');
     clockRow.className = 'settings-row';
     clockRow.innerHTML =
       '<label class="settings-label">' +
       '<input type="checkbox" id="setting-chess-clock"' +
       (current.chessClockEnabled ? ' checked' : '') +
-      '>' +
-      '<span>Enable chess clock (22 min/player)</span> <span class="settings-badge-restart">needs new game</span>' +
-      '</label>' +
-      '<p class="settings-hint">When off: no time limit, no time penalty.</p>';
+      '><span>Chess clock (22 min/player)</span>' +
+      '</label>';
     dialog.appendChild(clockRow);
 
     // ──────────────────────────────────────────────────────────────────
-    // SECTION B — 🎨 Display (live-applied visual settings)
+    // SECTION B — 🎨 Display
     // ──────────────────────────────────────────────────────────────────
     addSectionHeader('🎨', 'Display');
 
@@ -165,13 +157,11 @@
     const themeRow = document.createElement('div');
     themeRow.className = 'settings-row';
     themeRow.innerHTML =
-      '<div class="settings-label" style="display:block;margin-bottom:6px">' +
-      '<span>Theme</span> <span class="settings-badge-live">applies instantly</span>' +
-      '</div>' +
+      '<div class="settings-label-block">Theme</div>' +
       '<select id="setting-theme" class="settings-select">' +
-      '<option value="capture"' + (current.theme === 'capture' ? ' selected' : '') + '>Capture (default — clean, with coordinates)</option>' +
+      '<option value="capture"' + (current.theme === 'capture' ? ' selected' : '') + '>Capture (with coordinates)</option>' +
       '<option value="modern"' + (current.theme === 'modern' ? ' selected' : '') + '>Clean & Modern</option>' +
-      '<option value="physical"' + (current.theme === 'physical' ? ' selected' : '') + '>Match Physical Board</option>' +
+      '<option value="physical"' + (current.theme === 'physical' ? ' selected' : '') + '>Physical Board</option>' +
       '<option value="dark"' + (current.theme === 'dark' ? ' selected' : '') + '>Dark Mode</option>' +
       '<option value="playful"' + (current.theme === 'playful' ? ' selected' : '') + '>Bright & Playful</option>' +
       '</select>';
@@ -184,10 +174,8 @@
       '<label class="settings-label">' +
       '<input type="checkbox" id="setting-show-ai-hand"' +
       (current.showAiHand ? ' checked' : '') +
-      '>' +
-      '<span>Show AI hand (for learning/debugging)</span> <span class="settings-badge-live">applies instantly</span>' +
-      '</label>' +
-      '<p class="settings-hint">When ON, AI rack faces are visible. In AI vs AI mode, both AI racks visible.</p>';
+      '><span>Show AI hand</span>' +
+      '</label>';
     dialog.appendChild(showAiHandRow);
 
     // ──────────────────────────────────────────────────────────────────
@@ -199,31 +187,25 @@
     const thinkRow = document.createElement('div');
     thinkRow.className = 'settings-row';
     thinkRow.innerHTML =
-      '<label class="settings-label" for="setting-ai-think-time">' +
-      '<span>AI Thinking Time</span> <span class="settings-badge-live">applies on AI\'s next turn</span>' +
-      '</label>' +
+      '<div class="settings-label-block">AI Thinking Time</div>' +
       '<select id="setting-ai-think-time" class="settings-select">' +
-      '<option value="30"' + (current.aiThinkSeconds === 30 ? ' selected' : '') + '>30 seconds (fastest)</option>' +
+      '<option value="30"' + (current.aiThinkSeconds === 30 ? ' selected' : '') + '>30 seconds</option>' +
       '<option value="60"' + (current.aiThinkSeconds === 60 ? ' selected' : '') + '>1 minute</option>' +
       '<option value="120"' + (current.aiThinkSeconds === 120 ? ' selected' : '') + '>2 minutes</option>' +
-      '<option value="180"' + (current.aiThinkSeconds === 180 ? ' selected' : '') + '>3 minutes (default — best for Bingo finding)</option>' +
-      '<option value="300"' + (current.aiThinkSeconds === 300 ? ' selected' : '') + '>5 minutes (extremely thorough)</option>' +
-      '</select>' +
-      '<p class="settings-hint">How long the AI can think per turn. More time = better Bingos, especially with BLANKs.</p>';
+      '<option value="180"' + (current.aiThinkSeconds === 180 ? ' selected' : '') + '>3 minutes</option>' +
+      '<option value="300"' + (current.aiThinkSeconds === 300 ? ' selected' : '') + '>5 minutes</option>' +
+      '</select>';
     dialog.appendChild(thinkRow);
 
     // AI Swap Strategy
     const brainRow = document.createElement('div');
     brainRow.className = 'settings-row';
     brainRow.innerHTML =
-      '<label class="settings-label" for="setting-ai-swap-brain">' +
-      '<span>AI Swap Strategy</span> <span class="settings-badge-live">applies on AI\'s next turn</span>' +
-      '</label>' +
+      '<div class="settings-label-block">AI Swap Strategy</div>' +
       '<select id="setting-ai-swap-brain" class="settings-select">' +
-      '<option value="brain1"' + (current.aiSwapBrain === 'brain1' ? ' selected' : '') + '>Brain 1 — Seed Keeping (stable)</option>' +
-      '<option value="brain2"' + (current.aiSwapBrain === 'brain2' ? ' selected' : '') + '>Brain 2 — Probability (experimental)</option>' +
-      '</select>' +
-      '<p class="settings-hint">Brain 1 keeps a fixed seed template. Brain 2 computes expected score for many candidates.</p>';
+      '<option value="brain1"' + (current.aiSwapBrain === 'brain1' ? ' selected' : '') + '>Brain 1 — Seed Keeping</option>' +
+      '<option value="brain2"' + (current.aiSwapBrain === 'brain2' ? ' selected' : '') + '>Brain 2 — Probability</option>' +
+      '</select>';
     dialog.appendChild(brainRow);
 
     // ──────────────────────────────────────────────────────────────────
@@ -238,10 +220,8 @@
       '<label class="settings-label">' +
       '<input type="checkbox" id="setting-sound"' +
       (current.soundEnabled ? ' checked' : '') +
-      '>' +
-      '<span>Enable sound effects</span> <span class="settings-badge-live">applies instantly</span>' +
-      '</label>' +
-      '<p class="settings-hint">Tile click, submit, bingo fanfare, etc.</p>';
+      '><span>Sound effects</span>' +
+      '</label>';
     dialog.appendChild(soundRow);
 
     // Trash-talk
@@ -251,25 +231,20 @@
       '<label class="settings-label">' +
       '<input type="checkbox" id="setting-trash-talk"' +
       (current.trashTalkEnabled ? ' checked' : '') +
-      '>' +
-      '<span>Enable AI trash-talk messages</span> <span class="settings-badge-live">applies instantly</span>' +
-      '</label>' +
-      '<p class="settings-hint">AI taunts/comments during the game. Includes โค้ชตี๋ and friends.</p>';
+      '><span>AI trash-talk</span>' +
+      '</label>';
     dialog.appendChild(ttRow);
 
     // Trash-talk language
     const ttLangRow = document.createElement('div');
     ttLangRow.className = 'settings-row';
     ttLangRow.innerHTML =
-      '<label class="settings-label">' +
-      '<span>Trash-talk language</span> <span class="settings-badge-live">applies instantly</span>' +
+      '<div class="settings-label-block">Trash-talk language</div>' +
       '<select id="setting-trash-talk-lang" class="settings-select">' +
-      '<option value="th"' + (current.trashTalkLanguage === 'th' ? ' selected' : '') + '>Thai only (ภาษาไทย)</option>' +
+      '<option value="th"' + (current.trashTalkLanguage === 'th' ? ' selected' : '') + '>Thai only</option>' +
       '<option value="en"' + (current.trashTalkLanguage === 'en' ? ' selected' : '') + '>English only</option>' +
-      '<option value="both"' + (current.trashTalkLanguage === 'both' ? ' selected' : '') + '>Both / ทั้งสอง</option>' +
-      '</select>' +
-      '</label>' +
-      '<p class="settings-hint">Filter trash-talk messages by language. Default: Thai.</p>';
+      '<option value="both"' + (current.trashTalkLanguage === 'both' ? ' selected' : '') + '>Both</option>' +
+      '</select>';
     dialog.appendChild(ttLangRow);
 
     // Save + Close buttons

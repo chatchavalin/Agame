@@ -958,25 +958,22 @@
   /**
    * Wire up the tile tracker toggle button + auto-refresh.
    */
-  let trackerVisible = false;
+  // Tile tracker is always visible (per user request). The legacy toggle
+  // button is hidden in the layout; this flag exists only for backward
+  // compatibility with the refresh function below.
+  let trackerVisible = true;
 
   function wireTileTrackerButton() {
-    const btnTracker = document.getElementById('btn-tracker');
-    if (btnTracker) {
-      btnTracker.addEventListener('click', function () {
-        toggleTileTracker();
-      });
-    }
+    // Tile tracker toggle button is no longer used — tracker stays visible
+    // (CSS handles desktop hide vs mobile show). Just kick off an initial
+    // render so the panel has content.
+    refreshTileTracker();
   }
 
   function toggleTileTracker() {
-    trackerVisible = !trackerVisible;
-    const panel = document.getElementById('tile-tracker-panel');
-    if (!panel) return;
-    panel.style.display = trackerVisible ? 'block' : 'none';
-    if (trackerVisible) {
-      refreshTileTracker();
-    }
+    // Kept as a no-op for any old callers; tracker is always shown now.
+    trackerVisible = true;
+    refreshTileTracker();
   }
 
   function refreshTileTracker() {
