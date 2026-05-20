@@ -1086,6 +1086,34 @@ body.theme-dark .score-box.timer-paused::after {
   border-bottom: none;
 }
 
+/* Section header — visually separates groups of settings (Game Setup, Display,
+   AI Behavior, Audio & Banter). The header itself isn't a setting row so
+   it doesn't get the border-bottom treatment. */
+.settings-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 24px 0 12px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  background: var(--bg-page);
+  border-left: 3px solid #f59e0b;  /* amber accent */
+  border-radius: 0 4px 4px 0;
+}
+
+/* First section header sits right under the title — no top margin */
+.settings-title + .settings-section-header {
+  margin-top: 8px;
+}
+
+.settings-section-icon {
+  font-size: 16px;
+}
+
 .settings-label {
   display: flex;
   align-items: center;
@@ -1210,14 +1238,19 @@ body.theme-dark .score-box.timer-paused::after {
    ANIMATIONS & VISUAL POLISH
    ============================================================================= */
 
-/* Tile placement: pop in with bounce */
+/* Tile placement: pop in with bounce — applied ONLY to tentatively placed
+   tiles (this turn's new placements) and the AI's freshly-placed tiles.
+   Previously this rule applied to EVERY tile on the board, causing all
+   board tiles to "blink" on every re-render (e.g., when the player clicks
+   a rack tile). Now established board tiles are static. */
 @keyframes tile-pop-in {
   0% { transform: scale(0.3); opacity: 0; }
   60% { transform: scale(1.1); opacity: 1; }
   100% { transform: scale(1); opacity: 1; }
 }
 
-.amath-cell .amath-tile {
+.amath-cell .amath-tile.tile-tentative,
+.amath-cell .amath-tile.tile-fresh {
   animation: tile-pop-in 0.3s ease-out;
 }
 
@@ -1974,6 +2007,12 @@ body.theme-dark .score-sheet-table th {
   }
 }
 
+/* The mobile bottom timer bar is hidden on desktop (mobile media query
+   re-shows it). Declared BEFORE the @media block so it's overridable. */
+.timer-bar {
+  display: none;
+}
+
 /* =============================================================================
    RESPONSIVE — MOBILE PORTRAIT
    Use viewport-relative units so board fills available screen width.
@@ -2012,21 +2051,18 @@ body.theme-dark .score-sheet-table th {
     --rack-tile-size: 36px;
   }
 
-  .tile-face {
-    font-size: calc((100vw - 26px) / 15 * 0.5);
+  /* Capture theme adds a 16th column (left ruler) + top ruler row + wrapper
+     padding. To keep the board flush with screen edges, shrink cell-size to
+     fit those extras: 16 cells, 15 gaps, plus ~8px wrapper padding+border. */
+  body.theme-capture {
+    --cell-size: calc((100vw - 30px) / 16);
+    --tile-size: calc((100vw - 30px) / 16 - 2px);
   }
 
-  .amath-cell .premium-label {
-    font-size: calc((100vw - 26px) / 15 * 0.32);
-  }
-
-  .amath-cell.center-cell .center-star {
-    font-size: calc((100vw - 26px) / 15 * 0.65);
-  }
-
-  .tile-points {
-    font-size: calc((100vw - 26px) / 15 * 0.32);
-  }
+  .tile-face { font-size: calc((100vw - 26px) / 15 * 0.5); }
+  .amath-cell .premium-label { font-size: calc((100vw - 26px) / 15 * 0.32); }
+  .amath-cell.center-cell .center-star { font-size: calc((100vw - 26px) / 15 * 0.65); }
+  .tile-points { font-size: calc((100vw - 26px) / 15 * 0.32); }
 
   .amath-rack-slot .amath-tile .tile-face {
     font-size: 14px;
@@ -2037,38 +2073,40 @@ body.theme-dark .score-sheet-table th {
     min-width: 60px;
     padding: 4px 8px;
   }
-
-  .score-value {
-    font-size: 16px;
-  }
-
-  .timer-value {
-    font-size: 13px;
-  }
-
-  .btn {
-    padding: 8px 14px;
-    font-size: 13px;
-  }
+  .score-value { font-size: 16px; }
+  .timer-value { font-size: 13px; }
+  .btn { padding: 8px 14px; font-size: 13px; }
 
   /* Override main-area max-width so board can fill */
   .main-area, .board-area, .amath-board-wrapper {
     max-width: 100%;
   }
+  #status { margin: 4px 0; }
+  .amath-app { gap: 6px; }
 
-  /* Status box: narrower margins */
-  #status {
-    margin: 4px 0;
+  /* ── MOBILE LAYOUT REWORK ──
+     Hide the inline timer-boxes that sit next to the racks. They steal
+     horizontal space the board needs. The same timers are mirrored at
+     the bottom in the .timer-bar element (which JS keeps in sync). */
+  .opponent-area .opponent-timer,
+  .player-area .player-timer {
+    display: none;
   }
-
-  /* Amath-app gap: tighter spacing on mobile */
-  .amath-app {
+  .opponent-area,
+  .player-area {
     gap: 6px;
   }
 
-  /* Opponent/player areas: tight spacing */
-  .opponent-area, .player-area {
-    gap: 6px;
+  /* The bottom timer bar is visible only on mobile */
+  .timer-bar {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    justify-content: space-around;
+  }
+  .timer-bar .timer-bar-slot {
+    flex: 1 1 50%;
+    text-align: center;
   }
 }
 
