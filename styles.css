@@ -249,6 +249,12 @@ h1 {
     letter-spacing: 0.3px;
   }
 
+  /* When a second section header follows a body, add space above it
+     so stacked sections (e.g., Tile Tracker + Score Sheet) read clearly. */
+  .side-panel-body + .side-panel-header {
+    margin-top: 16px;
+  }
+
   .side-panel-body {
     font-size: 13px;
   }
@@ -1373,6 +1379,178 @@ body.theme-playful {
   --btn-primary-hover: #db2777;
 }
 
+/* =============================================================================
+   RULER (row/column numbers around the board)
+   Hidden by default. Visible only in capture theme — turns the board into a
+   labeled grid that's unambiguous in screenshots.
+   ============================================================================= */
+
+.amath-board-with-ruler {
+  display: contents; /* in non-capture themes, behaves like nothing wraps the grid */
+}
+
+.amath-board-middle {
+  display: contents; /* same — invisible wrapper in non-capture mode */
+}
+
+.amath-ruler {
+  display: none;
+}
+
+/* =============================================================================
+   COORDINATE LABELS — hidden by default, shown in capture theme only.
+   ============================================================================= */
+
+.amath-cell .coord-label {
+  display: none;
+  position: absolute;
+  top: 1px;
+  left: 2px;
+  font-size: clamp(7px, calc(var(--cell-size) * 0.20), 10px);
+  font-weight: 700;
+  color: #475569;            /* slate-600 — readable on white & pastels */
+  pointer-events: none;
+  user-select: none;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  line-height: 1;
+  z-index: 1;
+}
+
+/* Capture theme — clean, labeled, unambiguous look for screenshots */
+body.theme-capture {
+  --bg-page: #ffffff;
+  --bg-card: #ffffff;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --border-light: #e5e7eb;
+  --border-medium: #cbd5e1;
+  --cell-plain: #ffffff;
+  --cell-border: #cbd5e1;
+  /* Tile colors: high-contrast for crisp screenshots */
+  --tile-bg: #fef3c7;        /* amber-100 */
+  --tile-border: #92400e;
+  --tile-text: #111827;
+  --tile-points: #6b7280;
+}
+
+/* Capture theme: switch the board wrapper to a real grid layout so ruler
+   labels can sit alongside the board. */
+body.theme-capture .amath-board-with-ruler {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  gap: 2px;
+  background: #ffffff;
+  padding: 4px;
+}
+
+body.theme-capture .amath-ruler {
+  display: grid;
+  background: #f8fafc;       /* slate-50 */
+}
+
+body.theme-capture .amath-ruler-top {
+  grid-column: 1 / 3;
+  grid-template-columns:
+    var(--cell-size)
+    repeat(15, var(--cell-size));
+}
+
+body.theme-capture .amath-board-middle {
+  display: contents;
+}
+
+body.theme-capture .amath-ruler-left {
+  grid-template-rows: repeat(15, var(--cell-size));
+  grid-template-columns: var(--cell-size);
+}
+
+body.theme-capture .amath-ruler-cell,
+body.theme-capture .amath-ruler-corner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: clamp(10px, calc(var(--cell-size) * 0.32), 14px);
+  font-weight: 700;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+}
+
+body.theme-capture .amath-ruler-cell.ruler-major {
+  background: #fde68a;       /* amber-200 — highlight ×9 lines */
+  color: #92400e;
+}
+
+/* Capture theme: replace pastel premium colors with WHITE backgrounds and a
+   small marker glyph. This keeps tile content high-contrast in screenshots
+   while still letting me identify which cells are 3E/2E/3T/2T by their marker. */
+body.theme-capture .amath-cell {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+}
+body.theme-capture .amath-cell.premium-3E {
+  background: #ffffff;
+  border: 2px solid #db2777; /* pink-600 */
+}
+body.theme-capture .amath-cell.premium-2E {
+  background: #ffffff;
+  border: 2px dashed #7c3aed; /* violet-600 */
+}
+body.theme-capture .amath-cell.premium-3T {
+  background: #ffffff;
+  border: 2px solid #0284c7; /* sky-600 */
+}
+body.theme-capture .amath-cell.premium-2T {
+  background: #ffffff;
+  border: 2px dashed #ea580c; /* orange-600 */
+}
+
+/* Highlight cells on rows 0/7/14 and cols 0/7/14 (the ×9 lines).
+   Subtle background tint so the line "rivers" stand out at a glance. */
+body.theme-capture .amath-cell.on-x9-line {
+  background: #fffbeb;       /* amber-50 — very faint */
+}
+/* Where ×9-line cells are also premium, keep the premium border but still
+   show the line tint as background. */
+body.theme-capture .amath-cell.on-x9-line.premium-3E,
+body.theme-capture .amath-cell.on-x9-line.premium-2E,
+body.theme-capture .amath-cell.on-x9-line.premium-3T,
+body.theme-capture .amath-cell.on-x9-line.premium-2T {
+  background: #fffbeb;
+}
+
+/* In capture theme: hide the in-cell "3X"/"2X" text labels and center star.
+   The premium info is conveyed by border style instead. */
+body.theme-capture .amath-cell .premium-label {
+  display: none;
+}
+body.theme-capture .amath-cell.center-cell .center-star {
+  display: none;
+}
+body.theme-capture .amath-cell .coord-label {
+  display: block;
+}
+/* When a tile is placed, keep the coord label visible but smaller and in a
+   different corner so it doesn't clash with the tile. */
+body.theme-capture .amath-cell:has(.amath-tile) .coord-label {
+  display: block;
+  font-size: clamp(6px, calc(var(--cell-size) * 0.16), 8px);
+  color: #94a3b8;            /* lighter so it doesn't compete with the tile */
+  top: 1px;
+  left: 2px;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 0 1px;
+  border-radius: 2px;
+  z-index: 3;                /* above the tile */
+}
+/* In capture theme: hide the tiny point-value subscript ONLY for tiles on
+   the BOARD. Rack tiles keep their point-value subscripts. */
+body.theme-capture .amath-board .amath-tile .tile-points {
+  display: none;
+}
+
 .settings-select {
   width: 100%;
   padding: 8px 10px;
@@ -1382,6 +1560,29 @@ body.theme-playful {
   font-family: inherit;
   background: var(--bg-card);
   color: var(--text-primary);
+}
+
+/* Small inline badges next to settings labels to tell users whether changing
+   a setting takes effect right away or requires starting a new game. */
+.settings-badge-live,
+.settings-badge-restart {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  vertical-align: middle;
+  margin-left: 4px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;     /* keep badge text on one line */
+}
+.settings-badge-live {
+  background: #dcfce7;   /* green-100 */
+  color: #166534;        /* green-800 */
+}
+.settings-badge-restart {
+  background: #fef3c7;   /* amber-100 */
+  color: #92400e;        /* amber-800 */
 }
 
 /* =============================================================================
