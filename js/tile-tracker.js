@@ -1,26 +1,21 @@
 /**
  * A-Math Game — Tile Tracker
  *
- * Shows the player how many tiles of each face are STILL IN PLAY —
- * i.e., not yet placed on the board.
+ * Shows the player how many tiles of each face remain UNSEEN —
+ * i.e., not on the board and not in the player's own rack.
  *
- * "Tiles in play" = TOTAL inventory − (tiles on board)
+ * "Unseen tiles" = TOTAL inventory − (tiles on board) − (player rack)
  *
- * Includes tiles in: the bag, the opponent's rack, AND your own rack.
- * On turn 1 with no board tiles placed yet, this shows the full inventory
- * (70 for ประถม, 100 for มัธยม). As the game progresses and tiles get
- * locked onto the board, those counts go down.
- *
- * Why include your own rack? Your rack tiles are still in play — they
- * haven't been placed yet, and from a "what tiles still exist" standpoint
- * they're equivalent to tiles in the bag or opponent's rack.
+ * This tells the player what tiles are in the bag + opponent's rack.
+ * The player already knows their own rack, so those are excluded.
  */
 
 (function () {
   const C = window.AMath.constants;
 
   /**
-   * Compute the count of tiles still in play (not on board) by face.
+   * Compute the count of tiles not on the board and not in the player's rack.
+   * This tells the player what tiles the OPPONENT might hold or are still in the bag.
    * Returns { '0': 3, '1': 5, ..., '=': 7, 'BLANK': 2 }
    */
   function computeUnseenCounts(state) {
@@ -31,15 +26,21 @@
       counts[def.face] = def.count;
     }
 
-    // Subtract only tiles ON THE BOARD. Tiles in either rack (yours OR the
-    // opponent's) are still in play and remain counted.
+    // Subtract tiles ON THE BOARD
     for (let r = 0; r < C.BOARD_SIZE; r++) {
       for (let c = 0; c < C.BOARD_SIZE; c++) {
         const cell = state.board.cells[r][c];
         if (cell.tile) {
-          // For blanks placed with an assigned value, the original face is BLANK
           counts[cell.tile.face] = (counts[cell.tile.face] || 0) - 1;
         }
+      }
+    }
+
+    // Subtract PLAYER RACK tiles — the player already knows what they hold,
+    // so the remaining count = bag + opponent rack only.
+    if (state.playerRack && state.playerRack.tiles) {
+      for (const t of state.playerRack.tiles) {
+        counts[t.face] = (counts[t.face] || 0) - 1;
       }
     }
 
@@ -58,7 +59,7 @@
 
     const title = document.createElement('div');
     title.className = 'tracker-title';
-    title.textContent = 'Tiles Remaining (in bag + opponent + your rack)';
+    title.textContent = 'Tiles Remaining (in bag + opponent)';
     container.appendChild(title);
 
     const grid = document.createElement('div');

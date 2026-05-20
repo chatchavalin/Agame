@@ -72,9 +72,57 @@
     }
   }
 
+  /**
+   * Decide whether the AI should challenge the player's just-submitted play.
+   *
+   * Returns { challenge: bool, reason: string }
+   * - `challenge: true` → AI will raise the challenge (trash-talk sequence follows)
+   * - `challenge: false` → AI lets the play stand (rare; only on HARD if error
+   *    is hard to spot)
+   *
+   * Miss rates by difficulty:
+   *   EASY:   30% miss baseline
+   *   MEDIUM: 10% miss baseline
+   *   HARD:   1% miss, and ONLY on hard-to-spot errors (math errors)
+   *
+   * "Easy to spot" errors are NEVER missed (e.g., not a line, disconnected,
+   * missing center for first move). These are visually obvious.
+   * "Hard to spot" errors are math errors (e.g., 5+3=9) that require
+   * computation to catch.
+   */
+  function decideAiChallenge(validationResult, difficulty) {
+    if (validationResult.ok) {
+      return { challenge: false, reason: 'play was valid' };
+    }
+    difficulty = (difficulty || 'HARD').toUpperCase();
+    const reason = validationResult.reason || '';
+
+    // Classify: is this error easy to spot or hard?
+    // Hard-to-spot = math reasoning required (the "equation invalid" kind).
+    const isHardToSpot = /invalid|does not equal|equation|math|evaluate/i.test(reason);
+
+    let missChance;
+    if (difficulty === 'EASY') {
+      missChance = isHardToSpot ? 0.40 : 0.20;
+    } else if (difficulty === 'MEDIUM') {
+      missChance = isHardToSpot ? 0.15 : 0.05;
+    } else { // HARD (default)
+      // Easy errors: never missed. Hard errors: 1% miss.
+      missChance = isHardToSpot ? 0.01 : 0.00;
+    }
+
+    const miss = Math.random() < missChance;
+    return {
+      challenge: !miss,
+      isHardToSpot: isHardToSpot,
+      reason: reason,
+    };
+  }
+
   window.AMath = window.AMath || {};
   window.AMath.challenge = {
     verifyPlay: verifyPlay,
     revertPlay: revertPlay,
+    decideAiChallenge: decideAiChallenge,
   };
 })();

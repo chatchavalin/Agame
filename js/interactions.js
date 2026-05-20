@@ -423,6 +423,45 @@
   // UI REFRESH (call after any state change)
   // ============================================================================
 
+  /**
+   * Toggle the .is-active-turn class on the player/opponent row based on
+   * whose turn it is. The CSS handles the visual glow/pulse.
+   *
+   * Detection: we check `state.isPlayerTurn`. In AI vs AI mode the user is
+   * just a spectator and we should NOT highlight either row (both are bots).
+   * We can detect that case by checking the body class — `body.is-aivai`
+   * is set when the AI vs AI bar is shown, OR by checking if the modes
+   * module reports the current mode.
+   */
+  function updateActiveTurnHighlight() {
+    const playerArea = document.querySelector('.player-area');
+    const opponentArea = document.querySelector('.opponent-area');
+    if (!playerArea || !opponentArea) return;
+
+    // Detect AI vs AI mode — skip the highlight since user is spectating.
+    let isSpectator = false;
+    try {
+      const Modes = window.AMath.modes;
+      if (Modes && Modes.getMode && Modes.MODE_AI_VS_AI) {
+        isSpectator = (Modes.getMode() === Modes.MODE_AI_VS_AI);
+      }
+    } catch (e) {}
+
+    if (isSpectator) {
+      playerArea.classList.remove('is-active-turn');
+      opponentArea.classList.remove('is-active-turn');
+      return;
+    }
+
+    if (state.isPlayerTurn) {
+      playerArea.classList.add('is-active-turn');
+      opponentArea.classList.remove('is-active-turn');
+    } else {
+      playerArea.classList.remove('is-active-turn');
+      opponentArea.classList.add('is-active-turn');
+    }
+  }
+
   function refreshUI() {
     // Re-render board, rack, and update selection highlight
     UI.renderBoard(state.board, state.uiParts.boardArea);
@@ -435,6 +474,12 @@
     // Add draggable + dragstart to rack tiles and tentatively placed tiles
     makeRackTilesDraggable();
     makeTentativeTilesDraggable();
+
+    // Apply the active-turn highlight to the row of whoever is currently
+    // playing. The CSS handles the glow/pulse visuals; we just toggle a
+    // class. In AI vs AI spectator mode we skip the highlight — both
+    // players are bots and the user has no turn to wait for.
+    updateActiveTurnHighlight();
 
     // Highlight selected tile (normal mode)
     if (state.selectedTileId && !state.swapMode) {
@@ -462,6 +507,22 @@
       if (cellEl) {
         const tileEl = cellEl.querySelector('.amath-tile');
         if (tileEl) tileEl.classList.add('tile-tentative');
+      }
+    }
+
+    // Highlight the AI's most recent play with a colored border so the
+    // player can see at a glance what just landed. The highlight stays
+    // until the player's next move (submit/pass/swap), which clears
+    // state.lastAiPlay back to null in main.js.
+    if (state.lastAiPlay && state.lastAiPlay.placements) {
+      for (const p of state.lastAiPlay.placements) {
+        const cellEl = document.querySelector(
+          '.amath-cell[data-row="' + p.row + '"][data-col="' + p.col + '"]'
+        );
+        if (cellEl) {
+          const tileEl = cellEl.querySelector('.amath-tile');
+          if (tileEl) tileEl.classList.add('tile-ai-last-play');
+        }
       }
     }
 

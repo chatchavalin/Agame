@@ -116,9 +116,17 @@
    * Per pass-rule, 6 consecutive non-scoring turns end the game.
    * Endgame scoring: each player's remaining tile points are subtracted from score.
    *
+   * If the user has disabled the 6-pass auto-end rule
+   * (settings.disableSixPassEnd === true), this check is moot — passing
+   * cannot end the game via this path, so we always return false. This
+   * prevents the AI from making panicky last-resort plays when there is
+   * no actual impending game end.
+   *
    * @returns true if AI would lose or tie by passing
    */
   function wouldPassLoseGame(state) {
+    if (getStateSetting('disableSixPassEnd', false) === true) return false;
+
     const consecutiveNonScoring = state.consecutiveNonScoringTurns || 0;
     // Pass causes 6th non-scoring turn → game ends
     if (consecutiveNonScoring < 5) return false;
@@ -521,8 +529,15 @@
       // Trigger override when:
       //   (a) 2+ BLANKs in rack (search budget likely incomplete), OR
       //   (b) Bingo composition infeasible
-      // AND the best play is worth its BLANK cost
-      const shouldOverride = bestPlay && bestPlay.score >= scoreThreshold &&
+      // AND the best play is worth its BLANK cost.
+      //
+      // IMPORTANT: This override is DISABLED during the first 4 actual turns.
+      // The strategy spec is strict: first 4 turns → bingo/yoyo or SWAP.
+      // Playing a short 10-pt equation when you should be fishing for bingo
+      // is a strategic disaster. The override only applies when bingoYoyoOnly
+      // mode was triggered by being behind 100+ points (after turn 4).
+      const allowOverride = !isFirstFourPlays;   // only for isBehind100 mode
+      const shouldOverride = allowOverride && bestPlay && bestPlay.score >= scoreThreshold &&
                              (blanksInRack >= 2 || bingoInfeasible);
 
       if (shouldOverride) {

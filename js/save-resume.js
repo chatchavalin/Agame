@@ -49,10 +49,28 @@
       if (!stored) return null;
       const parsed = JSON.parse(stored);
       if (parsed.version !== 1) return null;
+      // Backfill slotMap on older saves (saved before position-stable racks).
+      // Without this, tilesBySlot would return all-nulls and the rack would
+      // render empty even though tiles exist.
+      ensureSlotMap(parsed.playerRack);
+      ensureSlotMap(parsed.aiRack);
       return parsed;
     } catch (e) {
       console.warn('Failed to load game:', e);
       return null;
+    }
+  }
+
+  /**
+   * If a rack has no slotMap (older save format), assign each tile to the
+   * slot index corresponding to its position in the packed tiles array.
+   */
+  function ensureSlotMap(rack) {
+    if (!rack || !rack.tiles) return;
+    if (rack.slotMap && Object.keys(rack.slotMap).length > 0) return;
+    rack.slotMap = {};
+    for (let i = 0; i < rack.tiles.length; i++) {
+      if (rack.tiles[i]) rack.slotMap[rack.tiles[i].id] = i;
     }
   }
 
@@ -147,6 +165,8 @@
             reject(new Error('Invalid save file: missing required fields'));
             return;
           }
+          ensureSlotMap(parsed.playerRack);
+          ensureSlotMap(parsed.aiRack);
           resolve(parsed);
         } catch (err) {
           reject(new Error('Failed to parse save file: ' + err.message));
