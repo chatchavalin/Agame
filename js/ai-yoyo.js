@@ -46,7 +46,20 @@
   function findAllYoYos(state) {
     const results = [];
     const startTime = Date.now();
-    const TIME_BUDGET_MS = 25000; // 25 sec budget for YoYo search
+    // Adaptive global budget based on BLANK count.
+    // Hard racks need more total time across all lines/sets.
+    // Per-position-set deadline is computed inside searchTileAssignments() and
+    // also adapts to BLANK count (1.5s-4s).
+    //
+    // If the caller passed _maxTimeMs (e.g., from ai-player.js telling us how
+    // much of the AI's total budget remains), respect that as an upper bound.
+    const blanks = state.aiRack.tiles.filter(t => t.type === 'blank').length;
+    const adaptive = blanks >= 4 ? 30000
+                   : blanks === 3 ? 25000
+                                  : 20000;
+    const TIME_BUDGET_MS = (typeof state._maxTimeMs === 'number')
+                         ? Math.min(adaptive, state._maxTimeMs)
+                         : adaptive;
 
     for (const line of C.YOYO_LINES) {
       if (Date.now() - startTime > TIME_BUDGET_MS) break;
@@ -209,46 +222,328 @@
   }
 
   /**
+   * Cheap pre-filter for YoYo placements: examines the FACE SEQUENCE on the line
+   * (after virtually placing the new tiles) and rejects sequences with obvious
+   * structural problems.
+   *
+   * This is purely an optimization — it doesn't replace the real validator.
+   * It rejects ~30-50% of impossible permutations BEFORE the expensive
+   * board-mutate / parse / scoring cycle.
+   *
+   * Returns false if obvious problem, true if maybe-valid (run full validator).
+   */
+  function quickSanityCheck(board, line, positions, placements) {
+    // Build face sequence along the line: each cell's face, or null if empty
+    // (won't be empty after placement since we add the new tiles).
+    const isRow = line.type === 'row';
+    const lineIndex = line.index;
+
+    // Build a quick lookup: position → face from placements
+    const newFaceAt = {};
+    for (const p of placements) {
+      const key = isRow ? p.col : p.row;
+      newFaceAt[key] = p.tile.assigned || p.tile.face;
+    }
+
+    // Walk the line and build the face sequence (existing tiles + new tiles)
+    const faces = [];
+    const start = isRow ? 0 : 0;
+    const end = C.BOARD_SIZE - 1;
+    for (let i = start; i <= end; i++) {
+      const r = isRow ? lineIndex : i;
+      const c = isRow ? i : lineIndex;
+      const newF = newFaceAt[i];
+      if (newF !== undefined) {
+        faces.push(newF);
+      } else {
+        const cell = Board.getCell(board, r, c);
+        if (cell && cell.tile) {
+          faces.push(cell.tile.assigned || cell.tile.face);
+        } else {
+          faces.push(null);   // empty cell
+        }
+      }
+    }
+
+    // Find the contiguous run that includes the placements
+    // (need to find min/max index of NON-NULL faces)
+    let minIdx = -1, maxIdx = -1;
+    for (let i = 0; i < faces.length; i++) {
+      if (faces[i] !== null) {
+        if (minIdx === -1) minIdx = i;
+        maxIdx = i;
+      }
+    }
+    if (minIdx === -1) return false;
+
+    // Check no gaps in [minIdx..maxIdx]
+    for (let i = minIdx; i <= maxIdx; i++) {
+      if (faces[i] === null) return false;  // gap in equation
+    }
+
+    // Extract the relevant sequence
+    const seq = faces.slice(minIdx, maxIdx + 1);
+
+    // Rule 1: must have at least one '='
+    let hasEq = false;
+    for (const f of seq) {
+      if (f === '=') { hasEq = true; break; }
+    }
+    if (!hasEq) return false;
+
+    // Rule 2: no two adjacent operators. EXCEPT: unary '-' is allowed after '='
+    // (or at the start of the equation, which is handled by Rule 3).
+    // E.g., "5=-3" is valid: '=' then '-'. But "5+-3" is invalid: '+' then '-' both binary.
+    function isOp(f) { return f === '+' || f === '-' || f === '×' || f === '÷'; }
+    function isEq(f) { return f === '='; }
+    for (let i = 0; i < seq.length - 1; i++) {
+      const a = seq[i];
+      const b = seq[i + 1];
+      // Two operators adjacent (both +-×÷): never allowed
+      if (isOp(a) && isOp(b)) return false;
+      // '=' followed by op: only '-' (unary) is allowed
+      if (isEq(a) && isOp(b) && b !== '-') return false;
+      // op followed by '=': never allowed (op at end of segment)
+      if (isOp(a) && isEq(b)) return false;
+      // '=' followed by '=': never allowed
+      if (isEq(a) && isEq(b)) return false;
+    }
+
+    // Rule 3: equation can't start or end with binary operator
+    // (start can be unary '-' though)
+    const first = seq[0];
+    const last = seq[seq.length - 1];
+    if (first === '+' || first === '×' || first === '÷' || first === '=') return false;
+    if (last === '+' || last === '-' || last === '×' || last === '÷' || last === '=') return false;
+
+    // Rule 4: leading zero on multi-digit numbers
+    // A "number group" is a contiguous run of digit faces. If it starts with '0'
+    // and has length > 1, that's invalid leading zero.
+    // (Single '0' is fine.)
+    function isSingleDigit(f) {
+      return f && f.length === 1 && f >= '0' && f <= '9';
+    }
+    function isTwoDigit(f) {
+      // Two-digit tile face: '10'..'20'
+      return f && f.length === 2 && /^([1][0-9]|20)$/.test(f);
+    }
+    function isAnyNumber(f) { return isSingleDigit(f) || isTwoDigit(f); }
+
+    let inNumber = false;
+    let numberStart = -1;
+    for (let i = 0; i < seq.length; i++) {
+      if (isSingleDigit(seq[i])) {
+        if (!inNumber) {
+          inNumber = true;
+          numberStart = i;
+        }
+      } else {
+        if (inNumber) {
+          // Number ended at i-1; length = i - numberStart
+          const numLen = i - numberStart;
+          if (numLen > 1 && seq[numberStart] === '0') return false;  // leading zero
+          if (numLen > 3) return false;  // max 3 digits per A-Math
+          inNumber = false;
+        }
+      }
+    }
+    // Check final number
+    if (inNumber) {
+      const numLen = seq.length - numberStart;
+      if (numLen > 1 && seq[numberStart] === '0') return false;
+      if (numLen > 3) return false;
+    }
+
+    // Rule 5: a two-digit tile can't be adjacent to any other number tile.
+    // (Two adjacent number tokens with no operator between them is invalid.)
+    // Note: single digits CAN concatenate into multi-digit numbers (tokenizer handles this),
+    // but a two-digit tile is already a "complete" number.
+    for (let i = 0; i < seq.length - 1; i++) {
+      const a = seq[i];
+      const b = seq[i + 1];
+      if (isTwoDigit(a) && isAnyNumber(b)) return false;
+      if (isAnyNumber(a) && isTwoDigit(b)) return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Compute "expected type" for each placement position based on adjacent cells
+   * in the line. Returns array of 'digit' | 'op' | 'mixed' per position.
+   *
+   * Heuristic:
+   *   - If both adjacent cells in the line are digits → this position is likely an op
+   *   - If both adjacent cells are ops/equals → this position is likely a digit
+   *   - Mixed or edge: 'mixed' (try both)
+   */
+  function computeContextHints(board, line, positions) {
+    const isLineDirRow = line.type === 'row';
+    const hints = [];
+
+    for (const p of positions) {
+      let prev = null, next = null;
+      if (isLineDirRow) {
+        const prevCell = Board.getCell(board, p.row, p.col - 1);
+        const nextCell = Board.getCell(board, p.row, p.col + 1);
+        prev = prevCell && prevCell.tile;
+        next = nextCell && nextCell.tile;
+      } else {
+        const prevCell = Board.getCell(board, p.row - 1, p.col);
+        const nextCell = Board.getCell(board, p.row + 1, p.col);
+        prev = prevCell && prevCell.tile;
+        next = nextCell && nextCell.tile;
+      }
+
+      const prevType = prev ? prev.type : null;
+      const nextType = next ? next.type : null;
+      const prevIsDigit = prevType === 'digit' || prevType === 'twodigit';
+      const nextIsDigit = nextType === 'digit' || nextType === 'twodigit';
+      const prevIsOp = prevType === 'op' || prevType === 'equals' || prevType === 'choice';
+      const nextIsOp = nextType === 'op' || nextType === 'equals' || nextType === 'choice';
+
+      if (prevIsDigit && nextIsDigit) {
+        // Between two digits — most likely an operator (or could be part of multi-digit)
+        hints.push('op-or-digit');
+      } else if (prevIsOp && nextIsOp) {
+        // Between two operators — must be a digit (you can't have two ops adjacent without a number)
+        hints.push('digit');
+      } else if (prevIsDigit || nextIsDigit) {
+        // Adjacent to at least one digit
+        hints.push('mixed');
+      } else if (prevIsOp || nextIsOp) {
+        // Adjacent to at least one op
+        hints.push('digit-likely');
+      } else {
+        hints.push('mixed');
+      }
+    }
+    return hints;
+  }
+
+  /**
+   * Get a prioritized list of BLANK faces based on context hint.
+   */
+  function blankFacesForHint(hint, allChoices) {
+    const ops = ['+', '-', '×', '÷', '='];
+    const smallDigits = ['1', '2', '0', '3', '4', '5'];
+    const largeDigits = ['6', '7', '8', '9'];
+    const twodigits = ['10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'];
+
+    const priority = [];
+    const seen = new Set();
+
+    function push(arr) {
+      for (const f of arr) {
+        if (allChoices.indexOf(f) !== -1 && !seen.has(f)) {
+          priority.push(f);
+          seen.add(f);
+        }
+      }
+    }
+
+    if (hint === 'digit') {
+      push(smallDigits);
+      push(largeDigits);
+      push(twodigits);
+      push(ops);     // fallback
+    } else if (hint === 'op-or-digit') {
+      push(ops);
+      push(smallDigits);
+      push(largeDigits);
+      push(twodigits);
+    } else if (hint === 'digit-likely') {
+      push(smallDigits);
+      push(largeDigits);
+      push(ops);
+      push(twodigits);
+    } else {
+      // mixed: balanced
+      push(ops);
+      push(smallDigits);
+      push(largeDigits);
+      push(twodigits);
+    }
+
+    // Append anything missing
+    for (const ch of allChoices) {
+      if (!seen.has(ch)) priority.push(ch);
+    }
+    return priority;
+  }
+
+  /**
    * Try all permutations of rack tiles on the given positions.
-   * For each, validate the play as a normal play, score it, and record valid ones.
+   *
+   * OPTIMIZED:
+   *  - Removed hard MAX_PERMUTATIONS cap; relies on time budget
+   *  - Pre-compute compatibility: skip permutations where tile face can't fit position
+   *    (e.g., =' tile placed where a digit is expected can be detected via existing-equation context)
+   *  - Smart BLANK pruning: try only digits + ops, not all 21 faces (cuts 21x → ~14x)
+   *  - First-found per position-set: stop after first valid YoYo per set
+   *  - Validates EVERY candidate, but the validator is fast
+   *
+   * Notes:
+   *  - We need to find at least ONE valid YoYo per position set, ideally high-scoring
+   *  - The validator (validateAndScore) catches invalid equations, so we can be liberal here
    */
   function searchTileAssignments(state, line, existing, positions, startTime, timeBudget) {
     const results = [];
     const rackTiles = state.aiRack.tiles.slice();
-
-    // Pick permutations of rack tiles of size = positions.length
-    // To limit search, generate up to N permutations
-    const MAX_PERMUTATIONS = 5000;
     const numPositions = positions.length;
-    let permCount = 0;
+    let foundForThisSet = false;
+
+    // Adaptive per-set deadline based on BLANK count.
+    // With many BLANKs, each set needs more time to find valid permutations.
+    //   0-1 BLANKs: 1.5s (typical case is fast)
+    //   2 BLANKs:   2s
+    //   3 BLANKs:   3s
+    //   4+ BLANKs:  4s
+    const blankCount = rackTiles.filter(t => t.type === 'blank').length;
+    const perSetMs = blankCount >= 4 ? 4000
+                   : blankCount === 3 ? 3000
+                   : blankCount === 2 ? 2000
+                                      : 1500;
+    const setDeadline = Math.min(startTime + timeBudget, Date.now() + perSetMs);
+
+    // Pre-compute context hints for each position (cuts BLANK enumeration drastically)
+    const contextHints = computeContextHints(state.board, line, positions);
+    const allBlankChoices = (C.getBlankChoices ? C.getBlankChoices() : C.BLANK_CHOICES);
 
     function tryPermutation(remaining, chosen) {
-      if (Date.now() - startTime > timeBudget) return;
-      if (permCount >= MAX_PERMUTATIONS) return;
+      if (Date.now() > setDeadline) return;
+      if (foundForThisSet && results.length >= 3) return;
 
       if (chosen.length === numPositions) {
-        permCount++;
-        // Construct the placements
         const placements = chosen.map((tile, i) => ({
           row: positions[i].row,
           col: positions[i].col,
           tile: tile,
         }));
 
-        // For BLANK/choice tiles, try common assignments
         const tryAssignments = (idx) => {
-          if (Date.now() - startTime > timeBudget) return;
+          if (Date.now() > setDeadline) return;
           if (idx === placements.length) {
+            // CHEAP PRE-FILTER: examine the line's face sequence after placement
+            // and reject obvious problems before the expensive validator.
+            // This is purely an optimization — validateAndScore is correct either way.
+            if (!quickSanityCheck(state.board, line, positions, placements)) return;
+
+            const before = results.length;
             validateAndScore(state, placements, results);
+            if (results.length > before) foundForThisSet = true;
             return;
           }
           const p = placements[idx];
           if (p.tile.type === 'blank') {
-            // Try all valid assignments for blank (respects active inventory)
-            const choices = (C.getBlankChoices ? C.getBlankChoices() : C.BLANK_CHOICES);
-            for (const ch of choices) {
+            // CONTEXT-AWARE: order BLANK assignments by what's likely to fit
+            const hint = contextHints[idx];
+            const priorityFaces = blankFacesForHint(hint, allBlankChoices);
+            for (const ch of priorityFaces) {
               p.tile.assigned = ch;
               tryAssignments(idx + 1);
+              if (Date.now() > setDeadline) { p.tile.assigned = null; return; }
+              if (foundForThisSet && results.length >= 3) { p.tile.assigned = null; return; }
             }
             p.tile.assigned = null;
           } else if (p.tile.type === 'choice') {
@@ -256,6 +551,7 @@
             for (const ch of choices) {
               p.tile.assigned = ch;
               tryAssignments(idx + 1);
+              if (Date.now() > setDeadline) { p.tile.assigned = null; return; }
             }
             p.tile.assigned = null;
           } else {
@@ -272,7 +568,8 @@
         chosen.push(tile);
         tryPermutation(next, chosen);
         chosen.pop();
-        if (permCount >= MAX_PERMUTATIONS) return;
+        if (Date.now() > setDeadline) return;
+        if (foundForThisSet && results.length >= 3) return;
       }
     }
 

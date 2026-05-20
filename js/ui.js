@@ -19,6 +19,44 @@
    */
   function renderBoard(board, container) {
     container.innerHTML = '';
+
+    // Wrapper that holds an optional ruler row/column plus the board grid.
+    // Ruler is invisible in non-capture themes (display:none via CSS) so it
+    // adds zero visual impact to normal play.
+    const wrap = document.createElement('div');
+    wrap.className = 'amath-board-with-ruler';
+
+    // Top ruler: 16 cells (a blank corner + 15 column numbers 0..14)
+    const topRuler = document.createElement('div');
+    topRuler.className = 'amath-ruler amath-ruler-top';
+    const topCorner = document.createElement('div');
+    topCorner.className = 'amath-ruler-corner';
+    topRuler.appendChild(topCorner);
+    for (let c = 0; c < C.BOARD_SIZE; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'amath-ruler-cell';
+      // Highlight the three "×9 lines": columns 0, 7, 14
+      if (c === 0 || c === 7 || c === 14) cell.classList.add('ruler-major');
+      cell.textContent = c;
+      topRuler.appendChild(cell);
+    }
+    wrap.appendChild(topRuler);
+
+    // Middle row: left ruler (15 row numbers) + board grid
+    const middle = document.createElement('div');
+    middle.className = 'amath-board-middle';
+
+    const leftRuler = document.createElement('div');
+    leftRuler.className = 'amath-ruler amath-ruler-left';
+    for (let r = 0; r < C.BOARD_SIZE; r++) {
+      const cell = document.createElement('div');
+      cell.className = 'amath-ruler-cell';
+      if (r === 0 || r === 7 || r === 14) cell.classList.add('ruler-major');
+      cell.textContent = r;
+      leftRuler.appendChild(cell);
+    }
+    middle.appendChild(leftRuler);
+
     const grid = document.createElement('div');
     grid.className = 'amath-board';
     grid.id = 'amath-board';
@@ -31,6 +69,12 @@
         cellEl.dataset.row = r;
         cellEl.dataset.col = c;
 
+        // Highlight cells on the ×9 lines (rows 0/7/14, cols 0/7/14)
+        // — visible only in capture theme via CSS
+        if (r === 0 || r === 7 || r === 14 || c === 0 || c === 7 || c === 14) {
+          cellEl.classList.add('on-x9-line');
+        }
+
         // Premium square class
         if (cell.premium) {
           cellEl.classList.add('premium-' + cell.premium);
@@ -42,6 +86,13 @@
           cellEl.appendChild(label);
         }
 
+        // Coordinate label — visible only in capture theme via CSS.
+        // Format: "r,c" e.g. "14,13". Always present in DOM regardless of theme.
+        const coordLabel = document.createElement('span');
+        coordLabel.className = 'coord-label';
+        coordLabel.textContent = r + ',' + c;
+        cellEl.appendChild(coordLabel);
+
         // Center star
         if (r === C.CENTER_CELL.row && c === C.CENTER_CELL.col) {
           cellEl.classList.add('center-cell');
@@ -51,9 +102,9 @@
           cellEl.appendChild(star);
         }
 
-        // If a tile is placed, render it
+        // If a tile is placed, render it (onBoard=true → suppress points subscript)
         if (cell.tile) {
-          const tileEl = renderTile(cell.tile, false);
+          const tileEl = renderTile(cell.tile, false, true);
           cellEl.appendChild(tileEl);
         }
 
@@ -61,7 +112,10 @@
       }
     }
 
-    container.appendChild(grid);
+    middle.appendChild(grid);
+    wrap.appendChild(middle);
+
+    container.appendChild(wrap);
   }
 
   function premiumLabelText(p) {
@@ -80,8 +134,11 @@
   /**
    * Creates a tile DOM element.
    * If faceDown is true, shows tile-back graphic (used for opponent rack).
+   * If onBoard is true, suppresses the point-value subscript (the tile is
+   * already placed on the board, so its score is committed and the small
+   * number adds visual noise).
    */
-  function renderTile(tile, faceDown) {
+  function renderTile(tile, faceDown, onBoard) {
     const el = document.createElement('div');
     el.className = 'amath-tile';
     el.dataset.tileId = tile.id;
@@ -104,8 +161,10 @@
     faceEl.textContent = formatFace(displayFace);
     el.appendChild(faceEl);
 
-    // Show point value as small subscript
-    if (tile.points > 0) {
+    // Show point value as small subscript — ONLY when tile is in a rack
+    // (not when placed on the board). Once placed, the score is already
+    // counted; the subscript becomes visual clutter.
+    if (!onBoard && tile.points > 0) {
       const ptsEl = document.createElement('span');
       ptsEl.className = 'tile-points';
       ptsEl.textContent = tile.points;

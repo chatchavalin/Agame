@@ -2,11 +2,15 @@
  * A-Math Game — AI Player (Phase 6c+ with YoYo + ×9 Strategy)
  *
  * Decision tree:
- *   1. Check ×9 threat → defend if best play ≤ 100
- *   2. Behind 140+ → try ×9 offense
- *   3. Bingo/YoYo-only mode (first 4 turns OR behind 100+) → play Bingo/YoYo
- *   4. Normal → play highest of Bingo/YoYo/regular
- *   5. Lead 150+ → close-board strategy
+ *   1. Detect ×9 threats from opponent (every turn, regardless of score)
+ *   2. Behind 140+ → try ×9 offense (also serves as defense)
+ *   3. Search Bingo + YoYo + regular plays
+ *   4. ×9 DEFENSE: if threat exists and bestPlay doesn't block it,
+ *      switch to a defensive alternative when swing favors defense
+ *      (threat magnitude > score lost by switching)
+ *   5. Bingo/YoYo-only mode (first 4 turns OR behind 100+) → enforce
+ *   6. Lead 150+ → don't CREATE new ×9/×4 threats
+ *   7. Normal → play best
  */
 
 (function () {
@@ -18,8 +22,15 @@
 
   // AI thinking time per turn. Read from settings (default 180s = 3 min).
   // Settings allows: 30, 60, 120, 180, 300 seconds.
+  // Worker-compatible: prefers _settings passed in state, falls back to window.
+  // (In Worker context, window is aliased to self by the worker bootstrap.)
+  let _stateSettings = null;
   function getTimeBudgetMs() {
     try {
+      if (_stateSettings && typeof _stateSettings.aiThinkSeconds === 'number') {
+        const s = _stateSettings.aiThinkSeconds;
+        if (s >= 10 && s <= 600) return s * 1000;
+      }
       if (window.AMath && window.AMath.settings && window.AMath.settings.get) {
         const seconds = window.AMath.settings.get('aiThinkSeconds');
         if (typeof seconds === 'number' && seconds >= 10 && seconds <= 600) {
@@ -28,6 +39,16 @@
       }
     } catch (e) { /* fallback below */ }
     return 180000; // 3 min default
+  }
+
+  function getStateSetting(key, fallback) {
+    if (_stateSettings && _stateSettings[key] !== undefined) return _stateSettings[key];
+    try {
+      if (window.AMath && window.AMath.settings && window.AMath.settings.get) {
+        return window.AMath.settings.get(key);
+      }
+    } catch (e) { /* */ }
+    return fallback;
   }
   const MAX_CANDIDATES_PER_STAGE = 1000000;  // Per-stage cap; multiplied by complexity
 
@@ -56,9 +77,7 @@
   /** Return a 'swap' decision using the selected brain (1 = seed-keeping, 2 = probability). */
   function smartSwap(state) {
     // Read brain selection from settings (default: brain1 — the stable, tested one)
-    const brain = (window.AMath.settings && window.AMath.settings.get)
-      ? (window.AMath.settings.get('aiSwapBrain') || 'brain1')
-      : 'brain1';
+    const brain = getStateSetting('aiSwapBrain', 'brain1') || 'brain1';
 
     let result = null;
     if (brain === 'brain2' && window.AMath.aiSwapBrain2 && window.AMath.aiSwapBrain2.computeSwapTiles_brain2) {
@@ -113,8 +132,11 @@
     return aiFinal <= playerFinal;
   }
 
-  function decideMove(state) {
+  async function decideMove(state) {
     const startTime = Date.now();
+
+    // Worker-compatibility: pick up settings from state if passed
+    _stateSettings = state._settings || null;
 
     // Identify which rack is playing (for play-count tracking)
     const rackOwner = (state.aiRack && state.aiRack.owner) || 'ai';
@@ -155,35 +177,71 @@
     // === 2b. Fast Bingo Pattern Search ===
     // Try pattern-based Bingo BEFORE expensive brute force.
     // This handles 3-BLANK racks that brute force can't solve in time.
-    // Skip on first move — fast Bingo's tryFirstMoveBingo isn't implemented yet,
-    // and there are no anchor tiles on an empty board anyway.
     let fastBingoPlay = null;
     if (window.AMath.aiBingoFast && state.aiRack.tiles.length === 8 && !state.isFirstMove) {
       const fastStart = Date.now();
-      // Give pattern search at most 5 seconds (it usually finishes in ms)
       fastBingoPlay = window.AMath.aiBingoFast.findFastBingo(state, 5000);
       if (fastBingoPlay) {
         console.log('[AI] Fast Bingo found in ' + (Date.now() - fastStart) + 'ms, score=' + fastBingoPlay.score);
       }
     }
 
+    // === 2c. Grammar Bingo Search (handles cases template engine misses) ===
+    // Grammar-based search catches edge cases like:
+    //   - First-move Bingos
+    //   - Unary minus equations
+    //   - Choice tile flexing
+    //   - Multi-equals chained equations
+    //   - Exotic patterns not in the hand-curated template list
+    //
+    // We always run this (not just as fallback) because it may find HIGHER-SCORING
+    // Bingos than the template engine, especially for first moves.
+    let grammarBingoPlay = null;
+    if (window.AMath.aiBingoGrammar && state.aiRack.tiles.length === 8) {
+      const grammarStart = Date.now();
+      // Adaptive budget based on rack difficulty:
+      //   - First move (no anchor): 8s base, +2s per BLANK over 2
+      //   - With anchor:            4s base, +1.5s per BLANK over 2
+      // Hard racks (3-4 BLANKs) need more time but we cap at 12s to keep AI responsive.
+      const blankCount = state.aiRack.tiles.filter(t => t.type === 'blank').length;
+      const extraBlanks = Math.max(0, blankCount - 2);
+      let grammarBudget;
+      if (state.isFirstMove) {
+        grammarBudget = Math.min(12000, 8000 + extraBlanks * 2000);
+      } else {
+        grammarBudget = Math.min(10000, 4000 + extraBlanks * 1500);
+      }
+      grammarBingoPlay = window.AMath.aiBingoGrammar.findGrammarBingo(state, grammarBudget);
+      if (grammarBingoPlay) {
+        console.log('[AI] Grammar Bingo found in ' + (Date.now() - grammarStart) + 'ms, score=' + grammarBingoPlay.score);
+      }
+    }
+
     // === 3. Search Bingo + YoYo + Regular plays ===
-    const bingoPlay = findBestPlay(state.board, state.aiRack, state.isFirstMove, startTime);
+    const bingoPlay = await findBestPlay(state.board, state.aiRack, state.isFirstMove, startTime, threats);
     const timeBudget = getTimeBudgetMs();
     let yoyoPlay = null;
     if (window.AMath.aiYoyo && (Date.now() - startTime) < timeBudget - 5000) {
+      // Pass remaining time so YoYo respects the total AI budget rather than
+      // using its own 20-30s budget on top of whatever findBestPlay already consumed.
+      const remainingMs = Math.max(2000, timeBudget - (Date.now() - startTime));
       yoyoPlay = window.AMath.aiYoyo.findBestYoYo({
         board: state.board,
         aiRack: state.aiRack,
         isFirstMove: state.isFirstMove,
+        _maxTimeMs: remainingMs,
       });
     }
 
-    // Identify the "best non-defense play" — compare brute force result with fast pattern result
+    // Identify the "best non-defense play" — compare all search results
     let bestPlay = pickBetterPlay(bingoPlay, yoyoPlay);
     if (fastBingoPlay && (!bestPlay || fastBingoPlay.score > bestPlay.score)) {
-      console.log('[AI] Using fast pattern Bingo (' + fastBingoPlay.score + ' pts) over brute force result (' + (bestPlay ? bestPlay.score : 'none') + ')');
+      console.log('[AI] Using fast pattern Bingo (' + fastBingoPlay.score + ' pts) over best so far (' + (bestPlay ? bestPlay.score : 'none') + ')');
       bestPlay = fastBingoPlay;
+    }
+    if (grammarBingoPlay && (!bestPlay || grammarBingoPlay.score > bestPlay.score)) {
+      console.log('[AI] Using grammar Bingo (' + grammarBingoPlay.score + ' pts) over best so far (' + (bestPlay ? bestPlay.score : 'none') + ')');
+      bestPlay = grammarBingoPlay;
     }
 
     // === Apply Rim Rule (Feature F) ===
@@ -223,17 +281,141 @@
       }
     }
 
-    // === 4. ×9 defense check ===
-    // If threat exists and our best play ≤ 100, we should defend
-    if (worstThreat && bestPlay && bestPlay.score <= C.AI_DEFEND_X9_SKIP_THRESHOLD) {
-      // Look for a defensive play
-      // Check if best play already blocks the threat (great — use it)
-      if (window.AMath.aiX9.playBlocksThreat(bestPlay.placements, worstThreat)) {
-        // Already defends — proceed
-      } else {
-        // Try to find a defensive alternative
-        // For Phase 1, we just play the bestPlay (defense may not be perfect)
-        // Future: implement explicit defensive play search
+    // === 4. ×9 defense check (Quality-aware implementation) ===
+    //
+    // The ×9 multiplier is catastrophic: an opponent ×9 play can score 100-300+ pts.
+    //
+    // Block quality matters: a tile placed ON a 3E square fully prevents the
+    // threat (STRONG), a tile BETWEEN the two 3Es on the same line is also very
+    // good (MEDIUM, ~90% prevention), but a SUBRIM block (one row/col away) is
+    // WEAK and may leave 60% of the threat intact — opponent can still hook
+    // using other tiles on the threat line. We must NOT pick a weak subrim
+    // block over a strong direct block just because the scores are close.
+    //
+    // Decision math:
+    //   defensive_value(play) = play.score + threat_prevented
+    //                         = play.score + threatScore × (1 - residual_threat)
+    //
+    //   Where residual_threat is:
+    //     STRONG block on 3E → 0%      (threat fully neutralized)
+    //     MEDIUM between 3Es → 10%     (opponent needs miracle)
+    //     WEAK subrim block  → 60%     (opponent still has hooks)
+    //     No block           → 100%    (full threat remains)
+    //
+    // The best play is the one with the highest defensive_value:
+    //   - A STRONG-block defensive play prevents 100% of threat → big bonus
+    //   - A WEAK-block "defensive" play only prevents 40% → small bonus
+    //   - A high-scoring NON-blocking play has no bonus but also loses
+    //     full threatScore on opponent's next turn
+    //
+    // Bug fix history:
+    //   v1: defense was a no-op TODO stub; ignored threats entirely
+    //   v2: implemented but treated all blocks as equal → picked weak subrim
+    //       blocks over strong direct blocks
+    //   v3 (current): quality-aware — strongly prefers STRONG/MEDIUM blocks
+    if (worstThreat && bestPlay && window.AMath.aiX9) {
+      const aiX9 = window.AMath.aiX9;
+      const threatScore = aiX9.estimateThreatScore(worstThreat);
+
+      // Helper: compute defensive_value for a single play, including the
+      // amplification penalty when the play makes the threat WORSE for opponent.
+      //
+      //   defensive_value = play.score
+      //                    + threatScore × (1 - residual)   // prevention bonus
+      //                    - threatScore × amplification    // amplification penalty
+      //
+      // where amplification > 0 if the threat severity goes UP after the play
+      // (e.g., AI's tile adds a hook on the threat line, reducing emptyBetween).
+      function evaluateCandidate(play) {
+        const residual = aiX9.residualThreatMultiplier(play.placements, worstThreat, state.board);
+        let amplification = 0;
+        try {
+          const threatsAfter = computeThreatsAfterPlay(state.board, play.placements);
+          for (const ta of threatsAfter) {
+            if (ta.line.type === worstThreat.line.type &&
+                ta.line.index === worstThreat.line.index &&
+                ta.positionA.row === worstThreat.positionA.row &&
+                ta.positionA.col === worstThreat.positionA.col &&
+                ta.positionB.row === worstThreat.positionB.row &&
+                ta.positionB.col === worstThreat.positionB.col) {
+              if (ta.severity > worstThreat.severity) {
+                amplification = (ta.severity - worstThreat.severity) / 100;
+              }
+            }
+          }
+        } catch (err) { /* ignore */ }
+        const defValue = (play.score || 0)
+                       + threatScore * (1 - residual)
+                       - threatScore * amplification;
+        const quality = aiX9.classifyBlockQuality(play.placements, worstThreat);
+        return { play: play, defValue: defValue, residual: residual,
+                 amplification: amplification, quality: quality };
+      }
+
+      // Try offensive ×9 (already tried in section 2 if behind 140)
+      let offensiveX9 = null;
+      if (!isBehind140) {
+        try {
+          offensiveX9 = aiX9.findOffensiveX9(state);
+        } catch (err) {
+          console.error('[AI] findOffensiveX9 failed:', err);
+        }
+      }
+
+      // Gather ALL candidate plays — blockers AND non-blockers. We compare them
+      // on the same metric (defensive_value) so a high-scoring non-blocker can
+      // win when no blocker scores well, and a blocker can win when it prevents
+      // a large threat.
+      const candidates = [bestPlay, bingoPlay, yoyoPlay, fastBingoPlay,
+                          grammarBingoPlay,
+                          bingoPlay && bingoPlay._bestNonRim,
+                          bingoPlay && bingoPlay._bestBlocking,
+                          offensiveX9].filter(Boolean);
+
+      // Dedupe — multiple candidates may point to the same play object.
+      const seen = new Set();
+      const uniqueCandidates = [];
+      for (const c of candidates) {
+        if (seen.has(c)) continue;
+        seen.add(c);
+        uniqueCandidates.push(c);
+      }
+
+      // Evaluate each and pick the best.
+      let bestEval = null;
+      for (const c of uniqueCandidates) {
+        const ev = evaluateCandidate(c);
+        if (!bestEval || ev.defValue > bestEval.defValue) {
+          bestEval = ev;
+        }
+      }
+
+      if (bestEval && bestEval.play !== bestPlay) {
+        const isOffX9 = (bestEval.play === offensiveX9);
+        const qName = (bestEval.quality >= aiX9.BLOCK_QUALITY.STRONG ? 'STRONG'
+                    : bestEval.quality >= aiX9.BLOCK_QUALITY.MEDIUM ? 'MEDIUM'
+                    : bestEval.quality >= aiX9.BLOCK_QUALITY.WEAK   ? 'WEAK'
+                    : 'NONE');
+        const ampNote = bestEval.amplification > 0
+          ? ' (amplifies threat by ' + (bestEval.amplification * 100).toFixed(0) + '%)'
+          : '';
+        console.log('[AI] ×9 defense: switched to ' + bestEval.play.score +
+                    '-pt' + (isOffX9 ? ' OFFENSIVE ×9' : '') +
+                    ' (' + qName + ' block, defValue ' + bestEval.defValue.toFixed(0) +
+                    ', residual ' + (bestEval.residual * 100).toFixed(0) + '%' +
+                    ampNote + ')');
+        bestPlay = bestEval.play;
+      } else if (bestEval) {
+        // bestPlay is already the best — log diagnostics for verification
+        const qName = (bestEval.quality >= aiX9.BLOCK_QUALITY.STRONG ? 'STRONG'
+                    : bestEval.quality >= aiX9.BLOCK_QUALITY.MEDIUM ? 'MEDIUM'
+                    : bestEval.quality >= aiX9.BLOCK_QUALITY.WEAK   ? 'WEAK'
+                    : 'NONE');
+        const ampNote = bestEval.amplification > 0
+          ? ' (amplifies threat ' + (bestEval.amplification * 100).toFixed(0) + '%)'
+          : '';
+        console.log('[AI] ×9 threat handled: ' + bestEval.play.score + '-pt ' + qName +
+                    ' block, defValue ' + bestEval.defValue.toFixed(0) + ampNote);
       }
     }
 
@@ -386,7 +568,10 @@
 
     // === 6. Lead 150+ closing mode (Feature G) ===
     // Goal: maintain the lead by playing safe + offload hard tiles.
-    // Priority: Score > Safety (no new ×9 or ×4) > Rack management > Bag prediction
+    // Priority: Defend existing ×9 > Score > Safety (no new ×9 or ×4) > Rack mgmt
+    //
+    // Note: ×9 DEFENSE for existing threats already happened in section 4 above.
+    // This section handles: don't CREATE new ×9/×4 threats with our play.
     if (isLead150 && bestPlay) {
       // Check if best play creates a new ×9 threat (Safety check)
       const createsNewX9 = wouldCreateX9Threat(state.board, bestPlay.placements);
@@ -399,15 +584,25 @@
         if (safeAlt &&
             !wouldCreateX9Threat(state.board, safeAlt.placements) &&
             !wouldCreateX4Threat(state.board, safeAlt.placements)) {
-          console.log('[AI] Lead-150 mode: switched to safer alt (avoiding ' +
-                      (createsNewX9 ? '×9' : '×4') + ' threat)');
-          bestPlay = safeAlt;
+          // Don't downgrade if the swap loses too much score relative to the threat.
+          // Creating a ×9 is roughly worth ~80-150 pts to opponent.
+          const lossIfSwap = bestPlay.score - safeAlt.score;
+          const threatCost = createsNewX9 ? 100 : 30;
+          if (lossIfSwap < threatCost) {
+            console.log('[AI] Lead-150 mode: switched to safer alt (avoiding ' +
+                        (createsNewX9 ? '×9' : '×4') + ' threat); lost ' +
+                        lossIfSwap + ' pts to prevent ~' + threatCost + ' pt threat');
+            bestPlay = safeAlt;
+          } else {
+            console.log('[AI] Lead-150 mode: kept higher-scoring play despite ' +
+                        (createsNewX9 ? '×9' : '×4') + ' threat (gain ' +
+                        bestPlay.score + ' > threat cost ' + threatCost + ')');
+          }
         }
-        // If still unsafe, play anyway — score matters most per user priority
       }
 
       // Check rack management: count hard tiles AFTER this play
-      const tileSet = window.AMath.settings ? window.AMath.settings.get('tileSet') : 'prathom';
+      const tileSet = getStateSetting('tileSet', 'prathom') || 'prathom';
       const maxHardInRack = (tileSet === 'mathayom') ? 2 : 1;
       const usedTileIds = new Set(bestPlay.placements.map(p => p.tile && p.tile.id).filter(x => x));
       const remainingRack = state.aiRack.tiles.filter(t => !usedTileIds.has(t.id));
@@ -548,10 +743,22 @@
     return a.score >= b.score ? a : b;
   }
 
-  function findBestPlay(board, aiRack, isFirstMove, startTime) {
+  // Yield to the browser so it can repaint and run timer setInterval callback.
+  // Called periodically inside AI's search loops. Resolves immediately on next tick.
+  function yieldToBrowser() {
+    return new Promise(function (resolve) { setTimeout(resolve, 0); });
+  }
+
+  async function findBestPlay(board, aiRack, isFirstMove, startTime, threats) {
     let bestPlay = null;
     let bestNonRimPlay = null;  // Best play that doesn't violate rim rule
     let bestSafePlay = null;    // Best play by adjusted score (penalizing rim hooks)
+    // Best play that blocks each detected threat at MEDIUM+ quality.
+    // Without this, the candidate pool in section 4 only sees top-1 results
+    // and may have nothing that blocks. By tracking blocking plays during the
+    // main search, section 4 always has options to consider.
+    let bestBlockingPlay = null;
+    let bestBlockingDefValue = -1;
     const rack = aiRack.tiles;
     if (rack.length === 0) return null;
 
@@ -607,6 +814,37 @@
       if (!bestSafePlay || adjustedScore > bestSafePlay._adjustedScore) {
         bestSafePlay = play;
       }
+
+      // Track best threat-blocking play if threats were provided.
+      // This widens the candidate pool for section 4's defensive logic, so we
+      // can find a blocking play even when bingoPlay/yoyoPlay/etc. don't happen
+      // to block.
+      //
+      // Scoring: defensive_value = play.score + Σ threatScore × (1 - residual)
+      // Higher = better play to defend AND score.
+      if (threats && threats.length > 0 && window.AMath.aiX9) {
+        const aiX9 = window.AMath.aiX9;
+        let totalPrevented = 0;
+        let blocksAtLeastOne = false;
+        for (const t of threats) {
+          const q = aiX9.classifyBlockQuality(play.placements, t);
+          if (q >= aiX9.BLOCK_QUALITY.MEDIUM) blocksAtLeastOne = true;
+          // Pass board so syntactic-feasibility check kicks in: an "between"
+          // play that creates an unfillable cell scores like a STRONG block.
+          const residual = aiX9.residualThreatMultiplier(play.placements, t, board);
+          totalPrevented += aiX9.estimateThreatScore(t) * (1 - residual);
+          // Also surface syntactic blocks even if positional quality is below MEDIUM —
+          // a syntactic block IS a real block even from a non-MEDIUM placement.
+          if (!blocksAtLeastOne && residual <= 0.15) blocksAtLeastOne = true;
+        }
+        if (blocksAtLeastOne) {
+          const defValue = play.score + totalPrevented;
+          if (defValue > bestBlockingDefValue) {
+            bestBlockingDefValue = defValue;
+            bestBlockingPlay = play;
+          }
+        }
+      }
     };
 
     // Search plan: each stage gets an ABSOLUTE time budget in ms (not fractions),
@@ -643,6 +881,9 @@
     // Execute search plan
     const stageLogs = [];
     let totalCandidates = 0;
+    let lastYieldTime = Date.now();
+    const YIELD_INTERVAL_MS = 150;  // yield to browser every ~150ms
+
     for (const stage of searchPlan) {
       const stageStart = Date.now();
       const stageDeadline = stageStart + stage.budgetMs;
@@ -652,11 +893,23 @@
       counter.abort = false;
       counter.count = 0;
 
+      // Yield at start of each stage so browser can repaint
+      if (Date.now() - lastYieldTime > YIELD_INTERVAL_MS) {
+        await yieldToBrowser();
+        lastYieldTime = Date.now();
+      }
+
       for (const anchor of anchors) {
         if (counter.abort) break;
         if (Date.now() > stageDeadline) {
           counter.abort = true;
           break;
+        }
+
+        // Yield periodically so timer can tick. Cheap check; ~150ms granularity.
+        if (Date.now() - lastYieldTime > YIELD_INTERVAL_MS) {
+          await yieldToBrowser();
+          lastYieldTime = Date.now();
         }
 
         for (const direction of ['horizontal', 'vertical']) {
@@ -694,12 +947,14 @@
       '[AI] Total candidates:', totalCandidates,
       '| Best:', bestPlay ? bestPlay.score + ' pts (' + bestPlay.placements.length + ' tiles)' : 'none',
       '| Best non-rim:', bestNonRimPlay ? bestNonRimPlay.score + ' pts' : 'none',
+      '| Best blocking:', bestBlockingPlay ? bestBlockingPlay.score + ' pts (defValue ' + bestBlockingDefValue.toFixed(0) + ')' : 'none',
       '| Stages:', stageLogs.join(' | ')
     );
 
-    // Attach non-rim alternative for caller's use
+    // Attach non-rim and blocking alternatives for caller's use
     if (bestPlay) {
       bestPlay._bestNonRim = bestNonRimPlay;
+      bestPlay._bestBlocking = bestBlockingPlay;
     }
     return bestPlay;
   }
@@ -812,6 +1067,32 @@
       unseenHard: unseenHard,
       hardRatio: unseenTotal > 0 ? unseenHard / unseenTotal : 0,
     };
+  }
+
+  /**
+   * Compute all ×9 threats that would exist after the given placements.
+   * Used to detect threat amplification (e.g., adding a hook to a threat line
+   * that strengthens an existing threat by lowering emptyBetween).
+   */
+  function computeThreatsAfterPlay(board, placements) {
+    if (!window.AMath.aiX9) return [];
+    const placedAt = [];
+    try {
+      for (const p of placements) {
+        if (p.tile && !board.cells[p.row][p.col].tile) {
+          window.AMath.board.placeTile(board, p.row, p.col, p.tile);
+          placedAt.push({ row: p.row, col: p.col });
+        }
+      }
+      return window.AMath.aiX9.detectAllThreats(board) || [];
+    } catch (err) {
+      console.error('[AI] computeThreatsAfterPlay error:', err);
+      return [];
+    } finally {
+      for (const pa of placedAt) {
+        window.AMath.board.removeTile(board, pa.row, pa.col);
+      }
+    }
   }
 
   /**
@@ -978,6 +1259,39 @@
         if (adj.length > 0) anchors.push({ row: r, col: c });
       }
     }
+
+    // OPTIMIZATION: order anchors by "promise" — premium-adjacent first.
+    // Anchors near 3E/2E squares often yield higher-scoring plays.
+    // We compute a simple heuristic score per anchor and sort descending.
+    anchors.forEach(function (a) {
+      let promise = 0;
+      // Walk up to 7 cells in each direction; bonus for premium cells nearby
+      const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+      for (const [dr, dc] of dirs) {
+        for (let d = 1; d <= 7; d++) {
+          const nr = a.row + dr * d;
+          const nc = a.col + dc * d;
+          if (!Board.inBounds(nr, nc)) break;
+          const cell = board.cells[nr][nc];
+          if (cell && !cell.tile) {
+            // Empty cell — could be part of placement; weight by distance
+            const w = 1 / d;
+            const prem = cell.premium;
+            if (prem === '3E') promise += 5 * w;
+            else if (prem === '2E') promise += 2 * w;
+            else if (prem === '3T') promise += 1 * w;
+            else if (prem === '2T') promise += 0.5 * w;
+          } else if (cell && cell.tile) {
+            // Existing tile — slight bonus (more equation context)
+            promise += 0.3 * (1 / d);
+            // (don't break; keep walking past)
+          }
+        }
+      }
+      a._promise = promise;
+    });
+
+    anchors.sort(function (x, y) { return (y._promise || 0) - (x._promise || 0); });
     return anchors;
   }
 
@@ -1048,7 +1362,7 @@
       if (counter.abort) return;
       if (used[i]) continue;
       const tile = rack[i];
-      const assignedValues = getCandidateAssignments(tile, rack);
+      const assignedValues = getCandidateAssignments(tile, rack, isFirstMove);
 
       for (const assigned of assignedValues) {
         if (counter.abort) return;
@@ -1069,18 +1383,30 @@
     }
   }
 
-  function getCandidateAssignments(tile, rack) {
+  function getCandidateAssignments(tile, rack, isFirstMove) {
     if (tile.type === 'choice') return tile.face.split('/');
     if (tile.type === 'blank') {
       const fullChoices = (C.getBlankChoices ? C.getBlankChoices() : C.BLANK_CHOICES);
+
+      if (!rack) return fullChoices;
+
+      const rackBlankCount = rack.filter(t => t && t.type === 'blank').length;
+      const rackHasEquals = rack.some(t => t && (t.face === '=' || t.assigned === '='));
+
+      // FORCED-EQUALS OPTIMIZATION:
+      // If this is the FIRST MOVE (board has no '='), the rack has 0 '=' tiles,
+      // and there is exactly 1 BLANK, then the BLANK MUST be '=' — no valid
+      // equation can be formed otherwise. Skip enumerating the other ~15 choices.
+      // (For non-first moves we can't safely force this — the placement might
+      // connect to an existing '=' on the board.)
+      if (isFirstMove && rackBlankCount === 1 && !rackHasEquals) {
+        return ['='];
+      }
 
       // Smart BLANK assignment: prune choices to reduce combinatorial explosion.
       // 1 BLANK: try all ~15 choices
       // 2 BLANKs: try ~10 (skip duplicates of rack faces)
       // 3+ BLANKs: try ~6 most useful (skip dups, prioritize structural symbols)
-      if (!rack) return fullChoices;
-
-      const rackBlankCount = rack.filter(t => t && t.type === 'blank').length;
       if (rackBlankCount <= 1) return fullChoices;
 
       const rackFaces = new Set();

@@ -53,11 +53,28 @@
     const anchors = findAnchorTiles(state.board);
     if (anchors.length === 0) return null;
 
+    const aiX9 = window.AMath.aiX9;
+    const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
     let attemptsCount = 0;
+    let skippedDead = 0;
     for (const anchor of anchors) {
       if (Date.now() - startTime > timeLimitMs) {
         console.log('[FastBingo] Time limit reached after ' + attemptsCount + ' anchor attempts');
         return null;
+      }
+
+      // Syntactic pre-filter: skip anchors whose every adjacent empty cell is
+      // syntactically dead (no tile of any type can legally fit).
+      if (aiX9 && aiX9.isCellDead) {
+        let hasLive = false;
+        for (const [dr, dc] of dirs) {
+          const nr = anchor.row + dr, nc = anchor.col + dc;
+          if (nr < 0 || nr >= C.BOARD_SIZE || nc < 0 || nc >= C.BOARD_SIZE) continue;
+          const ncell = Board.getCell(state.board, nr, nc);
+          if (!ncell || ncell.tile) continue;
+          if (!aiX9.isCellDead(state.board, nr, nc, null)) { hasLive = true; break; }
+        }
+        if (!hasLive) { skippedDead++; continue; }
       }
 
       const result = tryBingoAtAnchor(state, anchor, startTime, timeLimitMs);
@@ -68,7 +85,8 @@
       attemptsCount++;
     }
 
-    console.log('[FastBingo] No pattern Bingo found after checking ' + attemptsCount + ' anchors (' + (Date.now() - startTime) + 'ms)');
+    console.log('[FastBingo] No pattern Bingo found after checking ' + attemptsCount + ' anchors (' + (Date.now() - startTime) + 'ms)' +
+                (skippedDead > 0 ? ', ' + skippedDead + ' skipped as syntactically dead' : ''));
     return null;
   }
 
@@ -626,6 +644,13 @@
   function validatePlacements(board, placements) {
     if (!window.AMath.placement || !window.AMath.placement.validatePlay) {
       return { valid: true };  // skip if placement module missing
+    }
+    // Fast pre-filter: skip obviously illegal placements (digit next to
+    // twodigit, op next to op, etc.) without running full validation.
+    if (window.AMath.aiX9 && window.AMath.aiX9.isPlaySyntacticallyLegal) {
+      if (!window.AMath.aiX9.isPlaySyntacticallyLegal(board, placements)) {
+        return { valid: false, reason: 'syntactic pre-check failed' };
+      }
     }
     // Simulate placing tiles temporarily
     const applied = [];

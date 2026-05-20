@@ -51,6 +51,121 @@
   let session = null;
   let chessClockInterval = null;
 
+  // ============================================================================
+  // STALLING WATCH — needles the player with character-flavored trash-talk
+  // every 30 seconds they spend thinking on their turn.
+  //
+  // Runs independently of the chess clock (which may be disabled). Starts on
+  // player-turn-begin, ticks every second, fires trash-talk at 30/60/90/...,
+  // resets on player-turn-end (submit/pass/swap) or AI vs AI mode.
+  // ============================================================================
+
+  let stallingInterval = null;
+  let stallingSeconds = 0;
+  let stallingFiredCount = 0;  // 0 if player hasn't been needled yet this turn
+  const STALLING_THRESHOLD_S = 30;  // fire every 30 seconds
+
+  function startStallingWatch() {
+    stopStallingWatch();
+    stallingSeconds = 0;
+    stallingFiredCount = 0;
+    let lastTickAt = Date.now();
+    stallingInterval = setInterval(function () {
+      // Update lastTickAt EVERY tick (whether or not we count) so that
+      // returning to a player turn after a long AI think doesn't dump 60s
+      // of "wall time" into the stalling counter at once.
+      const now = Date.now();
+      const elapsed = Math.max(1, Math.floor((now - lastTickAt) / 1000));
+      lastTickAt = now;
+
+      if (!session || session.gameOver) return;
+      const Modes = window.AMath.modes;
+      const isPvA = !Modes || !Modes.getMode || Modes.getMode() === Modes.MODE_PLAYER_VS_AI;
+      if (!isPvA) return;
+      if (!session.isPlayerTurn) return;
+      if (session.playerTimerPaused) return;
+
+      const prevBucket = Math.floor(stallingSeconds / STALLING_THRESHOLD_S);
+      stallingSeconds += elapsed;
+      const newBucket = Math.floor(stallingSeconds / STALLING_THRESHOLD_S);
+      if (newBucket > prevBucket) {
+        // Crossed a 30s threshold — fire trash-talk.
+        // The very first fire of this turn is guaranteed (skips fire-chance
+        // gate) so the player actually sees the AI react to their stalling.
+        // Subsequent fires use the STALLING context's regular 70% gate.
+        const isFirstFire = stallingFiredCount === 0;
+        fireTrashTalk('stalling', { force: isFirstFire });
+        stallingFiredCount++;
+      }
+    }, 1000);
+  }
+
+  function stopStallingWatch() {
+    if (stallingInterval) {
+      clearInterval(stallingInterval);
+      stallingInterval = null;
+    }
+    stallingSeconds = 0;
+    stallingFiredCount = 0;
+  }
+
+  function resetStallingWatch() {
+    // Reset counter without stopping the interval; called when player takes
+    // an action (e.g., places a tile) — and when the player's turn begins
+    // after AI finishes. Zeros the elapsed time and the "fired count".
+    stallingSeconds = 0;
+    stallingFiredCount = 0;
+  }
+
+  /**
+   * Handle the result from Settings.showPopup.
+   *
+   * The dialog returns { saved, restartChanged, liveChanged }.
+   * Live-changed settings have already been applied inside settings.js (theme,
+   * sound) OR are read fresh on every relevant event (trash-talk, AI think
+   * time, AI swap brain). Some live settings need a small UI refresh handled
+   * here (showAiHand → re-render opponent rack).
+   *
+   * Restart-changed settings (gameMode, tileSet, chessClockEnabled) only take
+   * effect when a new game starts. Ask the user, but only when one of those
+   * actually changed.
+   */
+  function handleSettingsResult(result, opts) {
+    opts = opts || {};
+    if (!result || !result.saved) return;
+
+    // Re-render the opponent rack if showAiHand toggled — it controls
+    // whether AI rack tiles are visible. Only matters in Player vs AI mode;
+    // in AI vs AI mode both racks are always shown face-up regardless of
+    // this setting.
+    if (result.liveChanged.indexOf('showAiHand') !== -1) {
+      try {
+        const Modes = window.AMath.modes;
+        const isPvA = Modes && Modes.getMode && Modes.getMode() === Modes.MODE_PLAYER_VS_AI;
+        if (isPvA && session && session.uiParts && session.aiRack && window.AMath.ui) {
+          window.AMath.ui.renderRack(session.aiRack, session.uiParts.opponentRack, true);
+        }
+      } catch (e) { console.warn('rack rerender failed', e); }
+    }
+
+    // If something needs a new game, ask.
+    if (result.restartChanged.length > 0) {
+      const list = result.restartChanged.map(function (k) {
+        return ({
+          gameMode: 'Game mode',
+          tileSet: 'Tile set',
+          chessClockEnabled: 'Chess clock',
+        })[k] || k;
+      }).join(', ');
+      if (confirm(list + ' changed — start a new game to apply?')) {
+        if (opts.clearSave && window.AMath.saveResume) {
+          window.AMath.saveResume.clearSave();
+        }
+        startGameSession();
+      }
+    }
+  }
+
   function startGameSession() {
     const Settings = window.AMath.settings;
     const Modes = window.AMath.modes;
@@ -79,6 +194,7 @@
       clearInterval(chessClockInterval);
       chessClockInterval = null;
     }
+    stopStallingWatch();
 
     // Clear any previous save (new game starting)
     if (window.AMath.saveResume) window.AMath.saveResume.clearSave();
@@ -91,7 +207,11 @@
 
     // Reset AI play count for first-4-turns Bingo mode (all racks)
     if (window.AMath.aiPlayer && window.AMath.aiPlayer.resetPlayCount) {
-      window.AMath.aiPlayer.resetPlayCount(); // reset all
+      window.AMath.aiPlayer.resetPlayCount(); // reset all (main thread)
+    }
+    // Also reset in worker (if any) by terminating it — fresh worker on next decide
+    if (window.AMath.aiWorkerClient && window.AMath.aiWorkerClient.terminate) {
+      window.AMath.aiWorkerClient.terminate();
     }
 
     const existingPopup = document.querySelector('.game-end-overlay');
@@ -175,12 +295,8 @@
     const btnSettings = document.getElementById('btn-settings');
     if (btnSettings) {
       btnSettings.addEventListener('click', function () {
-        Settings.showPopup(function (changed) {
-          if (changed) {
-            if (confirm('Settings saved. Start a new game to apply?')) {
-              startGameSession();
-            }
-          }
+        Settings.showPopup(function (result) {
+          handleSettingsResult(result);
         });
       });
     }
@@ -237,6 +353,9 @@
     wireScorePauseHandlers();
     refreshDesktopSidePanels();
 
+    // Start stalling watch for Player vs AI mode
+    startStallingWatch();
+
     if (playerGoesFirst) {
       showStatus(
         '🎲 You go first! Tap a tile, then tap a board cell. First move must pass through the center ★.'
@@ -253,7 +372,7 @@
    */
   function runAiTakeoverTurn() {
     const Interactions = window.AMath.interactions;
-    const AI = window.AMath.aiPlayer;
+    const AI = (window.AMath.aiWorkerClient && window.AMath.aiWorkerClient.isAvailable()) ? window.AMath.aiWorkerClient : window.AMath.aiPlayer;
     const Board = window.AMath.board;
     const Rack = window.AMath.rack;
     const Bag = window.AMath.bag;
@@ -261,9 +380,9 @@
 
     showThinking(true);
 
-    setTimeout(function () {
+    setTimeout(async function () {
       try {
-        const decision = AI.decideMove({
+        const decision = await AI.decideMove({
           board: session.board,
           aiRack: session.playerRack,  // use player rack
           bag: session.bag,
@@ -347,6 +466,7 @@
       clearInterval(chessClockInterval);
       chessClockInterval = null;
     }
+    stopStallingWatch(); // no human player in AI vs AI mode
     if (window.AMath.saveResume) window.AMath.saveResume.clearSave();
     if (window.AMath.scoreSheet) window.AMath.scoreSheet.reset();
 
@@ -417,12 +537,8 @@
     const btnSettings = document.getElementById('btn-settings');
     if (btnSettings) {
       btnSettings.addEventListener('click', function () {
-        Settings.showPopup(function (changed) {
-          if (changed) {
-            if (confirm('Settings saved. Restart game?')) {
-              startGameSession();
-            }
-          }
+        Settings.showPopup(function (result) {
+          handleSettingsResult(result);
         });
       });
     }
@@ -496,7 +612,7 @@
    */
   function runAiVsAiTurn(singleStep) {
     const Modes = window.AMath.modes;
-    const AI = window.AMath.aiPlayer;
+    const AI = (window.AMath.aiWorkerClient && window.AMath.aiWorkerClient.isAvailable()) ? window.AMath.aiWorkerClient : window.AMath.aiPlayer;
     const Board = window.AMath.board;
     const Rack = window.AMath.rack;
     const Bag = window.AMath.bag;
@@ -515,9 +631,9 @@
     // Capture start time so we can deduct from the AI's chess clock
     const aiTurnStartTime = Date.now();
 
-    setTimeout(function () {
+    setTimeout(async function () {
       try {
-        const decision = AI.decideMove({
+        const decision = await AI.decideMove({
           board: session.board,
           aiRack: currentRack,
           bag: session.bag,
@@ -528,17 +644,14 @@
           opponentRack: isAi1 ? session.aiRack : session.playerRack,
         });
 
-        // Deduct AI's think time from its chess clock (sync search freezes setInterval)
+        // Reconcile timer to current value (some setInterval ticks may have
+        // happened during yield gaps, but we ensure the display matches
+        // session state precisely).
         if (session.chessClockEnabled) {
-          const elapsedSeconds = Math.floor((Date.now() - aiTurnStartTime) / 1000);
-          if (elapsedSeconds > 0) {
-            if (isAi1) {
-              session.playerTimeSeconds -= elapsedSeconds;
-              UI.renderTimer(session.uiParts.playerTimer, 'AI 1 Time', session.playerTimeSeconds);
-            } else {
-              session.aiTimeSeconds -= elapsedSeconds;
-              UI.renderTimer(session.uiParts.opponentTimer, 'AI 2 Time', session.aiTimeSeconds);
-            }
+          if (isAi1) {
+            UI.renderTimer(session.uiParts.playerTimer, 'AI 1 Time', session.playerTimeSeconds);
+          } else {
+            UI.renderTimer(session.uiParts.opponentTimer, 'AI 2 Time', session.aiTimeSeconds);
           }
         }
 
@@ -625,6 +738,7 @@
       clearInterval(chessClockInterval);
       chessClockInterval = null;
     }
+    stopStallingWatch();
 
     const container = document.getElementById('game-container');
     const parts = UI.buildGameLayout(container);
@@ -699,13 +813,8 @@
     const btnSettings = document.getElementById('btn-settings');
     if (btnSettings) {
       btnSettings.addEventListener('click', function () {
-        Settings.showPopup(function (changed) {
-          if (changed) {
-            if (confirm('Settings saved. Start a new game to apply?')) {
-              window.AMath.saveResume.clearSave();
-              startGameSession();
-            }
-          }
+        Settings.showPopup(function (result) {
+          handleSettingsResult(result, { clearSave: true });
         });
       });
     }
@@ -864,7 +973,7 @@
   function refreshDesktopSidePanels() {
     if (!session) return;
 
-    // Live score sheet (left panel)
+    // Live score sheet (now on right panel, under Tile Tracker)
     const sheetEl = document.getElementById('live-score-sheet');
     if (sheetEl && window.AMath.scoreSheet && window.AMath.scoreSheet.renderLive) {
       window.AMath.scoreSheet.renderLive(sheetEl, session.playerScore, session.aiScore);
@@ -922,12 +1031,21 @@
   // ============================================================================
 
   function startChessClock() {
+    // Track the last tick wall-clock time so we can compensate for missed ticks
+    // (the AI's synchronous search may delay setInterval callbacks; we want the
+    // displayed time to reflect actual elapsed wall-clock seconds, not the
+    // number of times setInterval has fired).
+    let lastTickAt = Date.now();
     chessClockInterval = setInterval(function () {
       if (!session || session.gameOver) return;
 
+      const now = Date.now();
+      const elapsedSeconds = Math.max(1, Math.floor((now - lastTickAt) / 1000));
+      lastTickAt = now;
+
       if (session.isPlayerTurn) {
         if (session.playerTimerPaused) return; // pause-by-double-click
-        session.playerTimeSeconds--;
+        session.playerTimeSeconds -= elapsedSeconds;
         window.AMath.ui.renderTimer(
           session.uiParts.playerTimer,
           'Your Time',
@@ -935,7 +1053,7 @@
         );
       } else {
         if (session.aiTimerPaused) return; // pause-by-double-click
-        session.aiTimeSeconds--;
+        session.aiTimeSeconds -= elapsedSeconds;
         window.AMath.ui.renderTimer(
           session.uiParts.opponentTimer,
           'AI Time',
@@ -1078,6 +1196,7 @@
     if (checkGameEnd()) return;
 
     Interactions.setPlayerTurn(false);
+    resetStallingWatch();
     setTimeout(runAiTurn, 800);
   }
 
@@ -1136,6 +1255,7 @@
     if (checkGameEnd()) return;
 
     Interactions.setPlayerTurn(false);
+    resetStallingWatch();
     setTimeout(runAiTurn, 800);
   }
 
@@ -1190,6 +1310,7 @@
     if (checkGameEnd()) return;
 
     Interactions.setPlayerTurn(false);
+    resetStallingWatch();
     setTimeout(runAiTurn, 800);
   }
 
@@ -1199,19 +1320,23 @@
 
   function runAiTurn() {
     const Interactions = window.AMath.interactions;
-    const AI = window.AMath.aiPlayer;
+    const AI = (window.AMath.aiWorkerClient && window.AMath.aiWorkerClient.isAvailable()) ? window.AMath.aiWorkerClient : window.AMath.aiPlayer;
 
     if (session.gameOver) return;
 
     showThinking(true);
 
     // Capture the AI's start time so we can deduct from its timer afterward.
-    // (AI search is synchronous and blocks the JS thread — chess clock can't tick during it.)
     const aiTurnStartTime = Date.now();
+    // Capture the session reference so we can detect mid-think game reset.
+    const sessionAtStart = session;
 
-    setTimeout(function () {
+    // Run AI search asynchronously so the browser can repaint and tick the
+    // chess clock between yield points. decideMove is async and yields
+    // periodically inside its search loop.
+    setTimeout(async function () {
       try {
-        const aiDecision = AI.decideMove({
+        const aiDecision = await AI.decideMove({
           board: session.board,
           aiRack: session.aiRack,
           bag: session.bag,
@@ -1222,23 +1347,29 @@
           opponentRack: session.playerRack,
         });
 
-        // Deduct actual think time from AI's chess clock (compensating for the
-        // synchronous freeze during search — setInterval can't fire while JS is busy).
+        // Detect stale decision (game was reset/ended during AI thinking)
+        if (session !== sessionAtStart || !session || session.gameOver) {
+          console.log('[AI] decision dropped — session changed during thinking');
+          return;
+        }
+
+        // Reconcile AI's chess clock with actual elapsed wall-clock time.
         if (session.chessClockEnabled && !session.aiTimerPaused) {
-          const elapsedMs = Date.now() - aiTurnStartTime;
-          const elapsedSeconds = Math.floor(elapsedMs / 1000);
-          if (elapsedSeconds > 0) {
-            session.aiTimeSeconds -= elapsedSeconds;
-            window.AMath.ui.renderTimer(
-              session.uiParts.opponentTimer,
-              'AI Time',
-              session.aiTimeSeconds
-            );
-          }
+          window.AMath.ui.renderTimer(
+            session.uiParts.opponentTimer,
+            'AI Time',
+            session.aiTimeSeconds
+          );
         }
 
         executeAiDecision(aiDecision);
       } catch (err) {
+        // If game was reset during AI thinking (worker terminated, session changed),
+        // silently drop this stale error rather than disrupting the new game.
+        if (session !== sessionAtStart || !session || session.gameOver) {
+          console.log('[AI] stale error dropped (game ended/reset during thinking)');
+          return;
+        }
         console.error('AI error:', err);
         showThinking(false);
         showStatus('AI error — your turn.', 'error');
@@ -1369,6 +1500,9 @@
     if (checkGameEnd()) return;
 
     Interactions.setPlayerTurn(true);
+    // Player's turn starts now — reset stalling counter so the first
+    // 30-second window is measured from now, not from any leftover time.
+    resetStallingWatch();
 
     // Show challenge button briefly after AI play
     if (decision.type === 'play') {
@@ -1395,6 +1529,7 @@
       playerScore: session.playerScore,
       aiScore: session.aiScore,
       lastScore: extras && extras.lastScore,
+      force: extras && extras.force,
     });
   }
 

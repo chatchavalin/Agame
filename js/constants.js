@@ -334,7 +334,7 @@ const YOYO_PLACE_MAX = 7;           // place at most 7 (8 = Bingo)
 const AI_LEAD_FOR_OFFENSE = 140;    // play ×9 offense when behind 140+
 const AI_LEAD_FOR_CLOSE = 150;      // close-board strategy when leading 150+
 const AI_BEHIND_FOR_BINGO_MODE = 100; // Bingo/YoYo-only when behind 100+
-const AI_DEFEND_X9_SKIP_THRESHOLD = 100; // skip defense if best play > 100
+const AI_DEFEND_X9_SKIP_THRESHOLD = 100; // DEPRECATED — replaced by dynamic threat-magnitude comparison in ai-player.js section 4
 const AI_BINGO_MODE_TURNS = 4;       // first 4 AI plays = Bingo/YoYo only
 
 // =============================================================================
