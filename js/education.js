@@ -23,15 +23,18 @@
     searchResult = { plays: [], swapAdvice: null, endgamePlan: null, status: 'searching' };
     searchAborted = false;
     ensureVerifyButton();
+    setVerifyFaded(true);
 
     runFullAnalysis(session).then(function (result) {
       if (searchAborted) return;
       searchResult = result;
       searchResult.status = 'done';
+      setVerifyFaded(false);
     }).catch(function (err) {
       console.error('[Education] analysis error:', err);
       if (!searchAborted) {
         searchResult = { plays: [], swapAdvice: null, endgamePlan: null, status: 'done' };
+        setVerifyFaded(false);
       }
     });
   }
@@ -591,6 +594,13 @@
     if (verifyBtn) {
       if (document.contains(verifyBtn)) verifyBtn.style.display = 'none';
       else verifyBtn = null;
+    }
+  }
+
+  function setVerifyFaded(faded) {
+    if (verifyBtn && document.contains(verifyBtn)) {
+      verifyBtn.style.opacity = faded ? '0.5' : '1';
+      verifyBtn.style.pointerEvents = 'auto'; // always clickable — shows "still analyzing" msg
     }
   }
 
