@@ -2170,6 +2170,9 @@
   };
 
   window.AMath._saveUndo = saveUndoSnapshot;
+  window.AMath._getSession = function () { return session; };
+  window.AMath._getUndoHistory = function () { return undoHistory; };
+  window.AMath._undoLastTurn = undoLastTurn;
 
   /**
    * Start the next turn — PvP switches players, PvA starts AI.
