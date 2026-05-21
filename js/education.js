@@ -10,6 +10,7 @@
 
   var searchResult = null;
   var searchAborted = false;
+  var searchGeneration = 0;   // prevents stale search from overwriting new one
   var verifyBtn = null;
   var popupOverlay = null;
   var currentSession = null;
@@ -22,17 +23,18 @@
     currentSession = session;
     searchResult = { plays: [], swapAdvice: null, endgamePlan: null, status: 'searching' };
     searchAborted = false;
+    var thisGen = ++searchGeneration;
     ensureVerifyButton();
     setVerifyFaded(true);
 
     runFullAnalysis(session).then(function (result) {
-      if (searchAborted) return;
+      if (searchAborted || thisGen !== searchGeneration) return;
       searchResult = result;
       searchResult.status = 'done';
       setVerifyFaded(false);
     }).catch(function (err) {
       console.error('[Education] analysis error:', err);
-      if (!searchAborted) {
+      if (!searchAborted && thisGen === searchGeneration) {
         searchResult = { plays: [], swapAdvice: null, endgamePlan: null, status: 'done' };
         setVerifyFaded(false);
       }

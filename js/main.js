@@ -1292,6 +1292,11 @@
     session.bagEmptyTaunted = snap.bagEmptyTaunted;
     session.playerTimeSeconds = snap.playerTimeSeconds;
     session.aiTimeSeconds = snap.aiTimeSeconds;
+    // Re-render timer displays
+    if (session.chessClockEnabled) {
+      renderTimerWithMirror(session.uiParts, 'player', 'Your Time', session.playerTimeSeconds);
+      renderTimerWithMirror(session.uiParts, 'ai', 'AI Time', session.aiTimeSeconds);
+    }
     session.tentativePlacements = [];
     session.gameOver = false;
     session.lastAiPlay = null;
