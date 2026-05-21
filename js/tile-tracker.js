@@ -25,20 +25,13 @@
       counts[def.face] = def.count;
     }
 
-    // Subtract tiles ON THE BOARD
+    // Subtract tiles ON THE BOARD only
     for (let r = 0; r < C.BOARD_SIZE; r++) {
       for (let c = 0; c < C.BOARD_SIZE; c++) {
         const cell = state.board.cells[r][c];
         if (cell.tile) {
           counts[cell.tile.face] = (counts[cell.tile.face] || 0) - 1;
         }
-      }
-    }
-
-    // Subtract AI/OPPONENT rack tiles
-    if (state.aiRack && state.aiRack.tiles) {
-      for (const t of state.aiRack.tiles) {
-        counts[t.face] = (counts[t.face] || 0) - 1;
       }
     }
 
@@ -57,7 +50,7 @@
 
     const title = document.createElement('div');
     title.className = 'tracker-title';
-    title.textContent = 'TILES REMAINING (IN BAG + YOUR HAND)';
+    title.textContent = 'TILES NOT ON BOARD';
     container.appendChild(title);
 
     const grid = document.createElement('div');
