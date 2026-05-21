@@ -297,7 +297,6 @@
    */
   function autoSwap() {
     if (!searchResult || !searchResult.swapAdvice || !currentSession) return;
-    if (window.AMath._saveUndo) window.AMath._saveUndo();
     var Interactions = window.AMath.interactions;
     var Board = window.AMath.board;
     var Rack = window.AMath.rack;
@@ -354,7 +353,6 @@
    */
   function autoPass() {
     if (!currentSession) return;
-    if (window.AMath._saveUndo) window.AMath._saveUndo();
     var Interactions = window.AMath.interactions;
     var Board = window.AMath.board;
     var Rack = window.AMath.rack;

@@ -407,6 +407,7 @@
     wireUndoHandler();
 
     if (playerGoesFirst) {
+      saveUndoSnapshot();  // snapshot at start of player's first turn
       showStatus(
         '🎲 You go first! Tap a tile, then tap a board cell. First move must pass through the center ★.'
       );
@@ -512,6 +513,9 @@
     wireTileTrackerButton();
     undoHistory = [];
     wireUndoHandler();
+    saveUndoSnapshot();  // snapshot at P1's first turn
+
+    // Hide AI-only buttons
     var btnTakeover = document.getElementById('btn-takeover');
     if (btnTakeover) btnTakeover.style.display = 'none';
 
@@ -537,6 +541,9 @@
 
     session.tentativePlacements = [];
     session.isPlayerTurn = true;
+
+    saveUndoSnapshot();  // snapshot at start of new player's turn
+
     Interactions.init(session);
     Interactions.setPlayerTurn(true);
 
@@ -1072,8 +1079,11 @@
 
     if (!session.isPlayerTurn) {
       setTimeout(runAiTurn, 800);
-    } else if (window.AMath.education && window.AMath.settings && window.AMath.settings.get('educationMode')) {
-      window.AMath.education.startBackgroundSearch(session);
+    } else {
+      saveUndoSnapshot();  // snapshot at resume point
+      if (window.AMath.education && window.AMath.settings && window.AMath.settings.get('educationMode')) {
+        window.AMath.education.startBackgroundSearch(session);
+      }
     }
   }
 
@@ -1128,7 +1138,7 @@
 
   /**
    * Save a snapshot of the current game state onto the undo stack.
-   * Call this BEFORE each action (player submit/pass/swap, AI turn).
+   * Called at the START of each player turn — one undo = one full round.
    */
   function saveUndoSnapshot() {
     if (!session || session.gameOver) return;
@@ -1618,8 +1628,6 @@
    * Commit the player's validated play to the board (called after education check).
    */
   function commitPlayerPlay(scoreResult) {
-    saveUndoSnapshot();
-
     // Stop education background search
     if (window.AMath.education) {
       window.AMath.education.stopSearch();
@@ -1715,7 +1723,6 @@
    * Undoes the player's tentative placements and commits the AI-suggested play.
    */
   function applySuggestedPlay(suggestedPlay) {
-    saveUndoSnapshot();
     const Placement = window.AMath.placement;
     const Scoring = window.AMath.scoring;
     const Rack = window.AMath.rack;
@@ -2023,7 +2030,6 @@
   }
 
   function executePass() {
-    saveUndoSnapshot();
     if (window.AMath.education) { window.AMath.education.stopSearch(); window.AMath.education.hideVerifyButton(); }
     const Interactions = window.AMath.interactions;
     const Board = window.AMath.board;
@@ -2097,7 +2103,6 @@
   }
 
   function executeSwap(tileIds) {
-    saveUndoSnapshot();
     if (window.AMath.education) { window.AMath.education.stopSearch(); window.AMath.education.hideVerifyButton(); }
     const Bag = window.AMath.bag;
     const Rack = window.AMath.rack;
@@ -2178,7 +2183,6 @@
   }
 
   function runAiTurn() {
-    saveUndoSnapshot();
     const Interactions = window.AMath.interactions;
     const workerAvailable = window.AMath.aiWorkerClient && window.AMath.aiWorkerClient.isAvailable();
     const AI = workerAvailable ? window.AMath.aiWorkerClient : window.AMath.aiPlayer;
@@ -2241,6 +2245,7 @@
         console.error('AI error stack:', err && err.stack);
         showThinking(false);
         showStatus('AI error — your turn. (' + (err && err.message || 'unknown') + ')', 'error');
+        saveUndoSnapshot();
         Interactions.setPlayerTurn(true);
       }
     }, 100);
@@ -2397,6 +2402,8 @@
     autoSave();
 
     if (checkGameEnd()) return;
+
+    saveUndoSnapshot();  // snapshot at start of player's turn (after AI played)
 
     Interactions.setPlayerTurn(true);
     // Player's turn starts now — reset stalling counter so the first
