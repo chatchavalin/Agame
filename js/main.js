@@ -1169,15 +1169,26 @@
 
     // Clone rack WITH tentative tiles added back
     var rackTiles = cloneTiles(session.playerRack.tiles);
+    var rackSlotMap = JSON.parse(JSON.stringify(session.playerRack.slotMap || {}));
     for (var tt = 0; tt < tentativeTiles.length; tt++) {
       var t = tentativeTiles[tt];
       rackTiles.push({ id: t.id, face: t.face, type: t.type, points: t.points, assigned: null });
+      // Re-add to slotMap — find an empty slot
+      var usedSlots = new Set(Object.values(rackSlotMap));
+      for (var si = 0; si < 8; si++) {
+        if (!usedSlots.has(si)) { rackSlotMap[t.id] = si; break; }
+      }
     }
+
+    // Clone AI rack + slotMap
+    var aiRackSlotMap = JSON.parse(JSON.stringify(session.aiRack.slotMap || {}));
 
     var snap = {
       board: boardSnap,
       playerRack: rackTiles,
+      playerSlotMap: rackSlotMap,
       aiRack: cloneTiles(session.aiRack.tiles),
+      aiSlotMap: aiRackSlotMap,
       bag: cloneTiles(session.bag.tiles),
       playerScore: session.playerScore,
       aiScore: session.aiScore,
@@ -1191,7 +1202,9 @@
       aiTimeSeconds: session.aiTimeSeconds,
       currentPlayer: session.currentPlayer || 1,
       p1Rack: session.p1Rack ? cloneTiles(session.p1Rack.tiles) : null,
+      p1SlotMap: session.p1Rack ? JSON.parse(JSON.stringify(session.p1Rack.slotMap || {})) : null,
       p2Rack: session.p2Rack ? cloneTiles(session.p2Rack.tiles) : null,
+      p2SlotMap: session.p2Rack ? JSON.parse(JSON.stringify(session.p2Rack.slotMap || {})) : null,
       scoreSheetEntries: window.AMath.scoreSheet
         ? window.AMath.scoreSheet.getAllEntries().map(function (e) {
             return JSON.parse(JSON.stringify(e));
@@ -1202,10 +1215,15 @@
     // PvP: also add tentative tiles back to the correct p1/p2 rack snapshot
     if (session.isPvP && tentativeTiles.length > 0) {
       var pRack = (session.currentPlayer || 1) === 1 ? snap.p1Rack : snap.p2Rack;
-      if (pRack) {
+      var pSlotMap = (session.currentPlayer || 1) === 1 ? snap.p1SlotMap : snap.p2SlotMap;
+      if (pRack && pSlotMap) {
         for (var pt = 0; pt < tentativeTiles.length; pt++) {
           var ptile = tentativeTiles[pt];
           pRack.push({ id: ptile.id, face: ptile.face, type: ptile.type, points: ptile.points, assigned: null });
+          var usedPvPSlots = new Set(Object.values(pSlotMap));
+          for (var psi = 0; psi < 8; psi++) {
+            if (!usedPvPSlots.has(psi)) { pSlotMap[ptile.id] = psi; break; }
+          }
         }
       }
     }
@@ -1241,15 +1259,19 @@
       }
     }
 
-    // Restore racks
+    // Restore racks + slotMaps
     session.playerRack.tiles = snap.playerRack;
+    session.playerRack.slotMap = snap.playerSlotMap || {};
     session.aiRack.tiles = snap.aiRack;
+    session.aiRack.slotMap = snap.aiSlotMap || {};
     session.bag.tiles = snap.bag;
 
     // PvP racks
     if (session.isPvP && snap.p1Rack) {
       session.p1Rack.tiles = snap.p1Rack;
+      session.p1Rack.slotMap = snap.p1SlotMap || {};
       session.p2Rack.tiles = snap.p2Rack;
+      session.p2Rack.slotMap = snap.p2SlotMap || {};
       session.currentPlayer = snap.currentPlayer;
       if (snap.currentPlayer === 1) {
         session.playerRack = session.p1Rack;
