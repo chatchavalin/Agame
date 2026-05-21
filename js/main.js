@@ -1132,9 +1132,51 @@
    */
   function saveUndoSnapshot() {
     if (!session || session.gameOver) return;
+
+    // Collect tentative tile IDs — these tiles are ON the board but
+    // logically still belong to the player's rack. The snapshot must
+    // capture them in the rack (not on the board) so undo restores correctly.
+    var tentativeIds = new Set();
+    var tentativeTiles = [];
+    if (session.tentativePlacements) {
+      for (var ti = 0; ti < session.tentativePlacements.length; ti++) {
+        var tp = session.tentativePlacements[ti];
+        var cell = session.board.cells[tp.row][tp.col];
+        if (cell && cell.tile) {
+          tentativeIds.add(cell.tile.id);
+          tentativeTiles.push(cell.tile);
+        }
+      }
+    }
+
+    // Clone board WITHOUT tentative tiles
+    var boardSnap = { cells: [] };
+    for (var r = 0; r < 15; r++) {
+      boardSnap.cells[r] = [];
+      for (var c = 0; c < 15; c++) {
+        var cl = session.board.cells[r][c];
+        var isTent = cl.tile && tentativeIds.has(cl.tile.id);
+        boardSnap.cells[r][c] = {
+          premium: cl.premium,
+          premiumUsed: cl.premiumUsed,
+          tile: isTent ? null : (cl.tile ? {
+            id: cl.tile.id, face: cl.tile.face, type: cl.tile.type,
+            points: cl.tile.points, assigned: cl.tile.assigned
+          } : null),
+        };
+      }
+    }
+
+    // Clone rack WITH tentative tiles added back
+    var rackTiles = cloneTiles(session.playerRack.tiles);
+    for (var tt = 0; tt < tentativeTiles.length; tt++) {
+      var t = tentativeTiles[tt];
+      rackTiles.push({ id: t.id, face: t.face, type: t.type, points: t.points, assigned: null });
+    }
+
     var snap = {
-      board: cloneBoard(session.board),
-      playerRack: cloneTiles(session.playerRack.tiles),
+      board: boardSnap,
+      playerRack: rackTiles,
       aiRack: cloneTiles(session.aiRack.tiles),
       bag: cloneTiles(session.bag.tiles),
       playerScore: session.playerScore,
@@ -1147,17 +1189,27 @@
       bagEmptyTaunted: session.bagEmptyTaunted,
       playerTimeSeconds: session.playerTimeSeconds,
       aiTimeSeconds: session.aiTimeSeconds,
-      // PvP
       currentPlayer: session.currentPlayer || 1,
       p1Rack: session.p1Rack ? cloneTiles(session.p1Rack.tiles) : null,
       p2Rack: session.p2Rack ? cloneTiles(session.p2Rack.tiles) : null,
-      // Score sheet
       scoreSheetEntries: window.AMath.scoreSheet
         ? window.AMath.scoreSheet.getAllEntries().map(function (e) {
             return JSON.parse(JSON.stringify(e));
           })
         : [],
     };
+
+    // PvP: also add tentative tiles back to the correct p1/p2 rack snapshot
+    if (session.isPvP && tentativeTiles.length > 0) {
+      var pRack = (session.currentPlayer || 1) === 1 ? snap.p1Rack : snap.p2Rack;
+      if (pRack) {
+        for (var pt = 0; pt < tentativeTiles.length; pt++) {
+          var ptile = tentativeTiles[pt];
+          pRack.push({ id: ptile.id, face: ptile.face, type: ptile.type, points: ptile.points, assigned: null });
+        }
+      }
+    }
+
     undoHistory.push(snap);
   }
 
