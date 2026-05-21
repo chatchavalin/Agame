@@ -126,6 +126,7 @@
    */
   function wouldPassLoseGame(state) {
     if (getStateSetting('disableSixPassEnd', false) === true) return false;
+    if (state.isFirstMove) return false;   // no tiles on board → 6-pass rule doesn't apply
 
     const consecutiveNonScoring = state.consecutiveNonScoringTurns || 0;
     // Pass causes 6th non-scoring turn → game ends
@@ -297,6 +298,11 @@
 
     // === 4. ×9 defense check (Quality-aware implementation) ===
     //
+    // Track whether this section picks the play for defensive reasons.
+    // If so, blank usage is justified even for short equations — blocking
+    // a ×9 threat is worth spending a BLANK.
+    let x9DefenseActive = false;
+    //
     // The ×9 multiplier is catastrophic: an opponent ×9 play can score 100-300+ pts.
     //
     // Block quality matters: a tile placed ON a 3E square fully prevents the
@@ -419,6 +425,7 @@
                     ', residual ' + (bestEval.residual * 100).toFixed(0) + '%' +
                     ampNote + ')');
         bestPlay = bestEval.play;
+        x9DefenseActive = true;   // play was chosen for defensive reasons — blanks OK
       } else if (bestEval) {
         // bestPlay is already the best — log diagnostics for verification
         const qName = (bestEval.quality >= aiX9.BLOCK_QUALITY.STRONG ? 'STRONG'
@@ -645,7 +652,52 @@
       }
     }
 
+    // === 6.5 LATE-GAME STRATEGY (bag ≤ 15, bag > 0) ===
+    //
+    // When the bag is running low but not empty, the strategic priorities shift:
+    //   - Rack balance matters (keep tiles that enable future bingo)
+    //   - Swap quality depends on what's actually left in the bag
+    //   - If opponent just swapped few tiles (<4), they're likely near bingo — BLOCK
+    //
+    // Decision tree:
+    //   OVERRIDE: Opponent swapped <4 tiles & bot leads → block their bingo spot
+    //   1. bestPlay > 60 pts → play it (any position)
+    //   2. Leading 60+, good swap odds → play if >40 pts, or smart swap (rack balance)
+    //   3. Leading 60+, bad swap odds → play short eq, dump worst tiles
+    //   4. Leading <60 / tied → play with rack balance focus
+    //   5. Behind → swap for bingo chance
+    if (bagSize > 0 && bagSize <= 15 && !state.isFirstMove && !bingoYoyoOnlyMode) {
+      const lateGameResult = lateGameStrategy(state, bestPlay, bingoPlay, yoyoPlay, bagSize);
+      if (lateGameResult) {
+        if (lateGameResult.type === 'play') recordPlay(rackOwner);
+        return lateGameResult;
+      }
+      // null → fall through to normal mode
+    }
+
     // === 7. Normal mode ===
+
+    // === 7a. ENDGAME PLANNER (bag empty) ===
+    // When the bag is empty, the AI has perfect information and should plan
+    // multiple turns ahead to empty its rack (earning the ×2 bonus on
+    // opponent's remaining tiles). This overrides normal play selection
+    // because the strategic priorities change completely:
+    //   - BLANK preservation is irrelevant (no future bingo possible)
+    //   - Rack management is irrelevant (no tiles to draw)
+    //   - Goal: empty rack first, block opponent from doing the same
+    if (bagSize === 0 && !state.isFirstMove && bestPlay) {
+      const endgamePlan = planEndgame(state, bestPlay);
+      if (endgamePlan) {
+        recordPlay(rackOwner);
+        return {
+          type: 'play',
+          placements: endgamePlan.placements,
+          score: endgamePlan.score,
+          equations: endgamePlan.equations,
+        };
+      }
+    }
+
     if (bestPlay) {
       // ×4 threat avoidance: check if this play opens up a 2E+2E line for opponent
       // Try alternatives if so.
@@ -664,45 +716,64 @@
         }
       }
 
-      // BLANK preservation check — never burn BLANKs on low-value plays
+      // BLANK preservation — strict rule.
+      //
+      // BLANKs are the most valuable tiles in A-Math (any value, 0 points cost).
+      // They should be saved for Bingo attempts. Using a BLANK in a short equation
+      // (e.g. 2=2 using a BLANK as the '=') is almost always a strategic disaster.
+      //
+      // Rule: If the best play uses ANY blanks and is NOT a Bingo (8 tiles),
+      //   REJECT it and find a blank-free alternative or swap.
+      //
+      // Exceptions (blanks may be used in short equations):
+      //   1. x9 defense — section 4 chose this play to block a ×9 threat.
+      //      Losing 100-300 pts to a ×9 is worse than spending a BLANK.
+      //   2. Endgame — bag ≤ 15 tiles. No future Bingo opportunity anyway;
+      //      the BLANK should be played for whatever it can get.
+      //   3. Bag too small to swap (≤ SWAP_FORBIDDEN_BAG_THRESHOLD) — forced.
       const blanksUsed = bestPlay.placements.filter(p => p.tile && p.tile.type === 'blank').length;
-      const blanksLeftInRack = state.aiRack.tiles.filter(t => t.type === 'blank').length;
+      const isBingo = bestPlay.placements.length === 8;
+      const isEndgame = bagSize <= 15 && !state.isFirstMove;
 
-      let minScoreForBlanks = 0;
-      if (blanksUsed === 1) minScoreForBlanks = 20;       // 1 BLANK: needs 20+ pts
-      else if (blanksUsed === 2) minScoreForBlanks = 45;  // 2 BLANKs: needs 45+ pts
-      else if (blanksUsed >= 3) minScoreForBlanks = 75;   // 3+ BLANKs: nearly Bingo only
+      if (blanksUsed > 0 && !isBingo && !x9DefenseActive && !isEndgame) {
+        console.log('[AI] BLANK protection: best play uses ' + blanksUsed +
+                    ' BLANK(s) for ' + bestPlay.score + ' pts (not Bingo, not x9 defense, not endgame). Rejecting.');
 
-      if (blanksUsed > 0 && bestPlay.score < minScoreForBlanks) {
-        // Best play wastes BLANKs. Consider alternatives:
-        // 1. If we have a non-BLANK alternative, use it
-        // 2. Otherwise, swap non-BLANKs to find better tiles next turn
-        console.log('[AI] BLANK protection: best play uses ' + blanksUsed + ' BLANK(s) for only ' +
-                    bestPlay.score + ' pts (threshold ' + minScoreForBlanks + ').');
+        // Try the tracked blank-free alternative from the search
+        const noBlankAlt = bingoPlay && bingoPlay._bestNoBlank;
+        if (noBlankAlt && noBlankAlt.score >= 5) {
+          console.log('[AI] Using blank-free alternative: ' + noBlankAlt.score + ' pts');
+          recordPlay(rackOwner);
+          return {
+            type: 'play',
+            placements: noBlankAlt.placements,
+            score: noBlankAlt.score,
+            equations: noBlankAlt.equations,
+          };
+        }
 
-        // Try the non-rim alternative if it doesn't use BLANKs heavily
-        const nonRimAlt = bingoPlay && bingoPlay._bestNonRim;
-        if (nonRimAlt) {
-          const altBlanks = nonRimAlt.placements.filter(p => p.tile && p.tile.type === 'blank').length;
-          if (altBlanks < blanksUsed && nonRimAlt.score >= 5) {
-            console.log('[AI] Using alternative play with fewer BLANKs: ' + nonRimAlt.score + ' pts, ' + altBlanks + ' BLANKs');
+        // Also try yoyo if it doesn't use blanks
+        if (yoyoPlay) {
+          const yoyoBlanks = yoyoPlay.placements.filter(p => p.tile && p.tile.type === 'blank').length;
+          if (yoyoBlanks === 0 && yoyoPlay.score >= 5) {
+            console.log('[AI] Using blank-free yoyo: ' + yoyoPlay.score + ' pts');
             recordPlay(rackOwner);
             return {
               type: 'play',
-              placements: nonRimAlt.placements,
-              score: nonRimAlt.score,
-              equations: nonRimAlt.equations,
+              placements: yoyoPlay.placements,
+              score: yoyoPlay.score,
+              equations: yoyoPlay.equations,
             };
           }
         }
 
-        // No good alternative — swap non-BLANK tiles if bag allows, keeping BLANKs
+        // No blank-free alternative — swap to preserve BLANKs for future Bingo
         if (bagSize > C.SWAP_FORBIDDEN_BAG_THRESHOLD) {
-          console.log('[AI] Swapping non-BLANKs to preserve BLANKs for a future Bingo');
-          return smartSwap(state);  // smart swap already protects BLANKs
+          console.log('[AI] Swapping to preserve BLANKs for future Bingo');
+          return smartSwap(state);
         }
-        // Bag too small — must play the bestPlay anyway
-        console.log('[AI] Bag too small to swap, playing the BLANK-heavy play anyway');
+        // Bag too small to swap — must play the blank-using play anyway
+        console.log('[AI] Bag too small to swap, playing blank-heavy play as last resort');
       }
 
       recordPlay(rackOwner);
@@ -780,6 +851,7 @@
     // main search, section 4 always has options to consider.
     let bestBlockingPlay = null;
     let bestBlockingDefValue = -1;
+    let bestNoBlankPlay = null;   // Best play that uses zero BLANK tiles
     const rack = aiRack.tiles;
     if (rack.length === 0) return null;
 
@@ -817,6 +889,14 @@
       if (!isRim || isBingoOn3E) {
         if (!bestNonRimPlay || play.score > bestNonRimPlay.score) {
           bestNonRimPlay = play;
+        }
+      }
+
+      // Track best play that uses ZERO blank tiles — for blank preservation in section 7
+      const playUsesBlanks = play.placements.some(p => p.tile && p.tile.type === 'blank');
+      if (!playUsesBlanks) {
+        if (!bestNoBlankPlay || play.score > bestNoBlankPlay.score) {
+          bestNoBlankPlay = play;
         }
       }
 
@@ -976,6 +1056,7 @@
     if (bestPlay) {
       bestPlay._bestNonRim = bestNonRimPlay;
       bestPlay._bestBlocking = bestBlockingPlay;
+      bestPlay._bestNoBlank = bestNoBlankPlay;
     }
     return bestPlay;
   }
@@ -1089,6 +1170,315 @@
       hardRatio: unseenTotal > 0 ? unseenHard / unseenTotal : 0,
     };
   }
+
+  // ============================================================================
+  // LATE-GAME STRATEGY (bag ≤ 15)
+  // ============================================================================
+
+  /**
+   * Detailed bag composition analysis.
+   * Returns counts of operators, numbers, equals, blanks, choices in unseen tiles.
+   */
+  function analyzeBagDetailed(state) {
+    const inventory = C.getActiveInventory ? C.getActiveInventory() : C.TILE_INVENTORY;
+    const seen = {};
+    for (let r = 0; r < C.BOARD_SIZE; r++) {
+      for (let c = 0; c < C.BOARD_SIZE; c++) {
+        const cell = state.board.cells[r][c];
+        if (cell && cell.tile) seen[cell.tile.face] = (seen[cell.tile.face] || 0) + 1;
+      }
+    }
+    for (const t of state.aiRack.tiles) seen[t.face] = (seen[t.face] || 0) + 1;
+
+    let ops = 0, nums = 0, equals = 0, blanks = 0, choices = 0, total = 0, hard = 0;
+    for (const def of inventory) {
+      const rem = Math.max(0, def.count - (seen[def.face] || 0));
+      if (rem === 0) continue;
+      total += rem;
+      if (def.type === 'op') ops += rem;
+      else if (def.type === 'equals') equals += rem;
+      else if (def.type === 'blank') blanks += rem;
+      else if (def.type === 'choice') choices += rem;
+      else { nums += rem; if (HARD_TILE_FACES.has(def.face)) hard += rem; }
+    }
+    return { ops, nums, equals, blanks, choices, total, hard,
+             hardRatio: total > 0 ? hard / total : 0 };
+  }
+
+  /**
+   * Count tile types in an array of tiles.
+   */
+  function countTileTypes(tiles) {
+    let ops = 0, nums = 0, eq = 0, blanks = 0, choices = 0;
+    for (const t of tiles) {
+      if (t.type === 'op') ops++;
+      else if (t.type === 'equals') eq++;
+      else if (t.type === 'blank') blanks++;
+      else if (t.type === 'choice') choices++;
+      else nums++;
+    }
+    return { ops, nums, eq, blanks, choices };
+  }
+
+  /**
+   * Assess swap quality: how likely is swapping bad tiles to improve rack?
+   * Returns 'good' | 'bad' with reasoning.
+   */
+  function assessSwapQuality(state, bagInfo, rackInfo) {
+    // Good swap: bag has what we NEED and low chance of getting what we DON'T need
+    //
+    // Rack balance for bingo:
+    //   Ideal: 4-5 numbers, 2 operators, 1 equals (or blank/choice as wildcard)
+    //   Bad: too many operators (3+), too many equals (2+), too many hard numbers
+
+    const reasons = [];
+    let score = 0;
+
+    // If bag has very few tiles, swap is risky (small pool)
+    if (bagInfo.total <= 8) { score -= 2; reasons.push('bag very small'); }
+
+    // Need operators? Check if bag has them
+    if (rackInfo.ops === 0 && bagInfo.ops + bagInfo.choices > 0) {
+      score += 1; reasons.push('bag has operators we need');
+    }
+
+    // Need equals? Check bag
+    if (rackInfo.eq === 0 && rackInfo.blanks === 0) {
+      if (bagInfo.equals > 0 || bagInfo.blanks > 0 || bagInfo.choices > 0) {
+        score += 1; reasons.push('bag has = or blanks');
+      } else {
+        score -= 2; reasons.push('bag has no = and no blanks');
+      }
+    }
+
+    // Too many equals in bag? Swapping risks drawing MORE equals (bad for bingo)
+    if (bagInfo.equals >= 2 && rackInfo.eq >= 1) {
+      score -= 1; reasons.push('bag has many = signs, risk drawing more');
+    }
+
+    // Bag has lots of good numbers (not hard)?
+    const goodNums = bagInfo.nums - bagInfo.hard;
+    if (goodNums > bagInfo.total * 0.4) {
+      score += 1; reasons.push('bag has good numbers');
+    }
+
+    // Bag mostly hard tiles? Bad swap
+    if (bagInfo.hardRatio > 0.5) {
+      score -= 1; reasons.push('bag mostly hard tiles');
+    }
+
+    // Need numbers but bag has few?
+    if (rackInfo.nums <= 2 && bagInfo.nums < 3) {
+      score -= 1; reasons.push('bag short on numbers');
+    }
+
+    return {
+      quality: score >= 0 ? 'good' : 'bad',
+      score: score,
+      reasons: reasons,
+    };
+  }
+
+  /**
+   * Find plays that use specific "bad" tiles (dump them).
+   * Returns the best play that uses at least one hard/excess tile.
+   */
+  function findDumpPlay(bestPlay, bingoPlay, yoyoPlay, state) {
+    const rack = state.aiRack.tiles;
+    const rackInfo = countTileTypes(rack);
+    const candidates = [bestPlay, bingoPlay && bingoPlay._bestNonRim,
+                        bingoPlay && bingoPlay._bestNoBlank, yoyoPlay].filter(Boolean);
+
+    // Score each candidate by how many "bad" tiles it dumps
+    let best = null;
+    let bestDumpScore = -1;
+
+    for (const play of candidates) {
+      if (play.score < 3) continue; // too weak
+      let dumpScore = 0;
+      for (const p of play.placements) {
+        if (!p.tile) continue;
+        if (isHardTile(p.tile)) dumpScore += 3;
+        // Excess operators (>2 in rack)
+        if ((p.tile.type === 'op' || p.tile.type === 'choice') && rackInfo.ops + rackInfo.choices > 2) dumpScore += 2;
+        // Excess equals (>1 in rack)
+        if (p.tile.type === 'equals' && rackInfo.eq > 1) dumpScore += 2;
+      }
+      // Bonus for using more tiles (closer to empty)
+      dumpScore += play.placements.length;
+      // Bonus for score
+      dumpScore += play.score * 0.1;
+
+      if (dumpScore > bestDumpScore) {
+        bestDumpScore = dumpScore;
+        best = play;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * Find plays that use the most tiles to achieve best rack balance.
+   */
+  function findRackBalancePlay(bestPlay, bingoPlay, yoyoPlay, state, bagInfo) {
+    const rack = state.aiRack.tiles;
+    const candidates = [bestPlay, bingoPlay && bingoPlay._bestNonRim,
+                        bingoPlay && bingoPlay._bestNoBlank, yoyoPlay].filter(Boolean);
+
+    let best = null;
+    let bestBalanceScore = -Infinity;
+
+    for (const play of candidates) {
+      if (play.score < 3) continue;
+      const usedIds = new Set(play.placements.map(p => p.tile && p.tile.id));
+      const remaining = rack.filter(t => !usedIds.has(t.id));
+      const remInfo = countTileTypes(remaining);
+
+      // Score remaining rack quality for future bingo
+      let balanceScore = play.score * 0.3; // base: play score matters
+      balanceScore += play.placements.length * 5; // more tiles played = better
+
+      // Remaining rack balance: ideal is 4-5 nums, 1-2 ops, 1 eq, 0-1 blank
+      // Penalize imbalance
+      if (remInfo.eq >= 2) balanceScore -= 15;  // 2+ equals is bingo-killer
+      if (remInfo.ops + remInfo.choices >= 4) balanceScore -= 10;
+      if (remInfo.nums <= 1 && remaining.length > 3) balanceScore -= 10;
+
+      // Reward keeping operators if bag has few
+      if (bagInfo.ops + bagInfo.choices <= 2 && remInfo.ops >= 1) balanceScore += 5;
+      // Reward keeping numbers if bag has few
+      if (bagInfo.nums <= 3 && remInfo.nums >= 2) balanceScore += 5;
+
+      // Penalize keeping hard tiles
+      const remHard = remaining.filter(t => isHardTile(t)).length;
+      balanceScore -= remHard * 3;
+
+      if (balanceScore > bestBalanceScore) {
+        bestBalanceScore = balanceScore;
+        best = play;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * Late-game strategy entry point. Called when 0 < bag ≤ 15.
+   * Returns a decision { type, ... } or null to fall through.
+   */
+  function lateGameStrategy(state, bestPlay, bingoPlay, yoyoPlay, bagSize) {
+    const lead = (state.aiScore || 0) - (state.playerScore || 0);
+    const lastOpp = state.lastOpponentAction;
+    const bagInfo = analyzeBagDetailed(state);
+    const rackInfo = countTileTypes(state.aiRack.tiles);
+
+    console.log('[AI] Late-game (bag=' + bagSize + ', lead=' + lead +
+                ', rack: ' + rackInfo.nums + 'N ' + rackInfo.ops + 'O ' +
+                rackInfo.eq + '= ' + rackInfo.blanks + 'B)');
+
+    // ── 1. Can score >60? Play it regardless (highest priority) ──
+    if (bestPlay && bestPlay.score > 60) {
+      console.log('[AI] Late-game: best play scores ' + bestPlay.score + ' (>60), playing it');
+      return null; // fall through to normal mode — already the best play
+    }
+
+    // ── OVERRIDE: Opponent swapped <4 tiles & bot leads → BLOCK ──
+    // A small swap (1-3 tiles) strongly suggests the opponent is near bingo/yoyo.
+    // If we're leading, it's worth sacrificing a few points to block them.
+    // (Checked AFTER >60 — a huge play shouldn't be sacrificed for blocking.)
+    if (lead > 0 && lastOpp && lastOpp.type === 'swap' && lastOpp.count < 4) {
+      console.log('[AI] Late-game BLOCK: opponent swapped only ' + lastOpp.count +
+                  ' tiles → likely near bingo. Attempting to block.');
+
+      if (bestPlay) {
+        const allCandidates = [bestPlay, bingoPlay && bingoPlay._bestNonRim,
+                               bingoPlay && bingoPlay._bestBlocking, yoyoPlay].filter(Boolean);
+        // Pick the play that uses the most tiles (blocks the most cells)
+        // while still scoring at least 5 points
+        let blockPlay = null;
+        for (const p of allCandidates) {
+          if (p.score < 5) continue;
+          if (!blockPlay || p.placements.length > blockPlay.placements.length ||
+              (p.placements.length === blockPlay.placements.length && p.score > blockPlay.score)) {
+            blockPlay = p;
+          }
+        }
+        if (blockPlay) {
+          console.log('[AI] Late-game BLOCK: playing ' + blockPlay.score + ' pts, ' +
+                      blockPlay.placements.length + ' tiles (blocking opponent bingo)');
+          return {
+            type: 'play',
+            placements: blockPlay.placements,
+            score: blockPlay.score,
+            equations: blockPlay.equations,
+          };
+        }
+      }
+    }
+
+    // ── 2 & 3. Leading by 60+ ──
+    if (lead >= 60) {
+      const swapQuality = assessSwapQuality(state, bagInfo, rackInfo);
+      console.log('[AI] Late-game leading ' + lead + '+, swap quality: ' +
+                  swapQuality.quality + ' (' + swapQuality.reasons.join(', ') + ')');
+
+      if (swapQuality.quality === 'good') {
+        // 2a. Good swap odds: play if >40 pts, or smart swap with rack balance
+        if (bestPlay && bestPlay.score > 40) {
+          console.log('[AI] Late-game: playing ' + bestPlay.score + ' pts (>40, good swap available)');
+          return null; // fall through
+        }
+        // Smart swap considering rack balance
+        if (bagSize > C.SWAP_FORBIDDEN_BAG_THRESHOLD) {
+          console.log('[AI] Late-game: smart swap for rack balance (lead=' + lead + ')');
+          return smartSwap(state);
+        }
+        // Can't swap (bag too small) — fall through to dump play below
+      }
+
+      // 3. Bad swap odds (or good swap but can't swap): dump worst tiles
+      const dumpPlay = findDumpPlay(bestPlay, bingoPlay, yoyoPlay, state);
+      if (dumpPlay) {
+        console.log('[AI] Late-game: dump play ' + dumpPlay.score + ' pts, ' +
+                    dumpPlay.placements.length + ' tiles (dumping bad tiles)');
+        return {
+          type: 'play',
+          placements: dumpPlay.placements,
+          score: dumpPlay.score,
+          equations: dumpPlay.equations,
+        };
+      }
+      return null; // no dump play found — fall through to normal
+    }
+
+    // ── 4. Leading <60 / tied → rack balance focus ──
+    if (lead >= 0) {
+      const balancePlay = findRackBalancePlay(bestPlay, bingoPlay, yoyoPlay, state, bagInfo);
+      if (balancePlay) {
+        console.log('[AI] Late-game: rack-balance play ' + balancePlay.score + ' pts, ' +
+                    balancePlay.placements.length + ' tiles');
+        return {
+          type: 'play',
+          placements: balancePlay.placements,
+          score: balancePlay.score,
+          equations: balancePlay.equations,
+        };
+      }
+      return null;
+    }
+
+    // ── 5. Behind → swap for bingo chance ──
+    if (bagSize > C.SWAP_FORBIDDEN_BAG_THRESHOLD) {
+      console.log('[AI] Late-game BEHIND ' + (-lead) + ', swapping to chase bingo');
+      return smartSwap(state);
+    }
+
+    // Can't swap (bag too small) — play best available
+    return null;
+  }
+
+  // ============================================================================
+  // END OF LATE-GAME STRATEGY
+  // ============================================================================
 
   /**
    * Compute all ×9 threats that would exist after the given placements.
@@ -1491,6 +1881,360 @@
     }
     return [null];
   }
+
+  // ============================================================================
+  // ENDGAME PLANNER — Multi-turn lookahead when bag is empty
+  //
+  // When the bag is empty, the AI has PERFECT information:
+  //   opponent_rack = total_inventory − board_tiles − ai_rack
+  //
+  // The planner finds the best sequence of plays to empty the AI's rack
+  // (earning the ×2 bonus on opponent's remaining tiles) while blocking
+  // the opponent from doing the same.
+  //
+  // Uses a depth-limited minimax: AI plays → opponent responds → AI plays...
+  // up to 3 ply deep. With ≤8 tiles per side and limited board positions,
+  // the search tree is manageable.
+  // ============================================================================
+
+  /**
+   * Deduce opponent's exact rack tiles when bag is empty.
+   * Returns array of virtual tile objects.
+   */
+  function deduceOpponentRack(state) {
+    const inventory = C.getActiveInventory ? C.getActiveInventory() : C.TILE_INVENTORY;
+    // Count remaining by face
+    const counts = {};
+    const typeLookup = {};
+    for (const def of inventory) {
+      counts[def.face] = (counts[def.face] || 0) + def.count;
+      typeLookup[def.face] = { type: def.type, points: def.points };
+    }
+    // Subtract board
+    for (let r = 0; r < C.BOARD_SIZE; r++) {
+      for (let c = 0; c < C.BOARD_SIZE; c++) {
+        const cell = state.board.cells[r][c];
+        if (cell.tile) counts[cell.tile.face] = (counts[cell.tile.face] || 0) - 1;
+      }
+    }
+    // Subtract AI rack
+    for (const t of state.aiRack.tiles) {
+      counts[t.face] = (counts[t.face] || 0) - 1;
+    }
+    // Build virtual tiles
+    const tiles = [];
+    for (const face in counts) {
+      const n = counts[face] || 0;
+      const info = typeLookup[face] || { type: 'num', points: 1 };
+      for (let i = 0; i < n; i++) {
+        tiles.push({
+          id: '_opp_' + face + '_' + i,
+          face: face, type: info.type, points: info.points, assigned: null,
+        });
+      }
+    }
+    return tiles;
+  }
+
+  /**
+   * Lightweight deep-copy of a board for endgame simulation.
+   */
+  function cloneBoardForSim(board) {
+    const clone = { cells: [] };
+    for (let r = 0; r < C.BOARD_SIZE; r++) {
+      clone.cells[r] = [];
+      for (let c = 0; c < C.BOARD_SIZE; c++) {
+        const cell = board.cells[r][c];
+        clone.cells[r][c] = {
+          premium: cell.premium,
+          premiumUsed: cell.premiumUsed,
+          tile: cell.tile ? { face: cell.tile.face, type: cell.tile.type,
+                             points: cell.tile.points, assigned: cell.tile.assigned,
+                             id: cell.tile.id } : null,
+        };
+      }
+    }
+    return clone;
+  }
+
+  /**
+   * Synchronous search: find up to `budget` valid plays for given tiles on board.
+   * Reuses the same anchor + permutation logic as the main AI search.
+   * @param deadline  - Date.now() absolute deadline (shared across entire endgame tree)
+   */
+  function findPlaysForTiles(board, tiles, budget, deadline) {
+    if (!tiles || tiles.length === 0) return [];
+    if (deadline && Date.now() > deadline) return [];  // already over time
+    budget = budget || 200;
+    const results = [];
+    const anchors = findAnchorCells(board, false);
+    const maxT = Math.min(tiles.length, 8);
+
+    const counter = { count: 0, abort: false };
+
+    for (let numTiles = maxT; numTiles >= 1; numTiles--) {
+      for (const anchor of anchors) {
+        for (const dir of ['horizontal', 'vertical']) {
+          if (counter.abort) break;
+          const cellPos = collectPlacementCells(board, anchor, dir, numTiles);
+          if (!cellPos) continue;
+
+          const used = new Array(tiles.length).fill(false);
+          const seq = [];
+          endgamePermute(tiles, used, seq, cellPos, numTiles, board,
+                         results, counter, deadline, budget);
+        }
+        if (counter.abort) break;
+      }
+      if (counter.abort) break;
+    }
+    return results;
+  }
+
+  /**
+   * Recursive permutation for endgame search.
+   * Like permuteAndTry but collects ALL valid plays into results array.
+   * Uses the shared global deadline for time-checking.
+   */
+  function endgamePermute(tiles, used, seq, cellPos, numTiles, board,
+                          results, counter, deadline, budget) {
+    if (counter.abort) return;
+    if (results.length >= budget) { counter.abort = true; return; }
+    // Check deadline every 300 candidates (cheap)
+    if (counter.count % 300 === 0 && deadline && Date.now() > deadline) {
+      counter.abort = true; return;
+    }
+
+    if (seq.length === numTiles) {
+      counter.count++;
+      const placements = seq.map((idx, i) => ({
+        row: cellPos[i].row, col: cellPos[i].col, tile: tiles[idx],
+      }));
+      const result = tryPlay(board, placements, false);
+      if (result) {
+        result.tilesUsed = seq.map(idx => tiles[idx]);
+        // Deduplicate: skip if identical score + same tile faces in same positions
+        const dominated = results.some(r =>
+          r.score >= result.score &&
+          r.placements.length === result.placements.length &&
+          r.placements.every((p, i) =>
+            p.row === result.placements[i].row && p.col === result.placements[i].col
+          )
+        );
+        if (!dominated) results.push(result);
+      }
+      return;
+    }
+
+    for (let i = 0; i < tiles.length; i++) {
+      if (counter.abort) return;
+      if (used[i]) continue;
+      const tile = tiles[i];
+      const assignedVals = getCandidateAssignments(tile, tiles, false);
+
+      for (const assigned of assignedVals) {
+        if (counter.abort) return;
+        const origAssigned = tile.assigned;
+        tile.assigned = assigned;
+        used[i] = true;
+        seq.push(i);
+
+        endgamePermute(tiles, used, seq, cellPos, numTiles, board,
+                       results, counter, deadline, budget);
+
+        seq.pop();
+        used[i] = false;
+        tile.assigned = origAssigned;
+      }
+    }
+  }
+
+  /**
+   * Apply a play to a board clone (permanently place tiles).
+   */
+  function applyPlayToBoard(board, play) {
+    for (const p of play.placements) {
+      const tile = { face: p.tile.face, type: p.tile.type, points: p.tile.points,
+                     assigned: p.assigned || p.tile.assigned, id: p.tile.id };
+      Board.placeTile(board, p.row, p.col, tile);
+      board.cells[p.row][p.col].premiumUsed = true;
+    }
+  }
+
+  /**
+   * Remove tiles used in a play from a tile array (by id).
+   * Returns new array of remaining tiles.
+   */
+  function removeTilesUsed(tiles, play) {
+    const usedIds = new Set(play.placements.map(p => p.tile.id));
+    return tiles.filter(t => !usedIds.has(t.id));
+  }
+
+  /**
+   * Sum of tile points in an array of tiles (for end-game scoring).
+   */
+  function tilesPointSum(tiles) {
+    let s = 0;
+    for (const t of tiles) {
+      if (t.type !== 'blank') s += (t.points || 0);
+    }
+    return s;
+  }
+
+  /**
+   * Endgame evaluation: recursively score a position with minimax.
+   *
+   * @param simBoard  - cloned board state
+   * @param myTiles   - current player's tiles (AI when isMyTurn)
+   * @param oppTiles  - opponent's tiles
+   * @param myScore   - AI's accumulated endgame score this sequence
+   * @param oppScore  - Opponent's accumulated endgame score
+   * @param isMyTurn  - true if it's AI's turn
+   * @param depth     - remaining search depth
+   * @param deadline  - Date.now() deadline for entire search
+   * @returns {number} evaluation score (positive = good for AI)
+   */
+  function endgameEval(simBoard, myTiles, oppTiles, myScore, oppScore, isMyTurn, depth, deadline) {
+    // Time check
+    if (Date.now() > deadline) {
+      return myScore - oppScore - tilesPointSum(myTiles) + tilesPointSum(oppTiles) * 0.5;
+    }
+
+    // Terminal: someone emptied rack → big bonus
+    if (myTiles.length === 0) {
+      return myScore + tilesPointSum(oppTiles) * 2 + 500;
+    }
+    if (oppTiles.length === 0) {
+      return myScore - oppScore - tilesPointSum(myTiles) * 2 - 500;
+    }
+    // Depth exhausted
+    if (depth <= 0) {
+      return myScore - oppScore - tilesPointSum(myTiles) + tilesPointSum(oppTiles) * 0.5;
+    }
+
+    // Reduce search budget and branching at deeper levels
+    const playBudget = depth >= 2 ? 80 : 40;
+    const branchLimit = depth >= 2 ? 8 : 5;
+
+    if (isMyTurn) {
+      const plays = findPlaysForTiles(simBoard, myTiles, playBudget, deadline);
+      if (plays.length === 0) {
+        return endgameEval(simBoard, myTiles, oppTiles, myScore, oppScore, false, depth - 1, deadline);
+      }
+      let bestVal = -Infinity;
+      plays.sort((a, b) => b.placements.length - a.placements.length || b.score - a.score);
+      const topPlays = plays.slice(0, branchLimit);
+
+      for (const play of topPlays) {
+        if (Date.now() > deadline) break;
+        const nextBoard = cloneBoardForSim(simBoard);
+        applyPlayToBoard(nextBoard, play);
+        const remaining = removeTilesUsed(myTiles, play);
+        const val = endgameEval(nextBoard, remaining, oppTiles,
+                                myScore + play.score, oppScore, false, depth - 1, deadline);
+        if (val > bestVal) bestVal = val;
+      }
+      return bestVal === -Infinity ? myScore - oppScore : bestVal;
+    } else {
+      const plays = findPlaysForTiles(simBoard, oppTiles, playBudget, deadline);
+      if (plays.length === 0) {
+        return endgameEval(simBoard, myTiles, oppTiles, myScore, oppScore, true, depth - 1, deadline);
+      }
+      let worstVal = Infinity;
+      plays.sort((a, b) => b.placements.length - a.placements.length || b.score - a.score);
+      const topPlays = plays.slice(0, branchLimit);
+
+      for (const play of topPlays) {
+        if (Date.now() > deadline) break;
+        const nextBoard = cloneBoardForSim(simBoard);
+        applyPlayToBoard(nextBoard, play);
+        const remaining = removeTilesUsed(oppTiles, play);
+        const val = endgameEval(nextBoard, myTiles, remaining,
+                                myScore, oppScore + play.score, true, depth - 1, deadline);
+        if (val < worstVal) worstVal = val;
+      }
+      return worstVal === Infinity ? myScore - oppScore : worstVal;
+    }
+  }
+
+  /**
+   * Main endgame planner. Called from decideMove when bag is empty.
+   *
+   * Returns the best play for the AI considering multi-turn consequences,
+   * or null if endgame planning didn't improve on the normal search.
+   */
+  function planEndgame(state, normalBestPlay) {
+    const startTime = Date.now();
+    const deadline = startTime + 15000;   // 15-second budget for entire endgame search
+    console.log('[AI] Endgame planner: bag empty, planning ahead...');
+
+    const oppTiles = deduceOpponentRack(state);
+    console.log('[AI] Opponent rack deduced: ' +
+                oppTiles.map(t => t.face).join(', ') +
+                ' (' + oppTiles.length + ' tiles, ' + tilesPointSum(oppTiles) + ' pts)');
+
+    const aiTiles = state.aiRack.tiles;
+    if (aiTiles.length === 0) return null;
+
+    // Find all plays for AI on current board
+    const allPlays = findPlaysForTiles(state.board, aiTiles, 200, deadline);
+    console.log('[AI] Endgame: found ' + allPlays.length + ' candidate plays');
+
+    if (allPlays.length === 0) return null;
+
+    // Evaluate each candidate with minimax lookahead
+    let bestPlay = null;
+    let bestValue = -Infinity;
+    const depth = aiTiles.length <= 4 ? 3 : 2;
+
+    // Include normal best play as a candidate if it exists
+    if (normalBestPlay) {
+      allPlays.push(normalBestPlay);
+    }
+
+    // Sort: prioritize plays using more tiles (closer to emptying rack)
+    allPlays.sort((a, b) => b.placements.length - a.placements.length || b.score - a.score);
+
+    for (const play of allPlays) {
+      if (Date.now() > deadline) break;
+
+      const simBoard = cloneBoardForSim(state.board);
+      applyPlayToBoard(simBoard, play);
+      const remaining = removeTilesUsed(aiTiles, play);
+
+      const value = endgameEval(
+        simBoard, remaining, oppTiles,
+        play.score, 0, false, depth, deadline
+      );
+
+      if (value > bestValue) {
+        bestValue = value;
+        bestPlay = play;
+      }
+    }
+
+    const elapsed = Date.now() - startTime;
+    if (bestPlay) {
+      console.log('[AI] Endgame plan: ' + bestPlay.score + '-pt play using ' +
+                  bestPlay.placements.length + ' tiles (eval ' + bestValue.toFixed(0) +
+                  ', depth ' + depth + ', ' + elapsed + 'ms)');
+
+      const rem = removeTilesUsed(aiTiles, bestPlay);
+      if (rem.length > 0) {
+        console.log('[AI] After play: ' + rem.length + ' tiles remain: ' +
+                    rem.map(t => t.face).join(', '));
+      } else {
+        console.log('[AI] This play empties the rack! Bonus: +' +
+                    (tilesPointSum(oppTiles) * 2) + ' pts');
+      }
+    }
+
+    return bestPlay;
+  }
+
+  // ============================================================================
+  // END OF ENDGAME PLANNER
+  // ============================================================================
 
   function tryPlay(board, placements, isFirstMove) {
     for (const p of placements) Board.placeTile(board, p.row, p.col, p.tile);

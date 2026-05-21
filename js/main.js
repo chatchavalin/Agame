@@ -303,6 +303,7 @@
       aiTimeSeconds: startTimeSeconds,
       chessClockEnabled: chessClockEnabled,
       lastAiPlay: null,    // For challenge: record the most recent AI play
+      bagEmptyTaunted: false,  // bag-empty trash talk fires only once
       playerTimerPaused: false,  // Feature M: double-click pause
       aiTimerPaused: false,
       onSubmit: handleSubmit,
@@ -818,6 +819,7 @@
       aiTimeSeconds: saved.aiTimeSeconds,
       chessClockEnabled: chessClockEnabled,
       lastAiPlay: null,
+      bagEmptyTaunted: (saved.bag && saved.bag.tiles && saved.bag.tiles.length === 0),
       playerTimerPaused: false,
       aiTimerPaused: false,
       onSubmit: handleSubmit,
@@ -1201,6 +1203,14 @@
 
     const wasBingo = scoreResult.bingoBonus > 0;
 
+    // Track opponent's last action for late-game AI strategy
+    session.lastOpponentAction = {
+      type: 'play',
+      tilesUsed: session.tentativePlacements.length,
+      score: scoreResult.total,
+      wasBingo: wasBingo,
+    };
+
     Rack.refillFromBag(session.playerRack, session.bag);
     Interactions.clearTentativePlacements();
 
@@ -1474,6 +1484,9 @@
 
     session.consecutiveNonScoringTurns++;
 
+    // Track opponent's last action for late-game AI strategy
+    session.lastOpponentAction = { type: 'pass' };
+
     if (window.AMath.scoreSheet) {
       window.AMath.scoreSheet.recordTurn('player', 'pass', 0, false, session.playerScore);
     }
@@ -1501,7 +1514,7 @@
     hideChallengeButton();
 
     if (Bag.bagSize(session.bag) <= C.SWAP_FORBIDDEN_BAG_THRESHOLD) {
-      showStatus('Swap not allowed — bag has ≤5 tiles remaining.', 'error');
+      showStatus('Swap not allowed — bag has ≤4 tiles remaining.', 'error');
       return;
     }
 
@@ -1531,6 +1544,12 @@
 
     Interactions.exitSwapMode();
     session.consecutiveNonScoringTurns++;
+
+    // Track opponent's last action for late-game AI strategy
+    session.lastOpponentAction = {
+      type: 'swap',
+      count: tilesToReturn.length,
+    };
 
     if (window.AMath.scoreSheet) {
       window.AMath.scoreSheet.recordTurn('player', 'swap', 0, false, session.playerScore);
@@ -1583,6 +1602,7 @@
           aiActualPlayCount: session.aiActualPlayCount || 0,
           consecutiveNonScoringTurns: session.consecutiveNonScoringTurns || 0,
           opponentRack: session.playerRack,
+          lastOpponentAction: session.lastOpponentAction || null,
         });
 
         // Detect stale decision (game was reset/ended during AI thinking)
@@ -1699,6 +1719,21 @@
       const event = isBingo ? 'ai_bingo' : (wasX9 ? 'ai_x9' : 'ai_play');
       fireTrashTalk(event, { lastScore: decision.score });
 
+      // Bag-empty taunt: when the bag runs out, the AI can deduce the
+      // player's rack perfectly. Fire a special taunt that reveals the
+      // player's tiles. Only once per game, delayed so it doesn't collide
+      // with the bingo/play toast.
+      if (session.bag.tiles.length === 0 && !session.bagEmptyTaunted) {
+        session.bagEmptyTaunted = true;
+        setTimeout(function () {
+          if (session && !session.gameOver) {
+            fireTrashTalk('bag_empty_taunt', {
+              playerTiles: session.playerRack.tiles.slice(),  // copy for safety
+            });
+          }
+        }, 3500);  // 3.5s delay — after the play/bingo toast fades
+      }
+
       // If it's BOTH a Bingo and a ×9 (very rare), follow up with the ×9
       // gloat after the Bingo banner — both moments deserve coverage.
       if (isBingo && wasX9) {
@@ -1784,6 +1819,7 @@
       aiScore: session.aiScore,
       lastScore: extras && extras.lastScore,
       force: extras && extras.force,
+      playerTiles: extras && extras.playerTiles,
     });
   }
 
@@ -1930,6 +1966,7 @@
       if (s && s.get) sixPassDisabled = s.get('disableSixPassEnd') === true;
     } catch (e) {}
     if (!sixPassDisabled &&
+        !session.isFirstMove &&
         session.consecutiveNonScoringTurns >= C.CONSECUTIVE_NON_SCORING_TURNS_TO_END) {
       finalizeGame('consecutive_passes');
       return true;

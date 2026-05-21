@@ -346,6 +346,84 @@
     ],
   };
 
+  // =========================================================================
+  // BAG-EMPTY TAUNTS — Dynamic messages referencing the player's actual rack.
+  // When the bag is empty, the AI can deduce the player's tiles perfectly
+  // (total inventory − board − AI rack = player rack). The AI flexes this
+  // knowledge with taunts that reveal the player's hand.
+  // =========================================================================
+
+  /**
+   * Format a tile face for display in trash talk messages.
+   * e.g. 'BLANK' → '?', '×/÷' → '×/÷', '5' → '5'
+   */
+  function faceDisplay(face) {
+    if (face === 'BLANK') return '?';
+    return face;
+  }
+
+  /**
+   * Generate a bag-empty taunt message based on the player's actual rack.
+   * Returns a string or null if no good taunt can be produced.
+   * @param playerTiles  Array of tile objects [{face, type, ...}, ...]
+   */
+  function generateBagEmptyTaunt(playerTiles) {
+    if (!playerTiles || playerTiles.length === 0) return null;
+
+    const faces = playerTiles.map(t => faceDisplay(t.assigned || t.face));
+    const faceStr = faces.join(' ');
+    const operators = playerTiles.filter(t => t.type === 'op' || t.type === 'choice' || t.type === 'equals');
+    const numbers = playerTiles.filter(t => t.type === 'num' || t.type === 'digit' || t.type === 'twodigit');
+    const blanks = playerTiles.filter(t => t.type === 'blank');
+    const equals = playerTiles.filter(t => t.type === 'equals' || (t.type === 'choice' && t.face === '+/-'));
+
+    // Build a pool of possible taunts for this rack
+    const pool = [];
+
+    // --- Thai taunts ---
+    pool.push('ฉันรู้นะ ว่าคุณมีเบี้ยอะไร 😏');
+    pool.push('มีเบี้ย ' + faceStr + ' ใช่มั้ย? ฉันเห็นหมดแล้ว 👀');
+    pool.push('ถุงหมดแล้ว ฉันรู้ว่าคุณถือ ' + faceStr + ' 💀');
+    pool.push('เบี้ยหมดถุงแล้วนะ ฉันนับได้หมดเลย 🧮');
+    pool.push('ไม่ต้องแอบ ฉันรู้ว่าคุณมี ' + faceStr + ' 😎');
+
+    if (operators.length >= 4) {
+      pool.push('มีเครื่องหมายเกินจะบิงโกได้หรอ? 55 😂');
+      pool.push('เครื่องหมายเยอะขนาดนี้ ลำบากเลยนะ 💀');
+      pool.push('oof เครื่องหมายล้นมือ จะลงยังไง? 🤭');
+    }
+    if (operators.length >= 3 && numbers.length <= 3) {
+      pool.push('เครื่องหมายเยอะ ตัวเลขน้อย... ยากแล้วนะ 55');
+    }
+    if (blanks.length >= 2) {
+      pool.push('BLANK 2 ตัว แต่จะมีประโยชน์มั้ยนะ? 🤔');
+    }
+    if (playerTiles.length <= 3) {
+      pool.push('เหลือแค่ ' + playerTiles.length + ' ตัว? จบเร็วๆ นะ 😘');
+    }
+    if (equals.length === 0 && blanks.length === 0) {
+      pool.push('ไม่มี = เลย? จะลงสมการได้ไง 555 🤣');
+    }
+    if (equals.length >= 3) {
+      pool.push('= เยอะจัง ลง = = = ได้มั้ย? 555');
+    }
+
+    // --- English taunts ---
+    pool.push("Bag's empty. I know your rack: " + faceStr + ' 👁️');
+    pool.push("Nice tiles you got there... oh wait, I can see them all. " + faceStr);
+    pool.push("No more bag. I see everything: " + faceStr + " 😏");
+
+    if (operators.length >= 4) {
+      pool.push("That many operators? Good luck making a bingo lol 😂");
+    }
+    if (playerTiles.length <= 3) {
+      pool.push("Only " + playerTiles.length + " tiles left? This'll be quick 💨");
+    }
+
+    // Pick a random one
+    return U.randomChoice(pool);
+  }
+
   // Avoid repetition: queue of last 5 messages shown
   const recentMessages = [];
   const RECENT_CAP = 5;
@@ -484,6 +562,33 @@
    * first stalling-needle fire of a player's turn, which we always want shown).
    */
   function fireForEvent(event, state) {
+    // Special case: bag-empty taunt uses dynamic messages based on player's rack
+    if (event === 'bag_empty_taunt') {
+      // Always fire (100% chance) — this is a dramatic moment
+      const msg = generateBagEmptyTaunt(state.playerTiles);
+      if (msg) {
+        // Apply language filter: if the user only wants Thai or English,
+        // regenerate until we get a matching message (up to 10 tries)
+        const lang = getLanguagePreference();
+        if (lang === 'both' || (lang === 'th' && hasThai(msg)) || (lang === 'en' && !hasThai(msg))) {
+          showToast(msg);
+        } else {
+          // Wrong language — retry
+          for (let i = 0; i < 10; i++) {
+            const alt = generateBagEmptyTaunt(state.playerTiles);
+            if (!alt) break;
+            if ((lang === 'th' && hasThai(alt)) || (lang === 'en' && !hasThai(alt))) {
+              showToast(alt);
+              return;
+            }
+          }
+          // Fallback: show whatever we got
+          showToast(msg);
+        }
+      }
+      return;
+    }
+
     const ctx = pickContext(event, state);
     const force = !!(state && state.force);
     const msg = selectMessage(ctx, force);
