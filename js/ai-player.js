@@ -730,6 +730,51 @@
       return { type: 'pass' };
     }
 
+    // === 5b. ALWAYS check: don't create ×9/×4 threats for opponent ===
+    // Creating a ×9 threat for the opponent is catastrophic at ANY lead.
+    // Check all plays, not just when leading 150+.
+    if (bestPlay && !state.isFirstMove && botLevel !== 'easy' && window.AMath.aiX9) {
+      const createsX9 = wouldCreateX9Threat(state.board, bestPlay.placements);
+      const createsX4 = wouldCreateX4Threat(state.board, bestPlay.placements);
+
+      if (createsX9 || createsX4) {
+        const threatType = createsX9 ? '×9' : '×4';
+        console.log('[AI] Safety: best play (' + bestPlay.score + ' pts) creates ' + threatType + ' threat. Seeking safer alt.');
+
+        // Gather alternatives
+        const safeAlts = [
+          bingoPlay && bingoPlay._bestNonRim,
+          bingoPlay && bingoPlay._bestNoBlank,
+          bingoPlay && bingoPlay._bestMinBlank,
+          yoyoPlay,
+        ].filter(Boolean);
+
+        let safeBest = null;
+        for (const alt of safeAlts) {
+          if (alt === bestPlay) continue;
+          if (wouldCreateX9Threat(state.board, alt.placements)) continue;
+          if (wouldCreateX4Threat(state.board, alt.placements)) continue;
+          if (!safeBest || alt.score > safeBest.score) safeBest = alt;
+        }
+
+        if (safeBest) {
+          const lossIfSwap = bestPlay.score - safeBest.score;
+          const threatCost = createsX9 ? 100 : 30;
+          if (lossIfSwap < threatCost) {
+            console.log('[AI] Safety: switched to safer play (' + safeBest.score +
+                        ' pts, -' + lossIfSwap + ') to avoid ' + threatType + ' threat (~' + threatCost + ' pts)');
+            bestPlay = safeBest;
+          } else {
+            console.log('[AI] Safety: kept ' + bestPlay.score + '-pt play despite ' +
+                        threatType + ' (gain ' + lossIfSwap + ' > threat cost ' + threatCost + ')');
+          }
+        } else {
+          console.log('[AI] Safety: no safe alternative found — playing ' +
+                      bestPlay.score + ' pts despite ' + threatType + ' risk');
+        }
+      }
+    }
+
     // === 6. Lead 150+ closing mode (Feature G) ===
     // Goal: maintain the lead by playing safe + offload hard tiles.
     // Priority: Defend existing ×9 > Score > Safety (no new ×9 or ×4) > Rack mgmt
@@ -737,34 +782,6 @@
     // Note: ×9 DEFENSE for existing threats already happened in section 4 above.
     // This section handles: don't CREATE new ×9/×4 threats with our play.
     if (isLead150 && bestPlay) {
-      // Check if best play creates a new ×9 threat (Safety check)
-      const createsNewX9 = wouldCreateX9Threat(state.board, bestPlay.placements);
-      const createsNewX4 = wouldCreateX4Threat(state.board, bestPlay.placements);
-
-      if (createsNewX9 || createsNewX4) {
-        // Try non-rim alternative from bingoPlay's tracking, or fallback to yoyoPlay
-        const nonRimAlt = bingoPlay ? bingoPlay._bestNonRim : null;
-        const safeAlt = pickBetterPlay(nonRimAlt, yoyoPlay);
-        if (safeAlt &&
-            !wouldCreateX9Threat(state.board, safeAlt.placements) &&
-            !wouldCreateX4Threat(state.board, safeAlt.placements)) {
-          // Don't downgrade if the swap loses too much score relative to the threat.
-          // Creating a ×9 is roughly worth ~80-150 pts to opponent.
-          const lossIfSwap = bestPlay.score - safeAlt.score;
-          const threatCost = createsNewX9 ? 100 : 30;
-          if (lossIfSwap < threatCost) {
-            console.log('[AI] Lead-150 mode: switched to safer alt (avoiding ' +
-                        (createsNewX9 ? '×9' : '×4') + ' threat); lost ' +
-                        lossIfSwap + ' pts to prevent ~' + threatCost + ' pt threat');
-            bestPlay = safeAlt;
-          } else {
-            console.log('[AI] Lead-150 mode: kept higher-scoring play despite ' +
-                        (createsNewX9 ? '×9' : '×4') + ' threat (gain ' +
-                        bestPlay.score + ' > threat cost ' + threatCost + ')');
-          }
-        }
-      }
-
       // Close-board preference: when leading big, prefer plays that REDUCE
       // the opponent's available positions rather than maximizing score.
       // A "closing" play fills cells in tight spaces where there are few
