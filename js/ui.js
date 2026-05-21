@@ -306,9 +306,11 @@
 
     const scoresEl = document.createElement('div');
     scoresEl.className = 'game-end-scores';
+    const pLabel = info.playerLabel || 'You';
+    const aLabel = info.aiLabel || 'AI';
     scoresEl.innerHTML =
-      '<div class="score-row"><span>You:</span><span>' + info.playerScore + '</span></div>' +
-      '<div class="score-row"><span>AI:</span><span>' + info.aiScore + '</span></div>';
+      '<div class="score-row"><span>' + pLabel + ':</span><span>' + info.playerScore + '</span></div>' +
+      '<div class="score-row"><span>' + aLabel + ':</span><span>' + info.aiScore + '</span></div>';
     dialog.appendChild(scoresEl);
 
     if (info.reason) {
@@ -323,8 +325,8 @@
       const penaltyEl = document.createElement('div');
       penaltyEl.className = 'game-end-penalty';
       const lines = [];
-      if (info.playerTimePenalty) lines.push('You: −' + info.playerTimePenalty + ' time penalty');
-      if (info.aiTimePenalty) lines.push('AI: −' + info.aiTimePenalty + ' time penalty');
+      if (info.playerTimePenalty) lines.push(pLabel + ': −' + info.playerTimePenalty + ' time penalty');
+      if (info.aiTimePenalty) lines.push(aLabel + ': −' + info.aiTimePenalty + ' time penalty');
       penaltyEl.innerHTML = lines.join('<br>');
       dialog.appendChild(penaltyEl);
     }

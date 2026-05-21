@@ -402,6 +402,10 @@
     // Start stalling watch for Player vs AI mode
     startStallingWatch();
 
+    // Clear undo history for new game
+    undoHistory = [];
+    wireUndoHandler();
+
     if (playerGoesFirst) {
       showStatus(
         '🎲 You go first! Tap a tile, then tap a board cell. First move must pass through the center ★.'
@@ -506,8 +510,8 @@
 
     wireExportImportButtons();
     wireTileTrackerButton();
-
-    // Hide AI-only buttons
+    undoHistory = [];
+    wireUndoHandler();
     var btnTakeover = document.getElementById('btn-takeover');
     if (btnTakeover) btnTakeover.style.display = 'none';
 
@@ -1024,6 +1028,8 @@
 
     wireExportImportButtons();
     wireTileTrackerButton();
+    undoHistory = [];
+    wireUndoHandler();
 
     // Wire up AI Takeover button (toggle mode)
     const btnTakeover = document.getElementById('btn-takeover');
@@ -1078,10 +1084,199 @@
     if (!session || session.gameOver) return;
     const SaveResume = window.AMath.saveResume;
     if (SaveResume) SaveResume.save(session);
-    // Refresh tile tracker if it's visible
     refreshTileTracker();
-    // Refresh desktop side panels (score sheet + tile tracker)
     refreshDesktopSidePanels();
+  }
+
+  // ============================================================================
+  // UNDO SYSTEM — Double-tap AI score box to undo
+  // ============================================================================
+
+  let undoHistory = [];
+  let undoGeneration = 0;  // incremented on each undo; AI checks this to discard stale results
+
+  /**
+   * Deep-copy a tile array.
+   */
+  function cloneTiles(tiles) {
+    return tiles.map(function (t) {
+      return { id: t.id, face: t.face, type: t.type, points: t.points, assigned: t.assigned };
+    });
+  }
+
+  /**
+   * Deep-copy the board cells.
+   */
+  function cloneBoard(board) {
+    var cells = [];
+    for (var r = 0; r < 15; r++) {
+      cells[r] = [];
+      for (var c = 0; c < 15; c++) {
+        var cell = board.cells[r][c];
+        cells[r][c] = {
+          premium: cell.premium,
+          premiumUsed: cell.premiumUsed,
+          tile: cell.tile ? {
+            id: cell.tile.id, face: cell.tile.face, type: cell.tile.type,
+            points: cell.tile.points, assigned: cell.tile.assigned
+          } : null,
+        };
+      }
+    }
+    return { cells: cells };
+  }
+
+  /**
+   * Save a snapshot of the current game state onto the undo stack.
+   * Call this BEFORE each action (player submit/pass/swap, AI turn).
+   */
+  function saveUndoSnapshot() {
+    if (!session || session.gameOver) return;
+    var snap = {
+      board: cloneBoard(session.board),
+      playerRack: cloneTiles(session.playerRack.tiles),
+      aiRack: cloneTiles(session.aiRack.tiles),
+      bag: cloneTiles(session.bag.tiles),
+      playerScore: session.playerScore,
+      aiScore: session.aiScore,
+      isFirstMove: session.isFirstMove,
+      consecutiveNonScoringTurns: session.consecutiveNonScoringTurns,
+      aiActualPlayCount: session.aiActualPlayCount || 0,
+      lastOpponentAction: session.lastOpponentAction
+        ? JSON.parse(JSON.stringify(session.lastOpponentAction)) : null,
+      bagEmptyTaunted: session.bagEmptyTaunted,
+      playerTimeSeconds: session.playerTimeSeconds,
+      aiTimeSeconds: session.aiTimeSeconds,
+      // PvP
+      currentPlayer: session.currentPlayer || 1,
+      p1Rack: session.p1Rack ? cloneTiles(session.p1Rack.tiles) : null,
+      p2Rack: session.p2Rack ? cloneTiles(session.p2Rack.tiles) : null,
+      // Score sheet
+      scoreSheetEntries: window.AMath.scoreSheet
+        ? window.AMath.scoreSheet.getAllEntries().map(function (e) {
+            return JSON.parse(JSON.stringify(e));
+          })
+        : [],
+    };
+    undoHistory.push(snap);
+  }
+
+  /**
+   * Undo the last turn — restore state from the undo stack.
+   */
+  function undoLastTurn() {
+    if (undoHistory.length === 0) {
+      showStatus('Nothing to undo.', 'info');
+      return;
+    }
+    if (!session) return;
+
+    // If AI is currently thinking, cancel it
+    if (window.AMath.aiWorkerClient && window.AMath.aiWorkerClient.cancel) {
+      window.AMath.aiWorkerClient.cancel();
+    }
+    showThinking(false);
+    undoGeneration++;  // invalidate any pending AI result
+
+    var snap = undoHistory.pop();
+    var UI = window.AMath.ui;
+    var Interactions = window.AMath.interactions;
+
+    // Restore board
+    for (var r = 0; r < 15; r++) {
+      for (var c = 0; c < 15; c++) {
+        session.board.cells[r][c] = snap.board.cells[r][c];
+      }
+    }
+
+    // Restore racks
+    session.playerRack.tiles = snap.playerRack;
+    session.aiRack.tiles = snap.aiRack;
+    session.bag.tiles = snap.bag;
+
+    // PvP racks
+    if (session.isPvP && snap.p1Rack) {
+      session.p1Rack.tiles = snap.p1Rack;
+      session.p2Rack.tiles = snap.p2Rack;
+      session.currentPlayer = snap.currentPlayer;
+      if (snap.currentPlayer === 1) {
+        session.playerRack = session.p1Rack;
+        session.aiRack = session.p2Rack;
+      } else {
+        session.playerRack = session.p2Rack;
+        session.aiRack = session.p1Rack;
+      }
+    }
+
+    // Restore scores and state
+    session.playerScore = snap.playerScore;
+    session.aiScore = snap.aiScore;
+    session.isFirstMove = snap.isFirstMove;
+    session.consecutiveNonScoringTurns = snap.consecutiveNonScoringTurns;
+    session.aiActualPlayCount = snap.aiActualPlayCount;
+    session.lastOpponentAction = snap.lastOpponentAction;
+    session.bagEmptyTaunted = snap.bagEmptyTaunted;
+    session.playerTimeSeconds = snap.playerTimeSeconds;
+    session.aiTimeSeconds = snap.aiTimeSeconds;
+    session.tentativePlacements = [];
+    session.gameOver = false;
+    session.lastAiPlay = null;
+    session.isPlayerTurn = true;
+
+    // Restore score sheet
+    if (window.AMath.scoreSheet && snap.scoreSheetEntries) {
+      window.AMath.scoreSheet.reset();
+      for (var i = 0; i < snap.scoreSheetEntries.length; i++) {
+        var e = snap.scoreSheetEntries[i];
+        window.AMath.scoreSheet.recordTurn(e.who, e.action, e.score, e.isBingo, e.total,
+          { swapCount: e.swapCount || 0 });
+      }
+    }
+
+    // Re-render everything
+    Interactions.init(session);
+    Interactions.setPlayerTurn(true);
+
+    var p1Label = session.isPvP ? 'P' + session.currentPlayer : 'You';
+    var p2Label = session.isPvP ? 'P' + (3 - session.currentPlayer) : 'AI';
+    UI.renderScore(session.uiParts.playerScoreBox, p1Label, session.isPvP && session.currentPlayer === 2 ? session.aiScore : session.playerScore);
+    UI.renderScore(session.uiParts.opponentScoreBox, p2Label, session.isPvP && session.currentPlayer === 2 ? session.playerScore : session.aiScore);
+
+    refreshTileTracker();
+    refreshDesktopSidePanels();
+    autoSave();
+
+    // Education mode: restart search
+    if (window.AMath.education && window.AMath.settings && window.AMath.settings.get('educationMode')) {
+      window.AMath.education.startBackgroundSearch(session);
+    }
+
+    showStatus('⏪ Undone! (' + undoHistory.length + ' more available)', 'info');
+  }
+
+  /**
+   * Wire double-tap on AI score box for undo.
+   * Uses a flag to prevent duplicate listeners on game restart.
+   */
+  var _undoWired = null; // reference to the element we wired
+  function wireUndoHandler() {
+    var box = session && session.uiParts && session.uiParts.opponentScoreBox;
+    if (!box) return;
+    // If already wired to this exact element, skip
+    if (_undoWired === box) return;
+
+    var lastTap = 0;
+    box.addEventListener('click', function () {
+      var now = Date.now();
+      if (now - lastTap < 400) {
+        // Double tap detected
+        undoLastTurn();
+        lastTap = 0;
+      } else {
+        lastTap = now;
+      }
+    });
+    _undoWired = box;
   }
 
   /**
@@ -1344,6 +1539,8 @@
    * Commit the player's validated play to the board (called after education check).
    */
   function commitPlayerPlay(scoreResult) {
+    saveUndoSnapshot();
+
     // Stop education background search
     if (window.AMath.education) {
       window.AMath.education.stopSearch();
@@ -1439,6 +1636,7 @@
    * Undoes the player's tentative placements and commits the AI-suggested play.
    */
   function applySuggestedPlay(suggestedPlay) {
+    saveUndoSnapshot();
     const Placement = window.AMath.placement;
     const Scoring = window.AMath.scoring;
     const Rack = window.AMath.rack;
@@ -1746,6 +1944,7 @@
   }
 
   function executePass() {
+    saveUndoSnapshot();
     if (window.AMath.education) { window.AMath.education.stopSearch(); window.AMath.education.hideVerifyButton(); }
     const Interactions = window.AMath.interactions;
     const Board = window.AMath.board;
@@ -1819,6 +2018,7 @@
   }
 
   function executeSwap(tileIds) {
+    saveUndoSnapshot();
     if (window.AMath.education) { window.AMath.education.stopSearch(); window.AMath.education.hideVerifyButton(); }
     const Bag = window.AMath.bag;
     const Rack = window.AMath.rack;
@@ -1885,6 +2085,8 @@
     }
   };
 
+  window.AMath._saveUndo = saveUndoSnapshot;
+
   /**
    * Start the next turn — PvP switches players, PvA starts AI.
    */
@@ -1897,6 +2099,7 @@
   }
 
   function runAiTurn() {
+    saveUndoSnapshot();
     const Interactions = window.AMath.interactions;
     const workerAvailable = window.AMath.aiWorkerClient && window.AMath.aiWorkerClient.isAvailable();
     const AI = workerAvailable ? window.AMath.aiWorkerClient : window.AMath.aiPlayer;
@@ -1912,6 +2115,7 @@
     const aiTurnStartTime = Date.now();
     // Capture the session reference so we can detect mid-think game reset.
     const sessionAtStart = session;
+    const genAtStart = undoGeneration;
 
     // Run AI search asynchronously so the browser can repaint and tick the
     // chess clock between yield points. decideMove is async and yields
@@ -1931,8 +2135,8 @@
           lastOpponentAction: session.lastOpponentAction || null,
         });
 
-        // Detect stale decision (game was reset/ended during AI thinking)
-        if (session !== sessionAtStart || !session || session.gameOver) {
+        // Detect stale decision (game was reset/ended/undone during AI thinking)
+        if (session !== sessionAtStart || !session || session.gameOver || undoGeneration !== genAtStart) {
           console.log('[AI] decision dropped — session changed during thinking');
           return;
         }
@@ -1950,7 +2154,7 @@
       } catch (err) {
         // If game was reset during AI thinking (worker terminated, session changed),
         // silently drop this stale error rather than disrupting the new game.
-        if (session !== sessionAtStart || !session || session.gameOver) {
+        if (session !== sessionAtStart || !session || session.gameOver || undoGeneration !== genAtStart) {
           console.log('[AI] stale error dropped (game ended/reset during thinking)');
           return;
         }

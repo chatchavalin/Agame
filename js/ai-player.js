@@ -163,6 +163,21 @@
     // Worker-compatibility: pick up settings from state if passed
     _stateSettings = state._settings || null;
 
+    // Top plays tracked during search — attached to the final decision for education mode
+    var _searchTopPlays = null;
+
+    // Helper: wrap play returns to include top plays for education
+    function makePlayResult(play) {
+      var r = {
+        type: 'play',
+        placements: play.placements,
+        score: play.score,
+        equations: play.equations,
+        _topPlays: _searchTopPlays || [],
+      };
+      return r;
+    }
+
     // Identify which rack is playing (for play-count tracking)
     const rackOwner = (state.aiRack && state.aiRack.owner) || 'ai';
 
@@ -300,6 +315,7 @@
     const hasMultiBlanks = rackBlanks >= 2;
 
     const bingoPlay = await findBestPlay(state.board, state.aiRack, state.isFirstMove, startTime, threats, bingoFeasible);
+    _searchTopPlays = bingoPlay && bingoPlay._topPlays ? bingoPlay._topPlays.slice() : [];
     const timeBudget = getTimeBudgetMs();
     let yoyoPlay = null;
     if (window.AMath.aiYoyo && (Date.now() - startTime) < timeBudget - 5000) {
@@ -989,12 +1005,7 @@
       }
 
       recordPlay(rackOwner);
-      return {
-        type: 'play',
-        placements: bestPlay.placements,
-        score: bestPlay.score,
-        equations: bestPlay.equations,
-      };
+      return makePlayResult(bestPlay);
     }
 
     // Strategic swap
@@ -1085,6 +1096,7 @@
     let bestBlockingDefValue = -1;
     let bestNoBlankPlay = null;   // Best play that uses zero BLANK tiles
     let bestMinBlankPlay = null;  // Best play using minimum number of blanks
+    let topPlays = [];            // Top 3 plays at different positions (for education mode)
     const rack = aiRack.tiles;
     if (rack.length === 0) return null;
 
@@ -1141,6 +1153,40 @@
           (playBlankCount === bestMinBlankPlay._blankCount && play.score > bestMinBlankPlay.score)) {
         bestMinBlankPlay = play;
         bestMinBlankPlay._blankCount = playBlankCount;
+      }
+
+      // Track top 3 plays at different board positions (for education mode)
+      // Use position key = sorted list of (row,col) to detect same-position plays
+      var posKey = play.placements.map(function (p) {
+        return p.row + ',' + p.col;
+      }).sort().join(';');
+      var dominated = false;
+      for (var ti = 0; ti < topPlays.length; ti++) {
+        if (topPlays[ti]._posKey === posKey) {
+          // Same position — keep higher score
+          if (play.score > topPlays[ti].score) {
+            topPlays[ti] = play;
+            topPlays[ti]._posKey = posKey;
+          }
+          dominated = true;
+          break;
+        }
+      }
+      if (!dominated) {
+        if (topPlays.length < 3) {
+          play._posKey = posKey;
+          topPlays.push(play);
+        } else {
+          // Replace lowest-scoring entry if this play is better
+          var minIdx = 0;
+          for (var mi = 1; mi < topPlays.length; mi++) {
+            if (topPlays[mi].score < topPlays[minIdx].score) minIdx = mi;
+          }
+          if (play.score > topPlays[minIdx].score) {
+            play._posKey = posKey;
+            topPlays[minIdx] = play;
+          }
+        }
       }
 
       // Track best "safe" play that doesn't create rim hooks for opponent.
@@ -1301,6 +1347,9 @@
       bestPlay._bestBlocking = bestBlockingPlay;
       bestPlay._bestNoBlank = bestNoBlankPlay;
       bestPlay._bestMinBlank = bestMinBlankPlay;
+      // Sort top plays by score descending
+      topPlays.sort(function (a, b) { return b.score - a.score; });
+      bestPlay._topPlays = topPlays;
     }
     return bestPlay;
   }

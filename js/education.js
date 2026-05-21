@@ -53,6 +53,7 @@
            : window.AMath.aiPlayer;
     var Bag = window.AMath.bag;
     var C = window.AMath.constants;
+    var Board = window.AMath.board;
     if (!AI || !AI.decideMove) return { plays: [], swapAdvice: null, endgamePlan: null };
 
     // Build complete rack (including tentative tiles)
@@ -126,28 +127,79 @@
       if (searchAborted) return result;
 
       if (decision.type === 'play') {
-        // Build equation display: mark each cell as isNew or existing
-        var newIds = new Set(decision.placements.map(function (p) { return p.tile ? p.tile.id : ''; }));
-        var equationCells = [];
-        if (decision.equations && decision.equations.length > 0) {
-          // Use first equation (primary equation on the main line)
-          for (var ei = 0; ei < decision.equations[0].length; ei++) {
-            var ec = decision.equations[0][ei];
-            equationCells.push({
-              face: ec.tile ? (ec.tile.assigned || ec.tile.face) : '?',
-              row: ec.row, col: ec.col,
-              isNew: ec.isNew !== false,   // true if newly placed
-              isExisting: ec.isNew === false, // already on board — HIGHLIGHT THIS
-            });
+        // Helper to build equation display for a play
+        function buildEquationCells(play) {
+          var cells = [];
+          if (play.equations && play.equations.length > 0) {
+            var playNewIds = new Set(play.placements.map(function (p) { return p.tile ? p.tile.id : ''; }));
+            for (var qi = 0; qi < play.equations[0].length; qi++) {
+              var qc = play.equations[0][qi];
+              cells.push({
+                face: qc.tile ? (qc.tile.assigned || qc.tile.face) : '?',
+                row: qc.row, col: qc.col,
+                isNew: qc.isNew !== false,
+                isExisting: qc.isNew === false,
+              });
+            }
           }
+          return cells;
         }
 
+        // Helper: check if a play creates ×9 or ×4 threat for opponent
+        function checkThreats(play) {
+          var X9 = window.AMath.aiX9;
+          if (!X9 || !Board) return { x9: false, x4: false };
+          var threatsBefore = X9.detectAllThreats(cleanBoard);
+          for (var pi = 0; pi < play.placements.length; pi++) {
+            Board.placeTile(cleanBoard, play.placements[pi].row, play.placements[pi].col, play.placements[pi].tile);
+          }
+          var threatsAfter = X9.detectAllThreats(cleanBoard);
+          for (var ri = play.placements.length - 1; ri >= 0; ri--) {
+            Board.removeTile(cleanBoard, play.placements[ri].row, play.placements[ri].col);
+          }
+          var newX9 = threatsAfter.length > threatsBefore.length;
+          if (!newX9 && threatsAfter.length > 0 && threatsBefore.length > 0) {
+            var maxB = 0, maxA = 0;
+            for (var bi = 0; bi < threatsBefore.length; bi++) maxB = Math.max(maxB, threatsBefore[bi].severity || 0);
+            for (var ai = 0; ai < threatsAfter.length; ai++) maxA = Math.max(maxA, threatsAfter[ai].severity || 0);
+            if (maxA > maxB + 50) newX9 = true;
+          }
+          return { x9: newX9 };
+        }
+
+        // Primary play (always included)
+        var primaryThreat = checkThreats(decision);
         result.plays.push({
           placements: decision.placements,
           score: decision.score,
           tilesUsed: decision.placements.length,
-          equationCells: equationCells,
+          equationCells: buildEquationCells(decision),
+          createsX9: primaryThreat.x9,
         });
+
+        // Add alternatives from _topPlays (up to 2 more, at different positions)
+        var topPlays = decision._topPlays || [];
+        var usedKeys = new Set();
+        // Mark primary play's position as used
+        var primaryKey = decision.placements.map(function (p) { return p.row + ',' + p.col; }).sort().join(';');
+        usedKeys.add(primaryKey);
+
+        for (var ti = 0; ti < topPlays.length && result.plays.length < 3; ti++) {
+          var tp = topPlays[ti];
+          if (!tp || !tp.placements) continue;
+          var tpKey = tp.placements.map(function (p) { return p.row + ',' + p.col; }).sort().join(';');
+          if (usedKeys.has(tpKey)) continue; // skip same position as primary
+          usedKeys.add(tpKey);
+
+          var altThreat = checkThreats(tp);
+          result.plays.push({
+            placements: tp.placements,
+            score: tp.score,
+            tilesUsed: tp.placements.length,
+            equationCells: buildEquationCells(tp),
+            createsX9: altThreat.x9,
+          });
+        }
       } else if (decision.type === 'swap') {
         var swapFaces = [];
         for (var si = 0; si < (decision.tileIds || []).length; si++) {
@@ -238,6 +290,7 @@
    */
   function autoSwap() {
     if (!searchResult || !searchResult.swapAdvice || !currentSession) return;
+    if (window.AMath._saveUndo) window.AMath._saveUndo();
     var Interactions = window.AMath.interactions;
     var Board = window.AMath.board;
     var Rack = window.AMath.rack;
@@ -294,6 +347,7 @@
    */
   function autoPass() {
     if (!currentSession) return;
+    if (window.AMath._saveUndo) window.AMath._saveUndo();
     var Interactions = window.AMath.interactions;
     var Board = window.AMath.board;
     var Rack = window.AMath.rack;
@@ -343,19 +397,36 @@
 
     // Best plays
     if (r.plays.length > 0) {
+      // Check if #1 is dangerous and a safe alternative exists
+      var bestIsDangerous = r.plays[0].createsX9;
+      var safeAltIdx = -1;
+      if (bestIsDangerous) {
+        for (var si = 1; si < r.plays.length; si++) {
+          if (!r.plays[si].createsX9) { safeAltIdx = si; break; }
+        }
+      }
+
       for (var i = 0; i < r.plays.length; i++) {
         var play = r.plays[i];
         html += '<div style="margin-bottom:12px;">';
         html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
-        html += '<span style="font-weight:bold;color:#059669;">💡 Best #' + (i + 1) + ': ' +
+        html += '<span style="font-weight:bold;color:' + (play.createsX9 ? '#dc2626' : '#059669') + ';">' +
+                '💡 Best #' + (i + 1) + ': ' +
                 '<span style="font-size:18px;">' + play.score + ' pts</span></span>';
 
-        // Auto-place button (works on both mobile and desktop)
+        // Auto-place button
         html += '<button onclick="window.AMath.education._autoPlace(' + i + ')" ' +
-                'style="background:#059669;color:white;border:none;border-radius:6px;' +
+                'style="background:' + (play.createsX9 ? '#dc2626' : '#059669') + ';color:white;border:none;border-radius:6px;' +
                 'padding:6px 12px;font-size:12px;cursor:pointer;font-weight:bold;">' +
                 '▶ Place on board</button>';
         html += '</div>';
+
+        // ×9 warning
+        if (play.createsX9) {
+          html += '<div style="padding:4px 8px;background:rgba(220,38,38,0.08);border-radius:4px;' +
+                  'border:1px solid rgba(220,38,38,0.2);font-size:12px;color:#dc2626;margin-bottom:4px;">' +
+                  '⚠️ This play gives opponent a ×9 opportunity!</div>';
+        }
 
         // Show full equation with existing tiles highlighted
         if (play.equationCells && play.equationCells.length > 0) {
@@ -379,11 +450,21 @@
                     '</div>';
           }
           html += '</div>';
-          html += '<div style="font-size:10px;color:#6b7280;margin-bottom:4px;">' +
-                  '<span style="background:#fbbf24;padding:0 4px;border-radius:2px;border:1px solid #d97706;">📌</span> on board &nbsp; ' +
-                  '<span style="background:#e0e7ff;padding:0 4px;border-radius:2px;border:1px solid #818cf8;">tile</span> from your rack</div>';
         }
         html += '</div>';
+      }
+      // Legend (show once after all plays)
+      html += '<div style="font-size:10px;color:#6b7280;margin-bottom:4px;">' +
+              '<span style="background:#fbbf24;padding:0 4px;border-radius:2px;border:1px solid #d97706;">📌</span> on board &nbsp; ' +
+              '<span style="background:#e0e7ff;padding:0 4px;border-radius:2px;border:1px solid #818cf8;">tile</span> from your rack</div>';
+
+      // Recommendation: if #1 is dangerous but a safe alt exists
+      if (bestIsDangerous && safeAltIdx >= 0) {
+        html += '<div style="margin-top:6px;padding:8px;background:rgba(220,38,38,0.06);border-radius:6px;' +
+                'border:1px solid rgba(220,38,38,0.2);font-size:13px;color:#dc2626;">' +
+                '⚠️ <b>#1 scores highest but gives opponent ×9!</b><br>' +
+                '<span style="color:#059669;">Consider <b>#' + (safeAltIdx + 1) + '</b> instead (' +
+                r.plays[safeAltIdx].score + ' pts, safe).</span></div>';
       }
     } else {
       html += '<div style="padding:8px;background:rgba(220,38,38,0.06);border-radius:6px;' +
