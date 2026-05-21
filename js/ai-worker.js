@@ -65,7 +65,10 @@ self.onmessage = function (e) {
       // decideMove is async — wait for it
       const p = self.AMath.aiPlayer.decideMove(state);
       Promise.resolve(p).then(function (decision) {
-        // Strip any internal-only fields; keep just what main thread needs
+        // Attach top plays from the search for education mode
+        if (self.AMath.aiPlayer.getLastTopPlays) {
+          decision._topPlays = self.AMath.aiPlayer.getLastTopPlays();
+        }
         self.postMessage({
           type: 'decided',
           requestId: msg.requestId,

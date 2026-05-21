@@ -25,6 +25,7 @@
   // Worker-compatible: prefers _settings passed in state, falls back to window.
   // (In Worker context, window is aliased to self by the worker bootstrap.)
   let _stateSettings = null;
+  let _lastTopPlays = [];  // Top plays from last search — survives any return path
   function getTimeBudgetMs() {
     try {
       // Bot level overrides think time
@@ -316,6 +317,7 @@
 
     const bingoPlay = await findBestPlay(state.board, state.aiRack, state.isFirstMove, startTime, threats, bingoFeasible);
     _searchTopPlays = bingoPlay && bingoPlay._topPlays ? bingoPlay._topPlays.slice() : [];
+    _lastTopPlays = _searchTopPlays; // persist at module level for education module
     const timeBudget = getTimeBudgetMs();
     let yoyoPlay = null;
     if (window.AMath.aiYoyo && (Date.now() - startTime) < timeBudget - 5000) {
@@ -798,12 +800,49 @@
     // Note: ×9 DEFENSE for existing threats already happened in section 4 above.
     // This section handles: don't CREATE new ×9/×4 threats with our play.
     if (isLead150 && bestPlay) {
-      // Close-board preference: when leading big, prefer plays that REDUCE
-      // the opponent's available positions rather than maximizing score.
-      // A "closing" play fills cells in tight spaces where there are few
-      // empty neighbors — this reduces the number of anchor cells available
-      // for the opponent's next play.
-      if (bestPlay.score < 80) {  // don't override very high scoring plays
+      // Lead 150+: actively block ×9 opportunities on the board.
+      // Identify unblocked ×9 lines where opponent could set up ×9.
+      // A ×9 line has two 3E squares; if both are open, opponent can score ×9.
+      const x9Lines = [
+        // Horizontal ×9 segments
+        { r1: 0, c1: 0, r2: 0, c2: 7 },   { r1: 0, c1: 7, r2: 0, c2: 14 },
+        { r1: 7, c1: 0, r2: 7, c2: 7 },   { r1: 7, c1: 7, r2: 7, c2: 14 },
+        { r1: 14, c1: 0, r2: 14, c2: 7 }, { r1: 14, c1: 7, r2: 14, c2: 14 },
+        // Vertical ×9 segments
+        { r1: 0, c1: 0, r2: 7, c2: 0 },   { r1: 7, c1: 0, r2: 14, c2: 0 },
+        { r1: 0, c1: 7, r2: 7, c2: 7 },   { r1: 7, c1: 7, r2: 14, c2: 7 },
+        { r1: 0, c1: 14, r2: 7, c2: 14 }, { r1: 7, c1: 14, r2: 14, c2: 14 },
+      ];
+
+      // Find unblocked ×9 lines (both 3E squares still open/unused)
+      const unblockedLines = [];
+      for (const line of x9Lines) {
+        const cell1 = state.board.cells[line.r1][line.c1];
+        const cell2 = state.board.cells[line.r2][line.c2];
+        const open1 = !cell1.tile || !cell1.premiumUsed;
+        const open2 = !cell2.tile || !cell2.premiumUsed;
+        if (open1 && open2) {
+          // Collect all cells on this line segment
+          const cells = [];
+          if (line.r1 === line.r2) {
+            // Horizontal
+            const minC = Math.min(line.c1, line.c2), maxC = Math.max(line.c1, line.c2);
+            for (let c = minC; c <= maxC; c++) cells.push({ r: line.r1, c: c });
+          } else {
+            // Vertical
+            const minR = Math.min(line.r1, line.r2), maxR = Math.max(line.r1, line.r2);
+            for (let r = minR; r <= maxR; r++) cells.push({ r: r, c: line.c1 });
+          }
+          unblockedLines.push(cells);
+        }
+      }
+
+      if (unblockedLines.length > 0) {
+        console.log('[AI] Lead-150: ' + unblockedLines.length + ' unblocked ×9 lines detected');
+      }
+
+      // Close-board preference + ×9 blocking bonus
+      if (bestPlay.score < 80) {
         const candidates = [bestPlay, bingoPlay && bingoPlay._bestNonRim,
                             bingoPlay && bingoPlay._bestNoBlank, yoyoPlay].filter(Boolean);
         let bestClosing = null;
@@ -811,22 +850,28 @@
 
         for (const play of candidates) {
           if (play.score < 5) continue;
-          // Count how many new anchor cells this play would create for opponent
-          // (fewer = more closing = better when ahead)
           let newAnchors = 0;
           for (const p of play.placements) {
             const adj = [[0,1],[0,-1],[1,0],[-1,0]];
             for (const [dr,dc] of adj) {
               const nr = p.row + dr, nc = p.col + dc;
               if (Board.inBounds(nr, nc) && Board.isCellEmpty(state.board, nr, nc)) {
-                // Check if this empty cell is already an anchor (adjacent to existing tile)
                 const existingAdj = Board.getAdjacentTiles(state.board, nr, nc);
-                if (existingAdj.length === 0) newAnchors++; // new anchor created
+                if (existingAdj.length === 0) newAnchors++;
               }
             }
           }
-          // Closing score: prefer fewer new anchors, higher play score, more tiles used
-          const closeScore = play.score * 0.3 + play.placements.length * 3 - newAnchors * 5;
+
+          // ×9 blocking bonus: how many unblocked ×9 lines does this play disrupt?
+          let x9BlockBonus = 0;
+          for (const lineCells of unblockedLines) {
+            for (const p of play.placements) {
+              const blocksLine = lineCells.some(function (lc) { return lc.r === p.row && lc.c === p.col; });
+              if (blocksLine) { x9BlockBonus += 15; break; } // 15 pts bonus per blocked line
+            }
+          }
+
+          const closeScore = play.score * 0.3 + play.placements.length * 3 - newAnchors * 5 + x9BlockBonus;
           if (closeScore > bestCloseScore) {
             bestCloseScore = closeScore;
             bestClosing = play;
@@ -2912,5 +2957,6 @@
   window.AMath.aiPlayer = {
     decideMove: decideMove,
     resetPlayCount: resetPlayCount,
+    getLastTopPlays: function () { return _lastTopPlays || []; },
   };
 })();

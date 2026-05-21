@@ -177,8 +177,10 @@
           createsX9: primaryThreat.x9,
         });
 
-        // Add alternatives from _topPlays (up to 2 more, at different positions)
-        var topPlays = decision._topPlays || [];
+        // Add alternatives from top plays (up to 2 more, at different positions)
+        // Use getLastTopPlays() which persists at module level — works for ALL return paths
+        var aiPlayer = window.AMath.aiPlayer;
+        var topPlays = (decision._topPlays) || (aiPlayer && aiPlayer.getLastTopPlays ? aiPlayer.getLastTopPlays() : []);
         var usedKeys = new Set();
         // Mark primary play's position as used
         var primaryKey = decision.placements.map(function (p) { return p.row + ',' + p.col; }).sort().join(';');
