@@ -464,7 +464,7 @@
           Rack.refillFromBag(session.playerRack, session.bag);
           session.consecutiveNonScoringTurns++;
           if (window.AMath.scoreSheet) {
-            window.AMath.scoreSheet.recordTurn('player', 'swap', 0, false, session.playerScore);
+            window.AMath.scoreSheet.recordTurn('player', 'swap', 0, false, session.playerScore, { swapCount: swapped.length });
           }
           showStatus('🤖→You swapped tiles.');
         } else {
@@ -812,6 +812,7 @@
       playerScore: saved.playerScore,
       aiScore: saved.aiScore,
       aiActualPlayCount: saved.aiActualPlayCount || 0,
+      lastOpponentAction: saved.lastOpponentAction || null,
       isFirstMove: saved.isFirstMove,
       gameOver: false,
       consecutiveNonScoringTurns: saved.consecutiveNonScoringTurns || 0,
@@ -840,7 +841,7 @@
         // For simplicity, we replay them — but this requires recordTurn to accept turn number.
         // Just re-record each entry in order.
         for (const e of saved.scoreSheet) {
-          window.AMath.scoreSheet.recordTurn(e.who, e.action, e.score, e.isBingo, e.total);
+          window.AMath.scoreSheet.recordTurn(e.who, e.action, e.score, e.isBingo, e.total, { swapCount: e.swapCount || 0 });
         }
       }
     }
@@ -1552,7 +1553,7 @@
     };
 
     if (window.AMath.scoreSheet) {
-      window.AMath.scoreSheet.recordTurn('player', 'swap', 0, false, session.playerScore);
+      window.AMath.scoreSheet.recordTurn('player', 'swap', 0, false, session.playerScore, { swapCount: tilesToReturn.length });
     }
     fireTrashTalk('opp_swap', {});
 
@@ -1756,7 +1757,7 @@
       session.lastAiPlay = null;
 
       if (window.AMath.scoreSheet) {
-        window.AMath.scoreSheet.recordTurn('ai', 'swap', 0, false, session.aiScore);
+        window.AMath.scoreSheet.recordTurn('ai', 'swap', 0, false, session.aiScore, { swapCount: swapped.length });
       }
 
       showStatus('🤖 AI swapped ' + swapped.length + ' tiles. Your turn!');
