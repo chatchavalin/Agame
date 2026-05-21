@@ -79,7 +79,7 @@
    */
   function applyTheme(themeName) {
     const body = document.body;
-    body.classList.remove('theme-modern', 'theme-physical', 'theme-dark', 'theme-playful', 'theme-capture');
+    body.classList.remove('theme-modern', 'theme-physical', 'theme-dark', 'theme-playful', 'theme-capture', 'theme-ocean', 'theme-forest', 'theme-sunset', 'theme-neon');
     body.classList.add('theme-' + themeName);
   }
 
@@ -210,6 +210,10 @@
       '<option value="physical"' + (current.theme === 'physical' ? ' selected' : '') + '>Physical Board</option>' +
       '<option value="dark"' + (current.theme === 'dark' ? ' selected' : '') + '>Dark Mode</option>' +
       '<option value="playful"' + (current.theme === 'playful' ? ' selected' : '') + '>Bright & Playful</option>' +
+      '<option value="ocean"' + (current.theme === 'ocean' ? ' selected' : '') + '>🌊 Ocean</option>' +
+      '<option value="forest"' + (current.theme === 'forest' ? ' selected' : '') + '>🌲 Forest</option>' +
+      '<option value="sunset"' + (current.theme === 'sunset' ? ' selected' : '') + '>🌅 Sunset</option>' +
+      '<option value="neon"' + (current.theme === 'neon' ? ' selected' : '') + '>💜 Neon</option>' +
       '</select>';
     dialog.appendChild(themeRow);
 

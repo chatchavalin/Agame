@@ -144,6 +144,66 @@
     tone(900, 0.03, 'square', 0.05);
   }
 
+  function swap() {
+    // Shuffle/whoosh sound
+    arpeggio([
+      { freq: 400, duration: 0.06, delay: 0 },
+      { freq: 500, duration: 0.06, delay: 0.05 },
+      { freq: 350, duration: 0.06, delay: 0.1 },
+      { freq: 450, duration: 0.06, delay: 0.15 },
+    ], 'triangle', 0.1);
+  }
+
+  function pass() {
+    // Descending two-note — meh
+    tone(440, 0.12, 'sine', 0.1);
+    setTimeout(() => tone(330, 0.15, 'sine', 0.1), 120);
+  }
+
+  function undo() {
+    // Rewind sound — descending arpeggio
+    arpeggio([
+      { freq: 784, duration: 0.08, delay: 0 },
+      { freq: 659, duration: 0.08, delay: 0.06 },
+      { freq: 523, duration: 0.08, delay: 0.12 },
+      { freq: 392, duration: 0.12, delay: 0.18 },
+    ], 'sine', 0.12);
+  }
+
+  function challenge() {
+    // Dramatic hit
+    chord([330, 415, 523], 0.3, 'sawtooth', 0.08);
+    setTimeout(() => tone(262, 0.4, 'sine', 0.15), 200);
+  }
+
+  function timerWarning() {
+    // Urgent beep-beep
+    tone(880, 0.08, 'square', 0.12);
+    setTimeout(() => tone(880, 0.08, 'square', 0.12), 150);
+  }
+
+  function x9Score() {
+    // Dramatic explosion — big score
+    arpeggio([
+      { freq: 262, duration: 0.2, delay: 0 },
+      { freq: 330, duration: 0.2, delay: 0.1 },
+      { freq: 392, duration: 0.2, delay: 0.2 },
+      { freq: 523, duration: 0.3, delay: 0.3 },
+      { freq: 784, duration: 0.5, delay: 0.4 },
+    ], 'triangle', 0.2);
+    setTimeout(() => chord([523, 659, 784, 1047], 0.6, 'sine', 0.12), 500);
+  }
+
+  function error() {
+    // Buzzer
+    tone(150, 0.25, 'sawtooth', 0.1);
+  }
+
+  function turnStart() {
+    // Gentle ping — your turn
+    tone(660, 0.1, 'sine', 0.08);
+  }
+
   // ============================================================================
   // EXPOSE
   // ============================================================================
@@ -160,5 +220,13 @@
     aiThinking: aiThinking,
     gameEnd: gameEnd,
     buttonClick: buttonClick,
+    swap: swap,
+    pass: pass,
+    undo: undo,
+    challenge: challenge,
+    timerWarning: timerWarning,
+    x9Score: x9Score,
+    error: error,
+    turnStart: turnStart,
   };
 })();

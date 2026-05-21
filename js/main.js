@@ -1341,6 +1341,7 @@
     }
 
     showStatus('⏪ Undone! (' + undoHistory.length + ' more available)', 'info');
+    if (window.AMath.sounds) window.AMath.sounds.undo();
   }
 
   /**
@@ -2059,6 +2060,7 @@
     fireTrashTalk('opp_pass', {});
 
     showStatus(session.isPvP ? 'Player ' + (session.currentPlayer || 1) + ' passed.' : 'You passed.');
+    if (window.AMath.sounds) window.AMath.sounds.pass();
 
     autoSave();
 
@@ -2137,6 +2139,7 @@
       ? 'Player ' + (session.currentPlayer || 1) + ' swapped ' + tilesToReturn.length + ' tiles.'
       : 'Swapped ' + tilesToReturn.length + ' tiles.';
     showStatus(swapMsg);
+    if (window.AMath.sounds) window.AMath.sounds.swap();
 
     autoSave();
 
@@ -2409,6 +2412,7 @@
     saveUndoSnapshot();  // snapshot at start of player's turn (after AI played)
 
     Interactions.setPlayerTurn(true);
+    if (window.AMath.sounds) window.AMath.sounds.turnStart();
     // Player's turn starts now — reset stalling counter so the first
     // 30-second window is measured from now, not from any leftover time.
     resetStallingWatch();

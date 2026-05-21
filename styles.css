@@ -2347,3 +2347,151 @@ body.theme-dark .score-sheet-table th {
     font-size: 13px;
   }
 }
+
+/* =============================================================================
+   🌊 OCEAN THEME — cool blues, sea-foam greens
+   ============================================================================= */
+body.theme-ocean {
+  --bg-page: #0c4a6e;
+  --bg-card: #164e63;
+  --text-primary: #e0f2fe;
+  --text-secondary: #7dd3fc;
+  --border-light: #155e75;
+  --border-medium: #0e7490;
+  --cell-plain: #0e4d5c;
+  --cell-border: #155e75;
+  --cell-3E: #be123c;
+  --cell-2E: #7dd3fc;
+  --cell-2E-text: #0c4a6e;
+  --cell-3T: #0284c7;
+  --cell-2T: #06b6d4;
+  --tile-bg: #ecfdf5;
+  --tile-border: #059669;
+  --tile-text: #064e3b;
+  --tile-points: #6b7280;
+  --score-bg: #164e63;
+  --score-border: #0e7490;
+  --timer-normal: #e0f2fe;
+  --btn-primary-bg: #0891b2;
+  --btn-primary-hover: #06b6d4;
+  --btn-secondary-bg: #155e75;
+  --btn-secondary-text: #e0f2fe;
+  --btn-secondary-hover: #0e7490;
+  --btn-disabled-bg: #0c4a6e;
+  --btn-disabled-text: #0e7490;
+}
+
+/* =============================================================================
+   🌲 FOREST THEME — deep greens, earthy browns, warm accents
+   ============================================================================= */
+body.theme-forest {
+  --bg-page: #14532d;
+  --bg-card: #1a3a2a;
+  --text-primary: #ecfdf5;
+  --text-secondary: #86efac;
+  --border-light: #166534;
+  --border-medium: #15803d;
+  --cell-plain: #1a3a2a;
+  --cell-border: #166534;
+  --cell-3E: #dc2626;
+  --cell-2E: #86efac;
+  --cell-2E-text: #14532d;
+  --cell-3T: #15803d;
+  --cell-2T: #a16207;
+  --tile-bg: #fef3c7;
+  --tile-border: #92400e;
+  --tile-text: #1c1917;
+  --tile-points: #78716c;
+  --score-bg: #1a3a2a;
+  --score-border: #15803d;
+  --timer-normal: #ecfdf5;
+  --btn-primary-bg: #16a34a;
+  --btn-primary-hover: #22c55e;
+  --btn-secondary-bg: #166534;
+  --btn-secondary-text: #ecfdf5;
+  --btn-secondary-hover: #15803d;
+  --btn-disabled-bg: #14532d;
+  --btn-disabled-text: #166534;
+}
+
+/* =============================================================================
+   🌅 SUNSET THEME — warm oranges, pinks, golden glow
+   ============================================================================= */
+body.theme-sunset {
+  --bg-page: #fef2e8;
+  --bg-card: #fffbf5;
+  --text-primary: #7c2d12;
+  --text-secondary: #c2410c;
+  --border-light: #fed7aa;
+  --border-medium: #fdba74;
+  --cell-plain: #fff7ed;
+  --cell-border: #fdba74;
+  --cell-3E: #be123c;
+  --cell-2E: #f472b6;
+  --cell-2E-text: #831843;
+  --cell-3T: #c2410c;
+  --cell-2T: #ea580c;
+  --tile-bg: #fffbeb;
+  --tile-border: #d97706;
+  --tile-text: #7c2d12;
+  --tile-points: #9a3412;
+  --btn-primary-bg: #ea580c;
+  --btn-primary-hover: #f97316;
+}
+
+/* =============================================================================
+   💜 NEON THEME — dark background, vibrant neon accents
+   ============================================================================= */
+body.theme-neon {
+  --bg-page: #0a0a1a;
+  --bg-card: #111133;
+  --text-primary: #e0e7ff;
+  --text-secondary: #a5b4fc;
+  --border-light: #1e1b4b;
+  --border-medium: #3730a3;
+  --cell-plain: #0f0f2e;
+  --cell-border: #2e1065;
+  --cell-3E: #f43f5e;
+  --cell-2E: #c084fc;
+  --cell-2E-text: #0a0a1a;
+  --cell-3T: #6366f1;
+  --cell-2T: #f59e0b;
+  --tile-bg: #1e1b4b;
+  --tile-border: #7c3aed;
+  --tile-text: #e0e7ff;
+  --tile-points: #a78bfa;
+  --score-bg: #111133;
+  --score-border: #3730a3;
+  --timer-normal: #e0e7ff;
+  --btn-primary-bg: #7c3aed;
+  --btn-primary-hover: #8b5cf6;
+  --btn-secondary-bg: #1e1b4b;
+  --btn-secondary-text: #e0e7ff;
+  --btn-secondary-hover: #2e1065;
+  --btn-disabled-bg: #0a0a1a;
+  --btn-disabled-text: #1e1b4b;
+}
+
+/* Dark-like overrides for ocean, forest, neon (dark background themes) */
+body.theme-ocean .desktop-side-panel,
+body.theme-forest .desktop-side-panel,
+body.theme-neon .desktop-side-panel {
+  background: var(--bg-card);
+  border-color: var(--border-medium);
+}
+body.theme-ocean .status-card,
+body.theme-forest .status-card,
+body.theme-neon .status-card {
+  background: var(--bg-card);
+  border-color: var(--border-medium);
+}
+body.theme-ocean .amath-tile.tile-ai-last-play,
+body.theme-forest .amath-tile.tile-ai-last-play,
+body.theme-neon .amath-tile.tile-ai-last-play {
+  box-shadow: 0 0 8px 3px rgba(251, 191, 36, 0.7);
+}
+body.theme-ocean .score-box.timer-paused,
+body.theme-forest .score-box.timer-paused,
+body.theme-neon .score-box.timer-paused {
+  border-color: #dc2626;
+}
