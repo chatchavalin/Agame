@@ -31,14 +31,26 @@
    *   onSubmit, onReset, onPass, onSwap
    * }
    */
+  var _boardHandlerEl = null;  // track which board element has handlers
+  var _rackHandlerEl = null;
+
   function init(sessionState) {
     state = sessionState;
-    // Swap mode state
     state.swapMode = false;
-    state.swapSelected = new Set(); // tile IDs selected for swap
-    attachBoardHandlers();
-    attachRackHandlers();
-    attachButtonHandlers();
+    state.swapSelected = new Set();
+
+    // Only re-attach handlers if DOM elements changed (new game rebuilds DOM)
+    var boardEl = document.getElementById('amath-board');
+    var rackEl = state.uiParts.playerRack;
+    if (boardEl !== _boardHandlerEl) {
+      attachBoardHandlers();
+      _boardHandlerEl = boardEl;
+    }
+    if (rackEl !== _rackHandlerEl) {
+      attachRackHandlers();
+      attachButtonHandlers();
+      _rackHandlerEl = rackEl;
+    }
     refreshUI();
   }
 
