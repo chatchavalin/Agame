@@ -87,16 +87,12 @@
         settings.aiSwapBrain = window.AMath.settings.get('aiSwapBrain');
         settings.tileSet = window.AMath.settings.get('tileSet');
         settings.disableSixPassEnd = window.AMath.settings.get('disableSixPassEnd');
-        settings.botLevel = window.AMath.settings.get('botLevel');
       }
     } catch (e) {/* */}
 
     // Note: structured clone handles nested objects fine; we don't need
     // explicit serialization, but we DO want to attach _settings.
-    // If the caller already set _settings (e.g., education forcing hard level),
-    // merge them — caller overrides take priority.
-    const merged = Object.assign({}, settings, state._settings || {});
-    return Object.assign({}, state, { _settings: merged });
+    return Object.assign({}, state, { _settings: settings });
   }
 
   /**

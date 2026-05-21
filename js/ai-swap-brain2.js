@@ -12,7 +12,7 @@
  *
  * Inherits hard rules:
  *   - Never swap BLANKs (always keep).
- *   - Bag ≤ 4 prevents swap (enforced upstream in ai-player.js).
+ *   - Bag ≤ 5 prevents swap (enforced upstream in ai-player.js).
  *
  * Extension points (future):
  *   - Leave equity table (commented stub below).

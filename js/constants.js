@@ -176,7 +176,7 @@ const CENTER_CELL = { row: 7, col: 7 };  // The 3T star square
 
 const RACK_SIZE = 8;
 const BINGO_BONUS = 40;
-const SWAP_FORBIDDEN_BAG_THRESHOLD = 4;       // Can't swap when bag ≤ this
+const SWAP_FORBIDDEN_BAG_THRESHOLD = 5;       // Can't swap when bag ≤ this
 const CONSECUTIVE_NON_SCORING_TURNS_TO_END = 6;  // 3 per player → game ends
 
 // BLANK tile possible assignments: =, all operators, all numbers 0-20.

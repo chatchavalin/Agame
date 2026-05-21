@@ -662,6 +662,5 @@
     enterSwapMode: enterSwapMode,
     exitSwapMode: exitSwapMode,
     getSwapSelection: getSwapSelection,
-    commitPlacement: commitPlacement,
   };
 })();

@@ -213,8 +213,6 @@
 
     if (mode === Modes.MODE_AI_VS_AI) {
       startAiVsAiSession();
-    } else if (mode === Modes.MODE_PLAYER_VS_PLAYER) {
-      startPvPSession();
     } else {
       startPlayerVsAiSession();
     }
@@ -332,16 +330,13 @@
       });
     }
 
-    // Wire up Settings button — use setTimeout so it responds even if
-    // the main thread is momentarily blocked by a main-thread AI fallback.
+    // Wire up Settings button
     const btnSettings = document.getElementById('btn-settings');
     if (btnSettings) {
       btnSettings.addEventListener('click', function () {
-        setTimeout(function () {
-          Settings.showPopup(function (result) {
-            handleSettingsResult(result);
-          });
-        }, 0);
+        Settings.showPopup(function (result) {
+          handleSettingsResult(result);
+        });
       });
     }
 
@@ -349,9 +344,7 @@
     const btnScoreSheet = document.getElementById('btn-score-sheet');
     if (btnScoreSheet) {
       btnScoreSheet.addEventListener('click', function () {
-        setTimeout(function () {
-          window.AMath.scoreSheet.showPopup(session.playerScore, session.aiScore);
-        }, 0);
+        window.AMath.scoreSheet.showPopup(session.playerScore, session.aiScore);
       });
     }
 
@@ -406,143 +399,10 @@
       showStatus(
         '🎲 You go first! Tap a tile, then tap a board cell. First move must pass through the center ★.'
       );
-      // Education mode: start background analysis
-      if (window.AMath.education && window.AMath.settings && window.AMath.settings.get('educationMode')) {
-        window.AMath.education.startBackgroundSearch(session);
-      }
     } else {
       showStatus('🎲 AI goes first.');
       setTimeout(runAiTurn, 800);
     }
-  }
-
-  // =========================================================================
-  // PLAYER VS PLAYER SESSION
-  // =========================================================================
-
-  function startPvPSession() {
-    const C = window.AMath.constants;
-    const Bag = window.AMath.bag;
-    const Rack = window.AMath.rack;
-    const Board = window.AMath.board;
-    const UI = window.AMath.ui;
-    const Settings = window.AMath.settings;
-    const Interactions = window.AMath.interactions;
-
-    const board = Board.createBoard();
-    const bag = Bag.createBag();
-    const p1Rack = Rack.createRack('player1');
-    const p2Rack = Rack.createRack('player2');
-    Rack.refillFromBag(p1Rack, bag);
-    Rack.refillFromBag(p2Rack, bag);
-
-    const chessClockEnabled = Settings.get('chessClockEnabled');
-    const clockMinutes = Settings.get('chessClockMinutes') || 22;
-
-    session = {
-      board: board,
-      playerRack: p1Rack,
-      aiRack: p2Rack,
-      p1Rack: p1Rack,
-      p2Rack: p2Rack,
-      bag: bag,
-      playerScore: 0,
-      aiScore: 0,
-      isPlayerTurn: true,
-      isFirstMove: true,
-      consecutiveNonScoringTurns: 0,
-      tentativePlacements: [],
-      gameOver: false,
-      isPvP: true,
-      currentPlayer: 1,
-      playerTimeSeconds: clockMinutes * 60,
-      aiTimeSeconds: clockMinutes * 60,
-      chessClockEnabled: chessClockEnabled,
-      lastAiPlay: null,
-      bagEmptyTaunted: false,
-      aiActualPlayCount: 0,
-      lastOpponentAction: null,
-      onSubmit: handleSubmit,
-      onReset: handleReset,
-      onPass: handlePass,
-      onSwap: handleSwap,
-    };
-
-    const uiParts = UI.buildGameLayout(document.getElementById('game-root'), session, {
-      showAiHand: true,
-      opponentLabel: 'Player 2',
-      playerLabel: 'Player 1',
-    });
-    session.uiParts = uiParts;
-
-    Interactions.init(session);
-    Interactions.setPlayerTurn(true);
-
-    UI.renderScore(uiParts.playerScoreBox, 'P1', 0);
-    UI.renderScore(uiParts.opponentScoreBox, 'P2', 0);
-
-    if (chessClockEnabled) startChessClock();
-
-    const btnNewGame = document.getElementById('btn-new-game');
-    if (btnNewGame) {
-      btnNewGame.addEventListener('click', function () { startGameSession(); });
-    }
-    const btnSettings = document.getElementById('btn-settings');
-    if (btnSettings) {
-      btnSettings.addEventListener('click', function () {
-        setTimeout(function () {
-          Settings.showPopup(function (result) { handleSettingsResult(result); });
-        }, 0);
-      });
-    }
-    const btnScoreSheet = document.getElementById('btn-score-sheet');
-    if (btnScoreSheet) {
-      btnScoreSheet.addEventListener('click', function () {
-        setTimeout(function () {
-          window.AMath.scoreSheet.showPopup(session.playerScore, session.aiScore);
-        }, 0);
-      });
-    }
-
-    wireExportImportButtons();
-    wireTileTrackerButton();
-
-    // Hide AI-only buttons
-    var btnTakeover = document.getElementById('btn-takeover');
-    if (btnTakeover) btnTakeover.style.display = 'none';
-
-    showStatus('🎲 Player vs Player! Player 1 goes first.');
-  }
-
-  function switchPvPTurn() {
-    if (!session || !session.isPvP || session.gameOver) return;
-    if (checkGameEnd()) return;
-
-    var UI = window.AMath.ui;
-    var Interactions = window.AMath.interactions;
-
-    if (session.currentPlayer === 1) {
-      session.currentPlayer = 2;
-      session.playerRack = session.p2Rack;
-      session.aiRack = session.p1Rack;
-    } else {
-      session.currentPlayer = 1;
-      session.playerRack = session.p1Rack;
-      session.aiRack = session.p2Rack;
-    }
-
-    session.tentativePlacements = [];
-    session.isPlayerTurn = true;
-    Interactions.init(session);
-    Interactions.setPlayerTurn(true);
-
-    var p1Score = session.currentPlayer === 1 ? session.playerScore : session.aiScore;
-    var p2Score = session.currentPlayer === 1 ? session.aiScore : session.playerScore;
-    UI.renderScore(session.uiParts.playerScoreBox, 'P' + session.currentPlayer, session.currentPlayer === 1 ? session.playerScore : session.aiScore);
-    UI.renderScore(session.uiParts.opponentScoreBox, 'P' + (3 - session.currentPlayer), session.currentPlayer === 1 ? session.aiScore : session.playerScore);
-
-    autoSave();
-    showStatus('🎲 Player ' + session.currentPlayer + '\'s turn!');
   }
 
   /**
@@ -604,7 +464,7 @@
           Rack.refillFromBag(session.playerRack, session.bag);
           session.consecutiveNonScoringTurns++;
           if (window.AMath.scoreSheet) {
-            window.AMath.scoreSheet.recordTurn('player', 'swap', 0, false, session.playerScore, { swapCount: swapped.length });
+            window.AMath.scoreSheet.recordTurn('player', 'swap', 0, false, session.playerScore);
           }
           showStatus('🤖→You swapped tiles.');
         } else {
@@ -719,20 +579,16 @@
     const btnSettings = document.getElementById('btn-settings');
     if (btnSettings) {
       btnSettings.addEventListener('click', function () {
-        setTimeout(function () {
-          Settings.showPopup(function (result) {
-            handleSettingsResult(result);
-          });
-        }, 0);
+        Settings.showPopup(function (result) {
+          handleSettingsResult(result);
+        });
       });
     }
 
     const btnScoreSheet = document.getElementById('btn-score-sheet');
     if (btnScoreSheet) {
       btnScoreSheet.addEventListener('click', function () {
-        setTimeout(function () {
-          window.AMath.scoreSheet.showPopup(session.playerScore, session.aiScore);
-        }, 0);
+        window.AMath.scoreSheet.showPopup(session.playerScore, session.aiScore);
       });
     }
 
@@ -956,7 +812,6 @@
       playerScore: saved.playerScore,
       aiScore: saved.aiScore,
       aiActualPlayCount: saved.aiActualPlayCount || 0,
-      lastOpponentAction: saved.lastOpponentAction || null,
       isFirstMove: saved.isFirstMove,
       gameOver: false,
       consecutiveNonScoringTurns: saved.consecutiveNonScoringTurns || 0,
@@ -985,7 +840,7 @@
         // For simplicity, we replay them — but this requires recordTurn to accept turn number.
         // Just re-record each entry in order.
         for (const e of saved.scoreSheet) {
-          window.AMath.scoreSheet.recordTurn(e.who, e.action, e.score, e.isBingo, e.total, { swapCount: e.swapCount || 0 });
+          window.AMath.scoreSheet.recordTurn(e.who, e.action, e.score, e.isBingo, e.total);
         }
       }
     }
@@ -1005,20 +860,16 @@
     const btnSettings = document.getElementById('btn-settings');
     if (btnSettings) {
       btnSettings.addEventListener('click', function () {
-        setTimeout(function () {
-          Settings.showPopup(function (result) {
-            handleSettingsResult(result, { clearSave: true });
-          });
-        }, 0);
+        Settings.showPopup(function (result) {
+          handleSettingsResult(result, { clearSave: true });
+        });
       });
     }
 
     const btnScoreSheet = document.getElementById('btn-score-sheet');
     if (btnScoreSheet) {
       btnScoreSheet.addEventListener('click', function () {
-        setTimeout(function () {
-          window.AMath.scoreSheet.showPopup(session.playerScore, session.aiScore);
-        }, 0);
+        window.AMath.scoreSheet.showPopup(session.playerScore, session.aiScore);
       });
     }
 
@@ -1066,8 +917,6 @@
 
     if (!session.isPlayerTurn) {
       setTimeout(runAiTurn, 800);
-    } else if (window.AMath.education && window.AMath.settings && window.AMath.settings.get('educationMode')) {
-      window.AMath.education.startBackgroundSearch(session);
     }
   }
 
@@ -1326,53 +1175,33 @@
       session.isFirstMove
     );
 
+    // === INVALID PLAY PATH ===
+    // We no longer block invalid plays at submit. Instead, we COMMIT the
+    // play (tiles stay on the board, score = 0 for now) and let the AI
+    // raise a challenge if it spots the error. This is the proper A-Math
+    // rule: you can submit any equation you claim is valid; your opponent
+    // decides whether to challenge.
     if (!result.ok) {
       handleInvalidPlaySubmission(result);
       return;
     }
 
+    // === VALID PLAY PATH (unchanged) ===
     const scoreResult = Scoring.scorePlay(
       result.equations,
       session.board,
       session.tentativePlacements.length
     );
 
-    commitPlayerPlay(scoreResult);
-  }
-
-  /**
-   * Commit the player's validated play to the board (called after education check).
-   */
-  function commitPlayerPlay(scoreResult) {
-    // Stop education background search
-    if (window.AMath.education) {
-      window.AMath.education.stopSearch();
-      window.AMath.education.hideVerifyButton();
-    }
-
-    const Rack = window.AMath.rack;
-    const Board = window.AMath.board;
-    const UI = window.AMath.ui;
-    const Interactions = window.AMath.interactions;
-
     for (const p of session.tentativePlacements) {
       Board.markPremiumUsed(session.board, p.row, p.col);
     }
-
     const oldScore = session.playerScore;
     session.playerScore += scoreResult.total;
     session.isFirstMove = false;
     session.consecutiveNonScoringTurns = 0;
 
     const wasBingo = scoreResult.bingoBonus > 0;
-
-    // Track opponent's last action for late-game AI strategy
-    session.lastOpponentAction = {
-      type: 'play',
-      tilesUsed: session.tentativePlacements.length,
-      score: scoreResult.total,
-      wasBingo: wasBingo,
-    };
 
     Rack.refillFromBag(session.playerRack, session.bag);
     Interactions.clearTentativePlacements();
@@ -1416,92 +1245,6 @@
     // highlight glowing anymore.
     clearLastAiPlayHighlight();
 
-    Interactions.setPlayerTurn(false);
-    resetStallingWatch();
-    startNextTurn();
-  }
-
-  /**
-   * Education mode: apply a suggested play instead of the player's original move.
-   * Undoes the player's tentative placements and commits the AI-suggested play.
-   */
-  function applySuggestedPlay(suggestedPlay) {
-    const Placement = window.AMath.placement;
-    const Scoring = window.AMath.scoring;
-    const Rack = window.AMath.rack;
-    const Board = window.AMath.board;
-    const UI = window.AMath.ui;
-    const Interactions = window.AMath.interactions;
-
-    // 1. Remove player's tentative tiles from the board back to rack
-    Interactions.clearTentativePlacements();
-
-    // 2. Place the suggested tiles on the board
-    for (const p of suggestedPlay.placements) {
-      if (p.tile) {
-        // Set assignment if needed
-        if (p.assigned) p.tile.assigned = p.assigned;
-        Board.placeTile(session.board, p.row, p.col, p.tile);
-        Board.markPremiumUsed(session.board, p.row, p.col);
-        // Remove tile from player's rack
-        Rack.removeTile(session.playerRack, p.tile.id);
-      }
-    }
-
-    // 3. Score the suggested play
-    const result = Placement.validatePlay(session.board, suggestedPlay.placements, session.isFirstMove);
-    let total = suggestedPlay.score;
-    let wasBingo = suggestedPlay.placements.length === 8;
-    if (result.ok) {
-      const scoreResult = Scoring.scorePlay(result.equations, session.board, suggestedPlay.placements.length);
-      total = scoreResult.total;
-      wasBingo = scoreResult.bingoBonus > 0;
-    }
-
-    // 4. Commit
-    const oldScore = session.playerScore;
-    session.playerScore += total;
-    session.isFirstMove = false;
-    session.consecutiveNonScoringTurns = 0;
-
-    session.lastOpponentAction = {
-      type: 'play',
-      tilesUsed: suggestedPlay.placements.length,
-      score: total,
-      wasBingo: wasBingo,
-    };
-
-    Rack.refillFromBag(session.playerRack, session.bag);
-
-    // Re-render
-    UI.renderBoard(session.uiParts.boardGrid, session.board, session.isFirstMove);
-    UI.renderRack(session.uiParts.playerRack, session.playerRack, false);
-    UI.renderScore(session.uiParts.playerScoreBox, 'You', session.playerScore);
-
-    const Anim = window.AMath.animations;
-    if (Anim) {
-      const scoreEl = session.uiParts.playerScoreBox.querySelector('.score-value');
-      if (scoreEl) Anim.animateScore(scoreEl, oldScore, session.playerScore);
-    }
-
-    if (window.AMath.scoreSheet) {
-      window.AMath.scoreSheet.recordTurn('player', 'play', total, wasBingo, session.playerScore);
-    }
-
-    let msg = '📚 Suggested play: ' + total + ' points!';
-    if (wasBingo) msg += ' (+40 BINGO! 🎉)';
-    showStatus(msg, 'success');
-
-    if (window.AMath.sounds) {
-      if (wasBingo) window.AMath.sounds.bingo();
-      else window.AMath.sounds.submitSuccess();
-    }
-
-    fireTrashTalk(wasBingo ? 'opp_bingo' : 'opp_pass_check', { lastScore: total });
-    autoSave();
-
-    if (checkGameEnd()) return;
-    clearLastAiPlayHighlight();
     Interactions.setPlayerTurn(false);
     resetStallingWatch();
     setTimeout(runAiTurn, 800);
@@ -1720,15 +1463,6 @@
     const Board = window.AMath.board;
     const Rack = window.AMath.rack;
 
-    executePass();
-  }
-
-  function executePass() {
-    if (window.AMath.education) { window.AMath.education.stopSearch(); window.AMath.education.hideVerifyButton(); }
-    const Interactions = window.AMath.interactions;
-    const Board = window.AMath.board;
-    const Rack = window.AMath.rack;
-
     hideChallengeButton();
 
     for (const p of [...session.tentativePlacements]) {
@@ -1741,9 +1475,6 @@
     Interactions.clearTentativePlacements();
 
     session.consecutiveNonScoringTurns++;
-
-    // Track opponent's last action for late-game AI strategy
-    session.lastOpponentAction = { type: 'pass' };
 
     if (window.AMath.scoreSheet) {
       window.AMath.scoreSheet.recordTurn('player', 'pass', 0, false, session.playerScore);
@@ -1761,7 +1492,7 @@
 
     Interactions.setPlayerTurn(false);
     resetStallingWatch();
-    startNextTurn();
+    setTimeout(runAiTurn, 800);
   }
 
   function handleSwap() {
@@ -1772,7 +1503,7 @@
     hideChallengeButton();
 
     if (Bag.bagSize(session.bag) <= C.SWAP_FORBIDDEN_BAG_THRESHOLD) {
-      showStatus('Swap not allowed — bag has ≤4 tiles remaining.', 'error');
+      showStatus('Swap not allowed — bag has ≤5 tiles remaining.', 'error');
       return;
     }
 
@@ -1791,15 +1522,6 @@
       return;
     }
 
-    executeSwap(tileIds);
-  }
-
-  function executeSwap(tileIds) {
-    if (window.AMath.education) { window.AMath.education.stopSearch(); window.AMath.education.hideVerifyButton(); }
-    const Bag = window.AMath.bag;
-    const Rack = window.AMath.rack;
-    const Interactions = window.AMath.interactions;
-
     const tilesToReturn = [];
     for (const id of tileIds) {
       const removed = Rack.removeTile(session.playerRack, id);
@@ -1812,14 +1534,8 @@
     Interactions.exitSwapMode();
     session.consecutiveNonScoringTurns++;
 
-    // Track opponent's last action for late-game AI strategy
-    session.lastOpponentAction = {
-      type: 'swap',
-      count: tilesToReturn.length,
-    };
-
     if (window.AMath.scoreSheet) {
-      window.AMath.scoreSheet.recordTurn('player', 'swap', 0, false, session.playerScore, { swapCount: tilesToReturn.length });
+      window.AMath.scoreSheet.recordTurn('player', 'swap', 0, false, session.playerScore);
     }
     fireTrashTalk('opp_swap', {});
 
@@ -1834,46 +1550,16 @@
 
     Interactions.setPlayerTurn(false);
     resetStallingWatch();
-    startNextTurn();
+    setTimeout(runAiTurn, 800);
   }
 
   // ============================================================================
   // AI TURN
   // ============================================================================
 
-  // Expose hook so education module can trigger AI turn after auto-swap/pass
-  window.AMath._triggerAiTurn = function () {
-    if (!session || session.gameOver) return;
-    showStatus('Your action applied.');
-    clearLastAiPlayHighlight();
-    resetStallingWatch();
-    autoSave();
-    if (checkGameEnd()) return;
-    if (session.isPvP) {
-      switchPvPTurn();
-    } else {
-      setTimeout(runAiTurn, 800);
-    }
-  };
-
-  /**
-   * Start the next turn — PvP switches players, PvA starts AI.
-   */
-  function startNextTurn() {
-    if (session.isPvP) {
-      setTimeout(switchPvPTurn, 400);
-    } else {
-      setTimeout(runAiTurn, 800);
-    }
-  }
-
   function runAiTurn() {
     const Interactions = window.AMath.interactions;
-    const workerAvailable = window.AMath.aiWorkerClient && window.AMath.aiWorkerClient.isAvailable();
-    const AI = workerAvailable ? window.AMath.aiWorkerClient : window.AMath.aiPlayer;
-    if (!workerAvailable) {
-      console.warn('[AI] Web Worker unavailable — running on main thread (UI may lag)');
-    }
+    const AI = (window.AMath.aiWorkerClient && window.AMath.aiWorkerClient.isAvailable()) ? window.AMath.aiWorkerClient : window.AMath.aiPlayer;
 
     if (session.gameOver) return;
 
@@ -1899,7 +1585,6 @@
           aiActualPlayCount: session.aiActualPlayCount || 0,
           consecutiveNonScoringTurns: session.consecutiveNonScoringTurns || 0,
           opponentRack: session.playerRack,
-          lastOpponentAction: session.lastOpponentAction || null,
         });
 
         // Detect stale decision (game was reset/ended during AI thinking)
@@ -1926,9 +1611,8 @@
           return;
         }
         console.error('AI error:', err);
-        console.error('AI error stack:', err && err.stack);
         showThinking(false);
-        showStatus('AI error — your turn. (' + (err && err.message || 'unknown') + ')', 'error');
+        showStatus('AI error — your turn.', 'error');
         Interactions.setPlayerTurn(true);
       }
     }, 100);
@@ -2054,7 +1738,7 @@
       session.lastAiPlay = null;
 
       if (window.AMath.scoreSheet) {
-        window.AMath.scoreSheet.recordTurn('ai', 'swap', 0, false, session.aiScore, { swapCount: swapped.length });
+        window.AMath.scoreSheet.recordTurn('ai', 'swap', 0, false, session.aiScore);
       }
 
       showStatus('🤖 AI swapped ' + swapped.length + ' tiles. Your turn!');
@@ -2090,11 +1774,6 @@
     // Player's turn starts now — reset stalling counter so the first
     // 30-second window is measured from now, not from any leftover time.
     resetStallingWatch();
-
-    // Education mode: start background analysis of player's rack
-    if (window.AMath.education && window.AMath.settings && window.AMath.settings.get('educationMode')) {
-      window.AMath.education.startBackgroundSearch(session);
-    }
 
     // Show challenge button briefly after AI play
     if (decision.type === 'play') {

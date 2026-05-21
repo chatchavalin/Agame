@@ -10,7 +10,6 @@
 
 (function () {
   const MODE_PLAYER_VS_AI = 'player_vs_ai';
-  const MODE_PLAYER_VS_PLAYER = 'player_vs_player';
   const MODE_AI_VS_AI = 'ai_vs_ai';
 
   let currentMode = MODE_PLAYER_VS_AI;
@@ -51,7 +50,6 @@
   window.AMath = window.AMath || {};
   window.AMath.modes = {
     MODE_PLAYER_VS_AI: MODE_PLAYER_VS_AI,
-    MODE_PLAYER_VS_PLAYER: MODE_PLAYER_VS_PLAYER,
     MODE_AI_VS_AI: MODE_AI_VS_AI,
     getMode: getMode,
     setMode: setMode,
