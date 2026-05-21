@@ -15,7 +15,7 @@
     turnNumber = 0;
   }
 
-  function recordTurn(who, action, score, isBingo, runningTotal) {
+  function recordTurn(who, action, score, isBingo, runningTotal, extra) {
     turnNumber++;
     entries.push({
       turn: turnNumber,
@@ -24,6 +24,7 @@
       score: score || 0,
       isBingo: !!isBingo,
       total: runningTotal,
+      swapCount: (extra && extra.swapCount) || 0,
     });
   }
 
@@ -101,7 +102,7 @@
         } else if (e.action === 'pass') {
           actionText = 'Pass';
         } else if (e.action === 'swap') {
-          actionText = 'Swap';
+          actionText = 'Swap' + (e.swapCount ? ' ' + e.swapCount : '');
         } else if (e.action === 'challenged') {
           actionText = '⚠️ Challenged';
         } else if (e.action === 'play-uncontested-invalid') {
@@ -222,7 +223,7 @@
       } else if (e.action === 'pass') {
         actionText = '—';
       } else if (e.action === 'swap') {
-        actionText = '↻';
+        actionText = '↻' + (e.swapCount ? e.swapCount : '');
       } else if (e.action === 'challenged') {
         actionText = '⚠️';
       } else if (e.action === 'play-uncontested-invalid') {

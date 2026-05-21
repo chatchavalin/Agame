@@ -119,11 +119,10 @@
   }
 
   function premiumLabelText(p) {
-    // Display labels matching the physical board: "3X" with sub-text
-    if (p === '3E') return '3X';
-    if (p === '2E') return '2X';
-    if (p === '3T') return '3X';
-    if (p === '2T') return '2X';
+    if (p === '3E') return '3E';
+    if (p === '2E') return '2E';
+    if (p === '3T') return '3T';
+    if (p === '2T') return '2T';
     return '';
   }
 

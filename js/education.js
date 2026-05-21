@@ -476,7 +476,10 @@
   }
 
   function closePopup() {
-    if (popupOverlay) { popupOverlay.remove(); popupOverlay = null; }
+    if (popupOverlay) {
+      if (document.contains(popupOverlay)) popupOverlay.remove();
+      popupOverlay = null;
+    }
   }
 
   // =========================================================================
@@ -484,6 +487,8 @@
   // =========================================================================
 
   function ensureVerifyButton() {
+    // If button exists but was removed from DOM (e.g. New Game rebuilt UI), reset it
+    if (verifyBtn && !document.contains(verifyBtn)) verifyBtn = null;
     if (verifyBtn) { verifyBtn.style.display = ''; return; }
     var submitBtn = document.getElementById('btn-submit');
     if (!submitBtn) return;
@@ -500,7 +505,10 @@
   }
 
   function hideVerifyButton() {
-    if (verifyBtn) verifyBtn.style.display = 'none';
+    if (verifyBtn) {
+      if (document.contains(verifyBtn)) verifyBtn.style.display = 'none';
+      else verifyBtn = null;
+    }
   }
 
   // =========================================================================
@@ -513,6 +521,7 @@
     stopSearch: stopSearch,
     onVerifyPress: onVerifyPress,
     hideVerifyButton: hideVerifyButton,
+    ensureVerifyButton: ensureVerifyButton,
     _autoPlace: function (idx) {
       if (searchResult && searchResult.plays && searchResult.plays[idx]) {
         autoPlacePlay(searchResult.plays[idx]);

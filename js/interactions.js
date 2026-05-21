@@ -571,11 +571,19 @@
     const btnPass = document.getElementById('btn-pass');
     const btnSwap = document.getElementById('btn-swap');
 
+    // Education mode: always ensure verify button when it's player's turn
+    if (state.isPlayerTurn && window.AMath.education && window.AMath.settings &&
+        window.AMath.settings.get('educationMode')) {
+      window.AMath.education.ensureVerifyButton();
+    }
+
     if (!state.isPlayerTurn) {
       if (btnSubmit) btnSubmit.disabled = true;
       if (btnReset) btnReset.disabled = true;
       if (btnPass) btnPass.disabled = true;
       if (btnSwap) btnSwap.disabled = true;
+      // Hide verify button during AI/opponent turn
+      if (window.AMath.education) window.AMath.education.hideVerifyButton();
       return;
     }
 
@@ -662,5 +670,6 @@
     enterSwapMode: enterSwapMode,
     exitSwapMode: exitSwapMode,
     getSwapSelection: getSwapSelection,
+    commitPlacement: commitPlacement,
   };
 })();

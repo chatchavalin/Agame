@@ -14,13 +14,12 @@
   const C = window.AMath.constants;
 
   /**
-   * Compute the count of tiles not on the board and not in the player's rack.
-   * This tells the player what tiles the OPPONENT might hold or are still in the bag.
-   * Returns { '0': 3, '1': 5, ..., '=': 7, 'BLANK': 2 }
+   * Compute tiles remaining: total minus board minus AI/opponent rack.
+   * Player tracks their own hand — not subtracted here.
+   * Result = bag + player hand.
    */
   function computeUnseenCounts(state) {
     const inventory = C.getActiveInventory ? C.getActiveInventory() : C.TILE_INVENTORY;
-    // Start with total inventory counts
     const counts = {};
     for (const def of inventory) {
       counts[def.face] = def.count;
@@ -36,10 +35,9 @@
       }
     }
 
-    // Subtract PLAYER RACK tiles — the player already knows what they hold,
-    // so the remaining count = bag + opponent rack only.
-    if (state.playerRack && state.playerRack.tiles) {
-      for (const t of state.playerRack.tiles) {
+    // Subtract AI/OPPONENT rack tiles
+    if (state.aiRack && state.aiRack.tiles) {
+      for (const t of state.aiRack.tiles) {
         counts[t.face] = (counts[t.face] || 0) - 1;
       }
     }
@@ -59,7 +57,7 @@
 
     const title = document.createElement('div');
     title.className = 'tracker-title';
-    title.textContent = 'Tiles Remaining (in bag + opponent)';
+    title.textContent = 'TILES REMAINING (IN BAG + YOUR HAND)';
     container.appendChild(title);
 
     const grid = document.createElement('div');

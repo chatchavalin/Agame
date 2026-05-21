@@ -20,12 +20,14 @@
     tileSet: 'prathom',         // 'prathom' (70 tiles) | 'mathayom' (100 tiles)
     showAiHand: true,           // Show AI rack faces (debugging/learning aid)
     showBoardTilePoints: false, // Show point values on tiles placed on the board (off by default — cleaner board)
+    educationMode: true,        // If true, warns player about suboptimal moves and suggests better ones
     disableSixPassEnd: false,   // If true, game does NOT auto-end after 6 consecutive non-scoring turns
                                 // (the official rule). Default false → rule remains ACTIVE.
     hideBlankFaceOnBoard: false,// If true, blank tiles placed on the board render with no text
                                 // and no dashed marker — visually identical to regular tiles.
                                 // Default false → current behavior (show assigned face + dashed orange border).
     aiSwapBrain: 'brain1',      // 'brain1' (seed-keeping, stable) | 'brain2' (probability, experimental)
+    botLevel: 'hard',           // 'easy' | 'normal' | 'hard' — AI difficulty level
     aiThinkSeconds: 180,        // AI thinking time per turn in seconds (30, 60, 120, 180, 300)
   };
 
@@ -98,14 +100,25 @@
 
     const overlay = document.createElement('div');
     overlay.className = 'settings-overlay';
+    overlay.onclick = function (e) { if (e.target === overlay) overlay.remove(); };
 
     const dialog = document.createElement('div');
     dialog.className = 'settings-dialog';
 
+    // Header with title and close button
+    const header = document.createElement('div');
+    header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;';
     const title = document.createElement('h2');
     title.textContent = 'Settings';
     title.className = 'settings-title';
-    dialog.appendChild(title);
+    title.style.margin = '0';
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '✕';
+    closeBtn.style.cssText = 'background:none;border:none;font-size:24px;cursor:pointer;color:#6b7280;padding:0 4px;line-height:1;';
+    closeBtn.onclick = function () { overlay.remove(); };
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+    dialog.appendChild(header);
 
     // Helper: create a section heading divider in the dialog
     function addSectionHeader(emoji, text) {
@@ -128,6 +141,7 @@
       '<div class="settings-label-block">Game Mode</div>' +
       '<select id="setting-game-mode" class="settings-select">' +
       '<option value="player_vs_ai"' + (current.gameMode === 'player_vs_ai' ? ' selected' : '') + '>Player vs AI</option>' +
+      '<option value="player_vs_player"' + (current.gameMode === 'player_vs_player' ? ' selected' : '') + '>Player vs Player</option>' +
       '<option value="ai_vs_ai"' + (current.gameMode === 'ai_vs_ai' ? ' selected' : '') + '>AI vs AI (spectator)</option>' +
       '</select>';
     dialog.appendChild(modeRow);
@@ -167,6 +181,18 @@
       '><span>Disable 6-consecutive-passes game end</span>' +
       '</label>';
     dialog.appendChild(disableSixPassRow);
+
+    // Education mode — when ON, the game warns about suboptimal moves
+    // and suggests better alternatives before committing the player's action.
+    const educationRow = document.createElement('div');
+    educationRow.className = 'settings-row';
+    educationRow.innerHTML =
+      '<label class="settings-label">' +
+      '<input type="checkbox" id="setting-education-mode"' +
+      (current.educationMode ? ' checked' : '') +
+      '><span>Education mode (suggest better moves)</span>' +
+      '</label>';
+    dialog.appendChild(educationRow);
 
     // ──────────────────────────────────────────────────────────────────
     // SECTION B — 🎨 Display
@@ -226,6 +252,18 @@
     // SECTION C — 🤖 AI Behavior
     // ──────────────────────────────────────────────────────────────────
     addSectionHeader('🤖', 'AI Behavior');
+
+    // Bot Level
+    const levelRow = document.createElement('div');
+    levelRow.className = 'settings-row';
+    levelRow.innerHTML =
+      '<div class="settings-label-block">Bot Level</div>' +
+      '<select id="setting-bot-level" class="settings-select">' +
+      '<option value="easy"' + (current.botLevel === 'easy' ? ' selected' : '') + '>🟢 Easy (quick, less strategic)</option>' +
+      '<option value="normal"' + (current.botLevel === 'normal' ? ' selected' : '') + '>🟡 Normal (balanced)</option>' +
+      '<option value="hard"' + (current.botLevel === 'hard' ? ' selected' : '') + '>🔴 Hard (full strategy)</option>' +
+      '</select>';
+    dialog.appendChild(levelRow);
 
     // AI Think Time
     const thinkRow = document.createElement('div');
@@ -310,8 +348,10 @@
       const showPointsCheckbox = document.getElementById('setting-show-board-points');
       const hideBlankFaceCheckbox = document.getElementById('setting-hide-blank-face');
       const disableSixPassCheckbox = document.getElementById('setting-disable-six-pass-end');
+      const educationCheckbox = document.getElementById('setting-education-mode');
       const brainSelect = document.getElementById('setting-ai-swap-brain');
       const thinkSelect = document.getElementById('setting-ai-think-time');
+      const levelSelect = document.getElementById('setting-bot-level');
       const ttLangSelect = document.getElementById('setting-trash-talk-lang');
 
       // Snapshot OLD values to detect what changed
@@ -327,9 +367,11 @@
       current.showAiHand = showAiHandCheckbox.checked;
       if (showPointsCheckbox) current.showBoardTilePoints = showPointsCheckbox.checked;
       if (hideBlankFaceCheckbox) current.hideBlankFaceOnBoard = hideBlankFaceCheckbox.checked;
+      if (educationCheckbox) current.educationMode = educationCheckbox.checked;
       if (disableSixPassCheckbox) current.disableSixPassEnd = disableSixPassCheckbox.checked;
       if (brainSelect) current.aiSwapBrain = brainSelect.value;
       if (thinkSelect) current.aiThinkSeconds = parseInt(thinkSelect.value, 10);
+      if (levelSelect) current.botLevel = levelSelect.value;
       if (ttLangSelect) current.trashTalkLanguage = ttLangSelect.value;
       save();
 
