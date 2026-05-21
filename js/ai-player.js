@@ -27,6 +27,11 @@
   let _stateSettings = null;
   function getTimeBudgetMs() {
     try {
+      // Bot level overrides think time
+      var level = getBotLevel();
+      if (level === 'easy') return 30000;   // 30s
+      if (level === 'normal') return 90000; // 90s
+
       if (_stateSettings && typeof _stateSettings.aiThinkSeconds === 'number') {
         const s = _stateSettings.aiThinkSeconds;
         if (s >= 10 && s <= 600) return s * 1000;
@@ -50,6 +55,17 @@
     } catch (e) { /* */ }
     return fallback;
   }
+
+  /**
+   * Get bot difficulty level. Affects search depth, strategy, and time budget.
+   *   'easy'   → shorter search, simpler strategy
+   *   'normal' → balanced
+   *   'hard'   → full power (default)
+   */
+  function getBotLevel() {
+    return getStateSetting('botLevel', 'hard');
+  }
+
   const MAX_CANDIDATES_PER_STAGE = 1000000;  // Per-stage cap; multiplied by complexity
 
   // Track how many actual plays each AI rack has made (per-rack counters)
@@ -162,11 +178,18 @@
     const aiPlayCount = (state.aiActualPlayCount !== undefined)
       ? state.aiActualPlayCount
       : getPlayCount(rackOwner);
-    const isFirstFourPlays = aiPlayCount < C.AI_BINGO_MODE_TURNS;
+    const botLevel = getBotLevel();
+
+    // Bot level affects bingo enforcement:
+    //   easy: no bingo enforcement (play any equation)
+    //   normal: first 2 turns only
+    //   hard: first 4 turns (full enforcement)
+    const bingoTurns = botLevel === 'easy' ? 0 : botLevel === 'normal' ? 2 : C.AI_BINGO_MODE_TURNS;
+    const isFirstFewPlays = aiPlayCount < bingoTurns;
     const isBehind100 = deficit > C.AI_BEHIND_FOR_BINGO_MODE;
     const isBehind140 = deficit >= C.AI_LEAD_FOR_OFFENSE;
     const isLead150 = lead >= C.AI_LEAD_FOR_CLOSE;
-    const bingoYoyoOnlyMode = (isFirstFourPlays || isBehind100) && lead <= C.AI_LEAD_FOR_CLOSE;
+    const bingoYoyoOnlyMode = botLevel !== 'easy' && (isFirstFewPlays || isBehind100) && lead <= C.AI_LEAD_FOR_CLOSE;
     const bagSize = Bag.bagSize(state.bag);
 
     // === 1. Detect ×9 threat from opponent ===
@@ -252,7 +275,11 @@
       const blankCount = state.aiRack.tiles.filter(t => t.type === 'blank').length;
       const extraBlanks = Math.max(0, blankCount - 2);
       let grammarBudget;
-      if (state.isFirstMove) {
+      if (botLevel === 'easy') {
+        grammarBudget = 2000; // 2s cap for easy
+      } else if (botLevel === 'normal') {
+        grammarBudget = state.isFirstMove ? 5000 : 3000;
+      } else if (state.isFirstMove) {
         grammarBudget = Math.min(12000, 8000 + extraBlanks * 2000);
       } else {
         grammarBudget = Math.min(10000, 4000 + extraBlanks * 1500);
@@ -580,7 +607,7 @@
       // Playing a short 10-pt equation when you should be fishing for bingo
       // is a strategic disaster. The override only applies when bingoYoyoOnly
       // mode was triggered by being behind 100+ points (after turn 4).
-      const allowOverride = !isFirstFourPlays;   // only for isBehind100 mode
+      const allowOverride = !isFirstFewPlays;   // only for isBehind100 mode
       const shouldOverride = allowOverride && bestPlay && bestPlay.score >= scoreThreshold &&
                              (blanksInRack >= 2 || bingoInfeasible);
 
@@ -738,7 +765,7 @@
     //   3. Leading 60+, bad swap odds → play short eq, dump worst tiles
     //   4. Leading <60 / tied → play with rack balance focus
     //   5. Behind → swap for bingo chance
-    if (bagSize > 0 && bagSize <= 15 && !state.isFirstMove && !bingoYoyoOnlyMode) {
+    if (bagSize > 0 && bagSize <= 15 && !state.isFirstMove && !bingoYoyoOnlyMode && botLevel !== 'easy') {
       const lateGameResult = lateGameStrategy(state, bestPlay, bingoPlay, yoyoPlay, bagSize);
       if (lateGameResult) {
         if (lateGameResult.type === 'play') recordPlay(rackOwner);
@@ -757,7 +784,7 @@
     //   - BLANK preservation is irrelevant (no future bingo possible)
     //   - Rack management is irrelevant (no tiles to draw)
     //   - Goal: empty rack first, block opponent from doing the same
-    if (bagSize === 0 && !state.isFirstMove && bestPlay) {
+    if (bagSize === 0 && !state.isFirstMove && bestPlay && botLevel !== 'easy') {
       const endgamePlan = planEndgame(state, bestPlay);
       if (endgamePlan) {
         recordPlay(rackOwner);
@@ -807,7 +834,7 @@
       const isBingo = bestPlay.placements.length === 8;
       const isEndgame = bagSize <= 15 && !state.isFirstMove;
 
-      if (blanksUsed > 0 && !isBingo && !x9DefenseActive && !isEndgame) {
+      if (blanksUsed > 0 && !isBingo && !x9DefenseActive && !isEndgame && botLevel === 'hard') {
         console.log('[AI] BLANK protection: best play uses ' + blanksUsed +
                     ' BLANK(s) for ' + bestPlay.score + ' pts (not Bingo, not x9 defense, not endgame). Rejecting.');
 
@@ -1055,7 +1082,7 @@
     const stageLogs = [];
     let totalCandidates = 0;
     let lastYieldTime = Date.now();
-    const YIELD_INTERVAL_MS = 150;  // yield to browser every ~150ms
+    const YIELD_INTERVAL_MS = 30;  // yield to browser every ~30ms for responsive UI
 
     for (const stage of searchPlan) {
       const stageStart = Date.now();

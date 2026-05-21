@@ -213,6 +213,8 @@
 
     if (mode === Modes.MODE_AI_VS_AI) {
       startAiVsAiSession();
+    } else if (mode === Modes.MODE_PLAYER_VS_PLAYER) {
+      startPvPSession();
     } else {
       startPlayerVsAiSession();
     }
@@ -330,13 +332,16 @@
       });
     }
 
-    // Wire up Settings button
+    // Wire up Settings button — use setTimeout so it responds even if
+    // the main thread is momentarily blocked by a main-thread AI fallback.
     const btnSettings = document.getElementById('btn-settings');
     if (btnSettings) {
       btnSettings.addEventListener('click', function () {
-        Settings.showPopup(function (result) {
-          handleSettingsResult(result);
-        });
+        setTimeout(function () {
+          Settings.showPopup(function (result) {
+            handleSettingsResult(result);
+          });
+        }, 0);
       });
     }
 
@@ -344,7 +349,9 @@
     const btnScoreSheet = document.getElementById('btn-score-sheet');
     if (btnScoreSheet) {
       btnScoreSheet.addEventListener('click', function () {
-        window.AMath.scoreSheet.showPopup(session.playerScore, session.aiScore);
+        setTimeout(function () {
+          window.AMath.scoreSheet.showPopup(session.playerScore, session.aiScore);
+        }, 0);
       });
     }
 
@@ -399,10 +406,143 @@
       showStatus(
         '🎲 You go first! Tap a tile, then tap a board cell. First move must pass through the center ★.'
       );
+      // Education mode: start background analysis
+      if (window.AMath.education && window.AMath.settings && window.AMath.settings.get('educationMode')) {
+        window.AMath.education.startBackgroundSearch(session);
+      }
     } else {
       showStatus('🎲 AI goes first.');
       setTimeout(runAiTurn, 800);
     }
+  }
+
+  // =========================================================================
+  // PLAYER VS PLAYER SESSION
+  // =========================================================================
+
+  function startPvPSession() {
+    const C = window.AMath.constants;
+    const Bag = window.AMath.bag;
+    const Rack = window.AMath.rack;
+    const Board = window.AMath.board;
+    const UI = window.AMath.ui;
+    const Settings = window.AMath.settings;
+    const Interactions = window.AMath.interactions;
+
+    const board = Board.createBoard();
+    const bag = Bag.createBag();
+    const p1Rack = Rack.createRack('player1');
+    const p2Rack = Rack.createRack('player2');
+    Rack.refillFromBag(p1Rack, bag);
+    Rack.refillFromBag(p2Rack, bag);
+
+    const chessClockEnabled = Settings.get('chessClockEnabled');
+    const clockMinutes = Settings.get('chessClockMinutes') || 22;
+
+    session = {
+      board: board,
+      playerRack: p1Rack,
+      aiRack: p2Rack,
+      p1Rack: p1Rack,
+      p2Rack: p2Rack,
+      bag: bag,
+      playerScore: 0,
+      aiScore: 0,
+      isPlayerTurn: true,
+      isFirstMove: true,
+      consecutiveNonScoringTurns: 0,
+      tentativePlacements: [],
+      gameOver: false,
+      isPvP: true,
+      currentPlayer: 1,
+      playerTimeSeconds: clockMinutes * 60,
+      aiTimeSeconds: clockMinutes * 60,
+      chessClockEnabled: chessClockEnabled,
+      lastAiPlay: null,
+      bagEmptyTaunted: false,
+      aiActualPlayCount: 0,
+      lastOpponentAction: null,
+      onSubmit: handleSubmit,
+      onReset: handleReset,
+      onPass: handlePass,
+      onSwap: handleSwap,
+    };
+
+    const uiParts = UI.buildGameLayout(document.getElementById('game-root'), session, {
+      showAiHand: true,
+      opponentLabel: 'Player 2',
+      playerLabel: 'Player 1',
+    });
+    session.uiParts = uiParts;
+
+    Interactions.init(session);
+    Interactions.setPlayerTurn(true);
+
+    UI.renderScore(uiParts.playerScoreBox, 'P1', 0);
+    UI.renderScore(uiParts.opponentScoreBox, 'P2', 0);
+
+    if (chessClockEnabled) startChessClock();
+
+    const btnNewGame = document.getElementById('btn-new-game');
+    if (btnNewGame) {
+      btnNewGame.addEventListener('click', function () { startGameSession(); });
+    }
+    const btnSettings = document.getElementById('btn-settings');
+    if (btnSettings) {
+      btnSettings.addEventListener('click', function () {
+        setTimeout(function () {
+          Settings.showPopup(function (result) { handleSettingsResult(result); });
+        }, 0);
+      });
+    }
+    const btnScoreSheet = document.getElementById('btn-score-sheet');
+    if (btnScoreSheet) {
+      btnScoreSheet.addEventListener('click', function () {
+        setTimeout(function () {
+          window.AMath.scoreSheet.showPopup(session.playerScore, session.aiScore);
+        }, 0);
+      });
+    }
+
+    wireExportImportButtons();
+    wireTileTrackerButton();
+
+    // Hide AI-only buttons
+    var btnTakeover = document.getElementById('btn-takeover');
+    if (btnTakeover) btnTakeover.style.display = 'none';
+
+    showStatus('🎲 Player vs Player! Player 1 goes first.');
+  }
+
+  function switchPvPTurn() {
+    if (!session || !session.isPvP || session.gameOver) return;
+    if (checkGameEnd()) return;
+
+    var UI = window.AMath.ui;
+    var Interactions = window.AMath.interactions;
+
+    if (session.currentPlayer === 1) {
+      session.currentPlayer = 2;
+      session.playerRack = session.p2Rack;
+      session.aiRack = session.p1Rack;
+    } else {
+      session.currentPlayer = 1;
+      session.playerRack = session.p1Rack;
+      session.aiRack = session.p2Rack;
+    }
+
+    session.tentativePlacements = [];
+    session.isPlayerTurn = true;
+    Interactions.init(session);
+    Interactions.setPlayerTurn(true);
+
+    var p1Score = session.currentPlayer === 1 ? session.playerScore : session.aiScore;
+    var p2Score = session.currentPlayer === 1 ? session.aiScore : session.playerScore;
+    UI.renderScore(session.uiParts.playerScoreBox, 'P' + session.currentPlayer, session.currentPlayer === 1 ? session.playerScore : session.aiScore);
+    UI.renderScore(session.uiParts.opponentScoreBox, 'P' + (3 - session.currentPlayer), session.currentPlayer === 1 ? session.aiScore : session.playerScore);
+
+    autoSave();
+    showStatus('🎲 Player ' + session.currentPlayer + '\'s turn!');
   }
 
   /**
@@ -579,16 +719,20 @@
     const btnSettings = document.getElementById('btn-settings');
     if (btnSettings) {
       btnSettings.addEventListener('click', function () {
-        Settings.showPopup(function (result) {
-          handleSettingsResult(result);
-        });
+        setTimeout(function () {
+          Settings.showPopup(function (result) {
+            handleSettingsResult(result);
+          });
+        }, 0);
       });
     }
 
     const btnScoreSheet = document.getElementById('btn-score-sheet');
     if (btnScoreSheet) {
       btnScoreSheet.addEventListener('click', function () {
-        window.AMath.scoreSheet.showPopup(session.playerScore, session.aiScore);
+        setTimeout(function () {
+          window.AMath.scoreSheet.showPopup(session.playerScore, session.aiScore);
+        }, 0);
       });
     }
 
@@ -861,16 +1005,20 @@
     const btnSettings = document.getElementById('btn-settings');
     if (btnSettings) {
       btnSettings.addEventListener('click', function () {
-        Settings.showPopup(function (result) {
-          handleSettingsResult(result, { clearSave: true });
-        });
+        setTimeout(function () {
+          Settings.showPopup(function (result) {
+            handleSettingsResult(result, { clearSave: true });
+          });
+        }, 0);
       });
     }
 
     const btnScoreSheet = document.getElementById('btn-score-sheet');
     if (btnScoreSheet) {
       btnScoreSheet.addEventListener('click', function () {
-        window.AMath.scoreSheet.showPopup(session.playerScore, session.aiScore);
+        setTimeout(function () {
+          window.AMath.scoreSheet.showPopup(session.playerScore, session.aiScore);
+        }, 0);
       });
     }
 
@@ -918,6 +1066,8 @@
 
     if (!session.isPlayerTurn) {
       setTimeout(runAiTurn, 800);
+    } else if (window.AMath.education && window.AMath.settings && window.AMath.settings.get('educationMode')) {
+      window.AMath.education.startBackgroundSearch(session);
     }
   }
 
@@ -1187,28 +1337,6 @@
       session.tentativePlacements.length
     );
 
-    // === Education Mode: check for better plays before committing ===
-    const Edu = window.AMath.education;
-    if (Edu && window.AMath.settings && window.AMath.settings.get('educationMode')) {
-      Edu.checkAndAdvise('play', scoreResult.total, session,
-        function onKeep() {
-          // Player chose to keep their move — commit it now
-          commitPlayerPlay(scoreResult);
-        },
-        function onUseSuggestion(suggestedPlay) {
-          // Player chose a better play — undo tentative, apply suggestion
-          applySuggestedPlay(suggestedPlay);
-        }
-      ).then(function (advised) {
-        if (!advised) {
-          // Advisor didn't intervene — commit normally
-          commitPlayerPlay(scoreResult);
-        }
-      });
-      return; // don't commit yet — wait for advisor
-    }
-
-    // No education mode — commit directly
     commitPlayerPlay(scoreResult);
   }
 
@@ -1216,6 +1344,12 @@
    * Commit the player's validated play to the board (called after education check).
    */
   function commitPlayerPlay(scoreResult) {
+    // Stop education background search
+    if (window.AMath.education) {
+      window.AMath.education.stopSearch();
+      window.AMath.education.hideVerifyButton();
+    }
+
     const Rack = window.AMath.rack;
     const Board = window.AMath.board;
     const UI = window.AMath.ui;
@@ -1284,7 +1418,7 @@
 
     Interactions.setPlayerTurn(false);
     resetStallingWatch();
-    setTimeout(runAiTurn, 800);
+    startNextTurn();
   }
 
   /**
@@ -1586,21 +1720,11 @@
     const Board = window.AMath.board;
     const Rack = window.AMath.rack;
 
-    // === Education Mode: check before passing ===
-    const Edu = window.AMath.education;
-    if (Edu && window.AMath.settings && window.AMath.settings.get('educationMode')) {
-      Edu.checkAndAdvise('pass', 0, session,
-        function onKeep() { executePass(); },
-        function onUseSuggestion(play) { applySuggestedPlay(play); }
-      ).then(function (advised) {
-        if (!advised) executePass();
-      });
-      return;
-    }
     executePass();
   }
 
   function executePass() {
+    if (window.AMath.education) { window.AMath.education.stopSearch(); window.AMath.education.hideVerifyButton(); }
     const Interactions = window.AMath.interactions;
     const Board = window.AMath.board;
     const Rack = window.AMath.rack;
@@ -1637,7 +1761,7 @@
 
     Interactions.setPlayerTurn(false);
     resetStallingWatch();
-    setTimeout(runAiTurn, 800);
+    startNextTurn();
   }
 
   function handleSwap() {
@@ -1667,24 +1791,11 @@
       return;
     }
 
-    // === Education Mode: check before swapping ===
-    const Edu = window.AMath.education;
-    if (Edu && window.AMath.settings && window.AMath.settings.get('educationMode')) {
-      Edu.checkAndAdvise('swap', 0, session,
-        function onKeep() { executeSwap(tileIds); },
-        function onUseSuggestion(play) {
-          Interactions.exitSwapMode();
-          applySuggestedPlay(play);
-        }
-      ).then(function (advised) {
-        if (!advised) executeSwap(tileIds);
-      });
-      return;
-    }
     executeSwap(tileIds);
   }
 
   function executeSwap(tileIds) {
+    if (window.AMath.education) { window.AMath.education.stopSearch(); window.AMath.education.hideVerifyButton(); }
     const Bag = window.AMath.bag;
     const Rack = window.AMath.rack;
     const Interactions = window.AMath.interactions;
@@ -1723,16 +1834,46 @@
 
     Interactions.setPlayerTurn(false);
     resetStallingWatch();
-    setTimeout(runAiTurn, 800);
+    startNextTurn();
   }
 
   // ============================================================================
   // AI TURN
   // ============================================================================
 
+  // Expose hook so education module can trigger AI turn after auto-swap/pass
+  window.AMath._triggerAiTurn = function () {
+    if (!session || session.gameOver) return;
+    showStatus('Your action applied.');
+    clearLastAiPlayHighlight();
+    resetStallingWatch();
+    autoSave();
+    if (checkGameEnd()) return;
+    if (session.isPvP) {
+      switchPvPTurn();
+    } else {
+      setTimeout(runAiTurn, 800);
+    }
+  };
+
+  /**
+   * Start the next turn — PvP switches players, PvA starts AI.
+   */
+  function startNextTurn() {
+    if (session.isPvP) {
+      setTimeout(switchPvPTurn, 400);
+    } else {
+      setTimeout(runAiTurn, 800);
+    }
+  }
+
   function runAiTurn() {
     const Interactions = window.AMath.interactions;
-    const AI = (window.AMath.aiWorkerClient && window.AMath.aiWorkerClient.isAvailable()) ? window.AMath.aiWorkerClient : window.AMath.aiPlayer;
+    const workerAvailable = window.AMath.aiWorkerClient && window.AMath.aiWorkerClient.isAvailable();
+    const AI = workerAvailable ? window.AMath.aiWorkerClient : window.AMath.aiPlayer;
+    if (!workerAvailable) {
+      console.warn('[AI] Web Worker unavailable — running on main thread (UI may lag)');
+    }
 
     if (session.gameOver) return;
 
@@ -1785,8 +1926,9 @@
           return;
         }
         console.error('AI error:', err);
+        console.error('AI error stack:', err && err.stack);
         showThinking(false);
-        showStatus('AI error — your turn.', 'error');
+        showStatus('AI error — your turn. (' + (err && err.message || 'unknown') + ')', 'error');
         Interactions.setPlayerTurn(true);
       }
     }, 100);
@@ -1948,6 +2090,11 @@
     // Player's turn starts now — reset stalling counter so the first
     // 30-second window is measured from now, not from any leftover time.
     resetStallingWatch();
+
+    // Education mode: start background analysis of player's rack
+    if (window.AMath.education && window.AMath.settings && window.AMath.settings.get('educationMode')) {
+      window.AMath.education.startBackgroundSearch(session);
+    }
 
     // Show challenge button briefly after AI play
     if (decision.type === 'play') {
