@@ -20,6 +20,7 @@
     tileSet: 'prathom',         // 'prathom' (70 tiles) | 'mathayom' (100 tiles)
     showAiHand: true,           // Show AI rack faces (debugging/learning aid)
     showBoardTilePoints: false, // Show point values on tiles placed on the board (off by default — cleaner board)
+    educationMode: false,       // If true, warns player about suboptimal moves and suggests better ones
     disableSixPassEnd: false,   // If true, game does NOT auto-end after 6 consecutive non-scoring turns
                                 // (the official rule). Default false → rule remains ACTIVE.
     hideBlankFaceOnBoard: false,// If true, blank tiles placed on the board render with no text
@@ -168,6 +169,18 @@
       '</label>';
     dialog.appendChild(disableSixPassRow);
 
+    // Education mode — when ON, the game warns about suboptimal moves
+    // and suggests better alternatives before committing the player's action.
+    const educationRow = document.createElement('div');
+    educationRow.className = 'settings-row';
+    educationRow.innerHTML =
+      '<label class="settings-label">' +
+      '<input type="checkbox" id="setting-education-mode"' +
+      (current.educationMode ? ' checked' : '') +
+      '><span>Education mode (suggest better moves)</span>' +
+      '</label>';
+    dialog.appendChild(educationRow);
+
     // ──────────────────────────────────────────────────────────────────
     // SECTION B — 🎨 Display
     // ──────────────────────────────────────────────────────────────────
@@ -310,6 +323,7 @@
       const showPointsCheckbox = document.getElementById('setting-show-board-points');
       const hideBlankFaceCheckbox = document.getElementById('setting-hide-blank-face');
       const disableSixPassCheckbox = document.getElementById('setting-disable-six-pass-end');
+      const educationCheckbox = document.getElementById('setting-education-mode');
       const brainSelect = document.getElementById('setting-ai-swap-brain');
       const thinkSelect = document.getElementById('setting-ai-think-time');
       const ttLangSelect = document.getElementById('setting-trash-talk-lang');
@@ -327,6 +341,7 @@
       current.showAiHand = showAiHandCheckbox.checked;
       if (showPointsCheckbox) current.showBoardTilePoints = showPointsCheckbox.checked;
       if (hideBlankFaceCheckbox) current.hideBlankFaceOnBoard = hideBlankFaceCheckbox.checked;
+      if (educationCheckbox) current.educationMode = educationCheckbox.checked;
       if (disableSixPassCheckbox) current.disableSixPassEnd = disableSixPassCheckbox.checked;
       if (brainSelect) current.aiSwapBrain = brainSelect.value;
       if (thinkSelect) current.aiThinkSeconds = parseInt(thinkSelect.value, 10);

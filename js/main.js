@@ -1176,27 +1176,55 @@
       session.isFirstMove
     );
 
-    // === INVALID PLAY PATH ===
-    // We no longer block invalid plays at submit. Instead, we COMMIT the
-    // play (tiles stay on the board, score = 0 for now) and let the AI
-    // raise a challenge if it spots the error. This is the proper A-Math
-    // rule: you can submit any equation you claim is valid; your opponent
-    // decides whether to challenge.
     if (!result.ok) {
       handleInvalidPlaySubmission(result);
       return;
     }
 
-    // === VALID PLAY PATH (unchanged) ===
     const scoreResult = Scoring.scorePlay(
       result.equations,
       session.board,
       session.tentativePlacements.length
     );
 
+    // === Education Mode: check for better plays before committing ===
+    const Edu = window.AMath.education;
+    if (Edu && window.AMath.settings && window.AMath.settings.get('educationMode')) {
+      Edu.checkAndAdvise('play', scoreResult.total, session,
+        function onKeep() {
+          // Player chose to keep their move — commit it now
+          commitPlayerPlay(scoreResult);
+        },
+        function onUseSuggestion(suggestedPlay) {
+          // Player chose a better play — undo tentative, apply suggestion
+          applySuggestedPlay(suggestedPlay);
+        }
+      ).then(function (advised) {
+        if (!advised) {
+          // Advisor didn't intervene — commit normally
+          commitPlayerPlay(scoreResult);
+        }
+      });
+      return; // don't commit yet — wait for advisor
+    }
+
+    // No education mode — commit directly
+    commitPlayerPlay(scoreResult);
+  }
+
+  /**
+   * Commit the player's validated play to the board (called after education check).
+   */
+  function commitPlayerPlay(scoreResult) {
+    const Rack = window.AMath.rack;
+    const Board = window.AMath.board;
+    const UI = window.AMath.ui;
+    const Interactions = window.AMath.interactions;
+
     for (const p of session.tentativePlacements) {
       Board.markPremiumUsed(session.board, p.row, p.col);
     }
+
     const oldScore = session.playerScore;
     session.playerScore += scoreResult.total;
     session.isFirstMove = false;
@@ -1254,6 +1282,92 @@
     // highlight glowing anymore.
     clearLastAiPlayHighlight();
 
+    Interactions.setPlayerTurn(false);
+    resetStallingWatch();
+    setTimeout(runAiTurn, 800);
+  }
+
+  /**
+   * Education mode: apply a suggested play instead of the player's original move.
+   * Undoes the player's tentative placements and commits the AI-suggested play.
+   */
+  function applySuggestedPlay(suggestedPlay) {
+    const Placement = window.AMath.placement;
+    const Scoring = window.AMath.scoring;
+    const Rack = window.AMath.rack;
+    const Board = window.AMath.board;
+    const UI = window.AMath.ui;
+    const Interactions = window.AMath.interactions;
+
+    // 1. Remove player's tentative tiles from the board back to rack
+    Interactions.clearTentativePlacements();
+
+    // 2. Place the suggested tiles on the board
+    for (const p of suggestedPlay.placements) {
+      if (p.tile) {
+        // Set assignment if needed
+        if (p.assigned) p.tile.assigned = p.assigned;
+        Board.placeTile(session.board, p.row, p.col, p.tile);
+        Board.markPremiumUsed(session.board, p.row, p.col);
+        // Remove tile from player's rack
+        Rack.removeTile(session.playerRack, p.tile.id);
+      }
+    }
+
+    // 3. Score the suggested play
+    const result = Placement.validatePlay(session.board, suggestedPlay.placements, session.isFirstMove);
+    let total = suggestedPlay.score;
+    let wasBingo = suggestedPlay.placements.length === 8;
+    if (result.ok) {
+      const scoreResult = Scoring.scorePlay(result.equations, session.board, suggestedPlay.placements.length);
+      total = scoreResult.total;
+      wasBingo = scoreResult.bingoBonus > 0;
+    }
+
+    // 4. Commit
+    const oldScore = session.playerScore;
+    session.playerScore += total;
+    session.isFirstMove = false;
+    session.consecutiveNonScoringTurns = 0;
+
+    session.lastOpponentAction = {
+      type: 'play',
+      tilesUsed: suggestedPlay.placements.length,
+      score: total,
+      wasBingo: wasBingo,
+    };
+
+    Rack.refillFromBag(session.playerRack, session.bag);
+
+    // Re-render
+    UI.renderBoard(session.uiParts.boardGrid, session.board, session.isFirstMove);
+    UI.renderRack(session.uiParts.playerRack, session.playerRack, false);
+    UI.renderScore(session.uiParts.playerScoreBox, 'You', session.playerScore);
+
+    const Anim = window.AMath.animations;
+    if (Anim) {
+      const scoreEl = session.uiParts.playerScoreBox.querySelector('.score-value');
+      if (scoreEl) Anim.animateScore(scoreEl, oldScore, session.playerScore);
+    }
+
+    if (window.AMath.scoreSheet) {
+      window.AMath.scoreSheet.recordTurn('player', 'play', total, wasBingo, session.playerScore);
+    }
+
+    let msg = '📚 Suggested play: ' + total + ' points!';
+    if (wasBingo) msg += ' (+40 BINGO! 🎉)';
+    showStatus(msg, 'success');
+
+    if (window.AMath.sounds) {
+      if (wasBingo) window.AMath.sounds.bingo();
+      else window.AMath.sounds.submitSuccess();
+    }
+
+    fireTrashTalk(wasBingo ? 'opp_bingo' : 'opp_pass_check', { lastScore: total });
+    autoSave();
+
+    if (checkGameEnd()) return;
+    clearLastAiPlayHighlight();
     Interactions.setPlayerTurn(false);
     resetStallingWatch();
     setTimeout(runAiTurn, 800);
@@ -1472,6 +1586,25 @@
     const Board = window.AMath.board;
     const Rack = window.AMath.rack;
 
+    // === Education Mode: check before passing ===
+    const Edu = window.AMath.education;
+    if (Edu && window.AMath.settings && window.AMath.settings.get('educationMode')) {
+      Edu.checkAndAdvise('pass', 0, session,
+        function onKeep() { executePass(); },
+        function onUseSuggestion(play) { applySuggestedPlay(play); }
+      ).then(function (advised) {
+        if (!advised) executePass();
+      });
+      return;
+    }
+    executePass();
+  }
+
+  function executePass() {
+    const Interactions = window.AMath.interactions;
+    const Board = window.AMath.board;
+    const Rack = window.AMath.rack;
+
     hideChallengeButton();
 
     for (const p of [...session.tentativePlacements]) {
@@ -1533,6 +1666,28 @@
       Interactions.exitSwapMode();
       return;
     }
+
+    // === Education Mode: check before swapping ===
+    const Edu = window.AMath.education;
+    if (Edu && window.AMath.settings && window.AMath.settings.get('educationMode')) {
+      Edu.checkAndAdvise('swap', 0, session,
+        function onKeep() { executeSwap(tileIds); },
+        function onUseSuggestion(play) {
+          Interactions.exitSwapMode();
+          applySuggestedPlay(play);
+        }
+      ).then(function (advised) {
+        if (!advised) executeSwap(tileIds);
+      });
+      return;
+    }
+    executeSwap(tileIds);
+  }
+
+  function executeSwap(tileIds) {
+    const Bag = window.AMath.bag;
+    const Rack = window.AMath.rack;
+    const Interactions = window.AMath.interactions;
 
     const tilesToReturn = [];
     for (const id of tileIds) {
