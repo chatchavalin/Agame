@@ -1367,12 +1367,27 @@
           lastYieldTime = Date.now();
         }
 
+        // Per-anchor time cap for bingo (size 8): ensures search SPREADS
+        // across the board instead of exhausting one area.
+        // Budget = stage_time / anchors × 3 (some anchors finish fast, redistribute)
+        var anchorStart = Date.now();
+        var perAnchorMs = (stage.size >= 7) ? Math.max(500, Math.floor(stage.budgetMs / anchors.length * 3)) : Infinity;
+
+        // For bingo stages, reset abort flag per anchor so one expensive
+        // anchor doesn't kill all subsequent ones
+        if (stage.size >= 7) {
+          counter.abort = false;
+        }
+
         for (const direction of ['horizontal', 'vertical']) {
           if (counter.abort) break;
           if (Date.now() > stageDeadline) {
             counter.abort = true;
             break;
           }
+          // Per-anchor cap: move on to next anchor after time limit
+          if (Date.now() - anchorStart > perAnchorMs) break;
+
           searchAtAnchor(
             board, aiRack, anchor, direction, stage.size, isFirstMove,
             onValidPlay, counter, stageStart, stage.budgetMs, maxCandidatesThisRack
