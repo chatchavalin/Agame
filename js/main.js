@@ -371,6 +371,10 @@
           Modes.setAiTakeover(false);
           btnTakeover.textContent = '🤖 Auto';
           btnTakeover.classList.remove('btn-active');
+          btnTakeover.style.background = '';
+          btnTakeover.style.color = '';
+          // Restore player label
+          UI.renderScore(session.uiParts.playerScoreBox, 'You', session.playerScore);
           showStatus('Takeover OFF — you play your own turns now.');
         } else {
           // Turn ON
@@ -381,7 +385,11 @@
           Modes.setAiTakeover(true);
           btnTakeover.textContent = '🤖 Auto ON';
           btnTakeover.classList.add('btn-active');
-          showStatus('🤖 Auto ON — AI will play your turns. Click again to stop.');
+          btnTakeover.style.background = '#dc2626';
+          btnTakeover.style.color = 'white';
+          // Update player label to show AI is controlling
+          UI.renderScore(session.uiParts.playerScoreBox, 'You (AI)', session.playerScore);
+          showStatus('🤖 Auto ON — AI2 will play your turns. Click again to stop.');
 
           // If it's currently the player's turn, start playing immediately
           if (session.isPlayerTurn && !session.gameOver) {
@@ -642,12 +650,12 @@
           session.isFirstMove = false;
           session.consecutiveNonScoringTurns = 0;
           Rack.refillFromBag(session.playerRack, session.bag);
-          UI.renderScore(session.uiParts.playerScoreBox, 'You', session.playerScore);
+          UI.renderScore(session.uiParts.playerScoreBox, 'You (AI)', session.playerScore);
           if (window.AMath.scoreSheet) {
             window.AMath.scoreSheet.recordTurn('player', 'play', decision.score, isBingo, session.playerScore);
           }
-          let msg = '🤖→You played: ' + decision.score + ' points.';
-          if (isBingo) msg = '🤖→You BINGO! +' + decision.score + '!';
+          let msg = '🤖 AI2→You played: ' + decision.score + ' points.';
+          if (isBingo) msg = '🤖 AI2→You BINGO! +' + decision.score + '!';
           showStatus(msg, 'success');
         } else if (decision.type === 'swap') {
           const swapped = [];
@@ -661,13 +669,13 @@
           if (window.AMath.scoreSheet) {
             window.AMath.scoreSheet.recordTurn('player', 'swap', 0, false, session.playerScore, { swapCount: swapped.length });
           }
-          showStatus('🤖→You swapped tiles.');
+          showStatus('🤖 AI2→You swapped tiles.');
         } else {
           session.consecutiveNonScoringTurns++;
           if (window.AMath.scoreSheet) {
             window.AMath.scoreSheet.recordTurn('player', 'pass', 0, false, session.playerScore);
           }
-          showStatus('🤖→You passed.');
+          showStatus('🤖 AI2→You passed.');
         }
 
         autoSave();
@@ -1094,6 +1102,9 @@
           Modes.setAiTakeover(false);
           btnTakeover.textContent = '🤖 Auto';
           btnTakeover.classList.remove('btn-active');
+          btnTakeover.style.background = '';
+          btnTakeover.style.color = '';
+          UI.renderScore(session.uiParts.playerScoreBox, 'You', session.playerScore);
           showStatus('Takeover OFF — you play your own turns now.');
         } else {
           if (session.tentativePlacements.length > 0) {
@@ -1103,7 +1114,10 @@
           Modes.setAiTakeover(true);
           btnTakeover.textContent = '🤖 Auto ON';
           btnTakeover.classList.add('btn-active');
-          showStatus('🤖 Auto ON — AI will play your turns. Click again to stop.');
+          btnTakeover.style.background = '#dc2626';
+          btnTakeover.style.color = 'white';
+          UI.renderScore(session.uiParts.playerScoreBox, 'You (AI)', session.playerScore);
+          showStatus('🤖 Auto ON — AI2 will play your turns. Click again to stop.');
 
           if (session.isPlayerTurn && !session.gameOver) {
             setTimeout(runAiTakeoverTurn, 600);
@@ -2873,7 +2887,9 @@
       ? (window.AMath.settings.get('aiThinkSeconds') || 180)
       : 180;
     const budgetText = seconds >= 60 ? Math.round(seconds / 60) + ' min' : seconds + 's';
-    setStatusText('🤖 AI is thinking... (up to ' + budgetText + ')', '#6b7280', '500');
+    const isTakeover = window.AMath.modes && window.AMath.modes.isAiTakeover();
+    const thinkLabel = isTakeover ? '🤖 AI2 (your side)' : '🤖 AI';
+    setStatusText(thinkLabel + ' is thinking... (up to ' + budgetText + ')', '#6b7280', '500');
 
     // Add a CSS-animated progress bar.
     // CSS animations run on the browser's compositor thread, NOT the JS thread,

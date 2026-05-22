@@ -2495,3 +2495,28 @@ body.theme-forest .score-box.timer-paused,
 body.theme-neon .score-box.timer-paused {
   border-color: #dc2626;
 }
+
+/* Blank tiles on board: force dark text on ALL dark themes */
+body.theme-dark .amath-tile.tile-blank-on-board .tile-face,
+body.theme-dark .amath-tile.tile-blank-on-board .tile-points,
+body.theme-ocean .amath-tile.tile-blank-on-board .tile-face,
+body.theme-ocean .amath-tile.tile-blank-on-board .tile-points,
+body.theme-forest .amath-tile.tile-blank-on-board .tile-face,
+body.theme-forest .amath-tile.tile-blank-on-board .tile-points,
+body.theme-neon .amath-tile.tile-blank-on-board .tile-face,
+body.theme-neon .amath-tile.tile-blank-on-board .tile-points {
+  color: #1e293b !important;
+}
+body.theme-ocean .amath-tile.tile-blank-on-board,
+body.theme-forest .amath-tile.tile-blank-on-board,
+body.theme-neon .amath-tile.tile-blank-on-board {
+  background: #fef3c7;
+  border-color: #f97316;
+}
+
+/* Auto (takeover) button active state */
+.btn.btn-active {
+  background: #dc2626 !important;
+  color: white !important;
+  border-color: #b91c1c !important;
+}
