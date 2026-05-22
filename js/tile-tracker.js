@@ -50,7 +50,7 @@
 
     const title = document.createElement('div');
     title.className = 'tracker-title';
-    title.textContent = 'TILES NOT ON BOARD';
+    title.textContent = 'Tile Tracker';
     container.appendChild(title);
 
     const grid = document.createElement('div');
