@@ -2032,18 +2032,10 @@
       const threatsAfter = window.AMath.aiX9.detectAllThreats(board);
       const afterCount = threatsAfter ? threatsAfter.length : 0;
 
-      // NEW threat = more threats after than before
-      if (afterCount > beforeCount) return true;
-
-      // Also check if severity increased (same count but worse threats)
-      if (afterCount > 0 && beforeCount > 0) {
-        var maxBefore = 0, maxAfter = 0;
-        for (var i = 0; i < threatsBefore.length; i++) maxBefore = Math.max(maxBefore, threatsBefore[i].severity || 0);
-        for (var j = 0; j < threatsAfter.length; j++) maxAfter = Math.max(maxAfter, threatsAfter[j].severity || 0);
-        if (maxAfter > maxBefore + 30) return true;
-      }
-
-      return false;
+      // NEW threat = more threat LINES after than before
+      // Don't compare severity — placing tiles on an already-threatened line
+      // increases severity but actually BLOCKS it (more tiles = less room for opponent)
+      return afterCount > beforeCount;
     } catch (err) {
       console.error('[AI] wouldCreateX9Threat error:', err);
       return false;

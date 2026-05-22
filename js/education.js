@@ -172,14 +172,9 @@
           for (var ri = play.placements.length - 1; ri >= 0; ri--) {
             Board.removeTile(cleanBoard, play.placements[ri].row, play.placements[ri].col);
           }
-          var newX9 = threatsAfter.length > threatsBefore.length;
-          if (!newX9 && threatsAfter.length > 0 && threatsBefore.length > 0) {
-            var maxB = 0, maxA = 0;
-            for (var bi = 0; bi < threatsBefore.length; bi++) maxB = Math.max(maxB, threatsBefore[bi].severity || 0);
-            for (var ai = 0; ai < threatsAfter.length; ai++) maxA = Math.max(maxA, threatsAfter[ai].severity || 0);
-            if (maxA > maxB + 50) newX9 = true;
-          }
-          return { x9: newX9 };
+          // Only count NEW threat lines — don't compare severity
+          // Placing tiles on already-threatened line blocks it, not worsens it
+          return { x9: threatsAfter.length > threatsBefore.length };
         }
 
         // Primary play (always included)
