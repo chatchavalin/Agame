@@ -2098,6 +2098,13 @@
 
     session.consecutiveNonScoringTurns++;
 
+    // Warn player when close to 6-pass game end
+    var sixPassDisabled = false;
+    try { sixPassDisabled = window.AMath.settings.get('disableSixPassEnd') === true; } catch (e) {}
+    if (!sixPassDisabled && session.consecutiveNonScoringTurns >= 5) {
+      showStatus('⚠️ ' + session.consecutiveNonScoringTurns + '/6 non-scoring turns! One more pass/swap ends the game!', 'error');
+    }
+
     // Track opponent's last action for late-game AI strategy
     session.lastOpponentAction = { type: 'pass' };
 
@@ -2189,6 +2196,14 @@
       : 'Swapped ' + tilesToReturn.length + ' tiles.';
     showStatus(swapMsg);
     if (window.AMath.sounds) window.AMath.sounds.swap();
+
+    // Warn about 6-pass rule
+    var sixPassOff3 = false;
+    try { sixPassOff3 = window.AMath.settings.get('disableSixPassEnd') === true; } catch(e){}
+    if (!sixPassOff3 && session.consecutiveNonScoringTurns >= 4) {
+      showStatus('⚠️ ' + session.consecutiveNonScoringTurns + '/6 non-scoring turns! ' +
+        (session.consecutiveNonScoringTurns >= 5 ? 'One more ends the game!' : 'Getting close to game end!'), 'error');
+    }
 
     autoSave();
 
@@ -2430,6 +2445,13 @@
       }
 
       showStatus('🤖 AI swapped ' + swapped.length + ' tiles. Your turn!');
+      // Warn about 6-pass rule
+      var sixPassOff = false;
+      try { sixPassOff = window.AMath.settings.get('disableSixPassEnd') === true; } catch(e){}
+      if (!sixPassOff && session.consecutiveNonScoringTurns >= 4) {
+        showStatus('⚠️ ' + session.consecutiveNonScoringTurns + '/6 non-scoring turns! ' +
+          (session.consecutiveNonScoringTurns >= 5 ? 'One more ends the game!' : 'Getting close to game end!'), 'error');
+      }
       fireTrashTalk('ai_swap', {});
     } else if (decision.type === 'pass') {
       session.consecutiveNonScoringTurns++;
@@ -2440,6 +2462,13 @@
       }
 
       showStatus('🤖 AI passed. Your turn!');
+      // Warn about 6-pass rule
+      var sixPassOff2 = false;
+      try { sixPassOff2 = window.AMath.settings.get('disableSixPassEnd') === true; } catch(e){}
+      if (!sixPassOff2 && session.consecutiveNonScoringTurns >= 4) {
+        showStatus('⚠️ ' + session.consecutiveNonScoringTurns + '/6 non-scoring turns! ' +
+          (session.consecutiveNonScoringTurns >= 5 ? 'One more ends the game!' : 'Getting close to game end!'), 'error');
+      }
       fireTrashTalk('ai_pass', {});
     } else {
       // Unknown decision type — treat as pass for safety
