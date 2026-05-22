@@ -1752,8 +1752,10 @@
         }
         // Excess operators (>2 in rack)
         if ((p.tile.type === 'op' || p.tile.type === 'choice') && rackInfo.ops + rackInfo.choices > 2) dumpScore += 2;
-        // Excess equals (>1 in rack)
-        if (p.tile.type === 'equals' && rackInfo.eq > 1) dumpScore += 2;
+        // Excess equals (>1 in rack) — in endgame, 1 = is enough
+        if (p.tile.type === 'equals' && rackInfo.eq > 1) dumpScore += 4;
+        // Bag=0: every tile dumped avoids penalty — bonus for tile points
+        if (Bag.bagSize(state.bag) === 0) dumpScore += (p.tile.points || 0);
       }
       // Bonus for using more tiles (closer to empty)
       dumpScore += play.placements.length;
