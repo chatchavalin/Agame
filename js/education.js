@@ -215,6 +215,21 @@
           if (ft) swapFaces.push(ft.assigned || ft.face);
         }
         result.swapAdvice = { count: swapFaces.length, faces: swapFaces, tileIds: decision.tileIds || [] };
+
+        // Check if bingo was actually feasible — if yes, the search may have timed out
+        var numCount = 0, opCount = 0, eqCount = 0, blankCount = 0;
+        for (var fi = 0; fi < virtualRack.tiles.length; fi++) {
+          var ft2 = virtualRack.tiles[fi];
+          if (ft2.type === 'digit' || ft2.type === 'twodigit') numCount++;
+          else if (ft2.type === 'op' || ft2.type === 'choice') opCount++;
+          else if (ft2.type === 'equals') eqCount++;
+          else if (ft2.type === 'blank') blankCount++;
+        }
+        var bingoCouldWork = virtualRack.tiles.length === 8 &&
+          (numCount + blankCount) >= 2 && (opCount + blankCount) >= 1 && (eqCount + blankCount) >= 1;
+        if (bingoCouldWork) {
+          result.bingoHint = true; // flag for popup to show bingo hint
+        }
       } else if (decision.type === 'pass') {
         result.swapAdvice = { count: 0, faces: [], isPass: true };
       }
@@ -504,6 +519,15 @@
                   'padding:2px 8px;font-weight:bold;font-size:14px;color:#1e293b;">' + r.swapAdvice.faces[k] + '</span>';
         }
         html += '</div></div>';
+      }
+
+      // Bingo hint: AI recommended swap but bingo might be possible
+      if (r.bingoHint) {
+        html += '<div style="margin-top:6px;padding:8px;background:rgba(124,58,237,0.08);' +
+                'border-radius:6px;border:1px solid rgba(124,58,237,0.2);font-size:13px;color:#7c3aed;">' +
+                '🎯 <b>Bingo might be possible!</b><br>' +
+                'Your rack has 8 tiles with numbers, operators, and equals. ' +
+                'AI search timed out — try looking for an 8-tile equation yourself before swapping!</div>';
       }
     } else if (r.plays.length > 0) {
       html += '<div style="margin-top:6px;font-size:12px;color:#059669;">✅ Playing is your best option.</div>';

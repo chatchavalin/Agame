@@ -304,6 +304,10 @@
       } else {
         grammarBudget = Math.min(10000, 4000 + extraBlanks * 1500);
       }
+      // Two-digit tiles increase equation complexity — boost grammar budget
+      const grammarTwoDigits = state.aiRack.tiles.filter(t => t.type === 'twodigit').length;
+      if (grammarTwoDigits >= 2) grammarBudget = Math.min(15000, grammarBudget * 1.5);
+      else if (grammarTwoDigits >= 1) grammarBudget = Math.min(12000, grammarBudget * 1.2);
       grammarBingoPlay = window.AMath.aiBingoGrammar.findGrammarBingo(state, grammarBudget);
       if (grammarBingoPlay) {
         console.log('[AI] Grammar Bingo found in ' + (Date.now() - grammarStart) + 'ms, score=' + grammarBingoPlay.score);
@@ -1167,6 +1171,10 @@
     else if (blankCount >= 1) candidateMultiplier = 2;
     if (choiceCount >= 2) candidateMultiplier *= 1.5;
     if (isFirstMove) candidateMultiplier *= 1.5;
+    // Two-digit tiles increase search space — boost budget
+    const twoDigitCount = rack.filter(t => t.type === 'twodigit').length;
+    if (twoDigitCount >= 2) candidateMultiplier *= 1.5;
+    else if (twoDigitCount >= 1) candidateMultiplier *= 1.2;
 
     const maxCandidatesThisRack = Math.floor(MAX_CANDIDATES_PER_STAGE * candidateMultiplier);
     if (candidateMultiplier > 1) {
