@@ -1498,14 +1498,22 @@
     refreshTileTracker();
   }
 
-  var _logBtnWired = null;
+  var _logBtnWired = false;
   function wireGameLogButton() {
-    var btn = document.getElementById('btn-gamelog');
-    if (!btn || btn === _logBtnWired) return;
+    if (_logBtnWired) return;
+    // Create a tiny floating button at bottom-left
+    var btn = document.createElement('div');
+    btn.id = 'btn-gamelog';
+    btn.title = 'Game Log';
+    btn.textContent = 'log';
+    btn.style.cssText = 'position:fixed;bottom:4px;left:4px;z-index:999;' +
+      'font-size:9px;color:rgba(150,150,150,0.4);cursor:pointer;' +
+      'padding:2px 5px;font-family:monospace;user-select:none;';
     btn.addEventListener('click', function () {
-      setTimeout(function () { if (window.AMath.gameLog) window.AMath.gameLog.show(); }, 0);
+      if (window.AMath.gameLog) window.AMath.gameLog.show();
     });
-    _logBtnWired = btn;
+    document.body.appendChild(btn);
+    _logBtnWired = true;
   }
 
   function toggleTileTracker() {
