@@ -33,6 +33,7 @@
    */
   var _boardHandlerEl = null;  // track which board element has handlers
   var _rackHandlerEl = null;
+  var _oppRackHandlerEl = null;
 
   function init(sessionState) {
     state = sessionState;
@@ -42,6 +43,7 @@
     // Only re-attach handlers if DOM elements changed (new game rebuilds DOM)
     var boardEl = document.getElementById('amath-board');
     var rackEl = state.uiParts.playerRack;
+    var oppRackEl = state.uiParts.opponentRack;
     if (boardEl !== _boardHandlerEl) {
       attachBoardHandlers();
       _boardHandlerEl = boardEl;
@@ -50,6 +52,11 @@
       attachRackHandlers();
       attachButtonHandlers();
       _rackHandlerEl = rackEl;
+    }
+    // PvP: also wire opponent rack so P2 can interact from top position
+    if (state.isPvP && oppRackEl && oppRackEl !== _oppRackHandlerEl) {
+      attachRackHandlersTo(oppRackEl);
+      _oppRackHandlerEl = oppRackEl;
     }
     refreshUI();
   }
@@ -93,7 +100,15 @@
   }
 
   function attachRackHandlers() {
-    const rackEl = state.uiParts.playerRack;
+    attachRackHandlersTo(state.uiParts.playerRack);
+  }
+
+  /**
+   * Attach click + drag handlers to any rack DOM element.
+   * In PvP, called for BOTH bottom and top racks.
+   * Only tiles belonging to the current player's rack respond.
+   */
+  function attachRackHandlersTo(rackEl) {
     if (!rackEl) return;
 
     rackEl.addEventListener('click', function (e) {
@@ -103,9 +118,7 @@
       if (tileId) onRackTileClick(tileId);
     });
 
-    // Drop on rack:
-    //   - If tile came from board (tentative) → return to rack
-    //   - If tile came from rack → reorder
+    // Drop on rack
     rackEl.addEventListener('dragover', function (e) {
       e.preventDefault();
     });
@@ -114,7 +127,6 @@
       const tileId = e.dataTransfer.getData('text/plain');
       if (!tileId) return;
 
-      // Detect the slot being dropped on (for reordering)
       const slotEl = e.target.closest('.amath-rack-slot');
       const targetIndex = slotEl ? parseInt(slotEl.dataset.slotIndex, 10) : -1;
 
@@ -465,7 +477,16 @@
       return;
     }
 
-    if (state.isPlayerTurn) {
+    if (state.isPvP) {
+      // PvP: highlight the active player's rack (P1=bottom, P2=top)
+      if ((state.currentPlayer || 1) === 1) {
+        playerArea.classList.add('is-active-turn');
+        opponentArea.classList.remove('is-active-turn');
+      } else {
+        playerArea.classList.remove('is-active-turn');
+        opponentArea.classList.add('is-active-turn');
+      }
+    } else if (state.isPlayerTurn) {
       playerArea.classList.add('is-active-turn');
       opponentArea.classList.remove('is-active-turn');
     } else {
@@ -477,8 +498,16 @@
   function refreshUI() {
     // Re-render board, rack, and update selection highlight
     UI.renderBoard(state.board, state.uiParts.boardArea);
-    UI.renderRack(state.playerRack, state.uiParts.playerRack, false);
-    UI.renderRack(state.aiRack, state.uiParts.opponentRack, true);
+
+    // PvP: P1 always at bottom, P2 always at top (racks don't move)
+    // P2 uses isOpponent=true for CSS class, but face-up via isPvP check in renderRack
+    if (state.isPvP) {
+      UI.renderRack(state.p1Rack, state.uiParts.playerRack, false);
+      UI.renderRack(state.p2Rack, state.uiParts.opponentRack, true);
+    } else {
+      UI.renderRack(state.playerRack, state.uiParts.playerRack, false);
+      UI.renderRack(state.aiRack, state.uiParts.opponentRack, true);
+    }
 
     // Re-attach board handlers since we just re-rendered
     attachBoardHandlers();
@@ -543,18 +572,31 @@
   }
 
   function makeRackTilesDraggable() {
-    const tiles = state.uiParts.playerRack.querySelectorAll('.amath-tile');
-    tiles.forEach(function (tileEl) {
-      tileEl.setAttribute('draggable', 'true');
-      tileEl.addEventListener('dragstart', function (e) {
-        e.dataTransfer.setData('text/plain', tileEl.dataset.tileId);
-        e.dataTransfer.effectAllowed = 'move';
-        tileEl.classList.add('tile-dragging');
+    // In PvP, the active player's rack might be at top or bottom
+    // Make tiles draggable in BOTH rack containers, but only if they
+    // belong to the current player (checked by onTileDroppedOnBoard)
+    var containers = [state.uiParts.playerRack];
+    if (state.isPvP && state.uiParts.opponentRack) {
+      containers.push(state.uiParts.opponentRack);
+    }
+    for (var ci = 0; ci < containers.length; ci++) {
+      var tiles = containers[ci].querySelectorAll('.amath-tile');
+      tiles.forEach(function (tileEl) {
+        // Only make draggable if tile belongs to current player's rack
+        var tileId = tileEl.dataset.tileId;
+        var inRack = state.playerRack.tiles.some(function (t) { return t.id === tileId; });
+        if (!inRack) return;
+        tileEl.setAttribute('draggable', 'true');
+        tileEl.addEventListener('dragstart', function (e) {
+          e.dataTransfer.setData('text/plain', tileEl.dataset.tileId);
+          e.dataTransfer.effectAllowed = 'move';
+          tileEl.classList.add('tile-dragging');
+        });
+        tileEl.addEventListener('dragend', function () {
+          tileEl.classList.remove('tile-dragging');
+        });
       });
-      tileEl.addEventListener('dragend', function () {
-        tileEl.classList.remove('tile-dragging');
-      });
-    });
+    }
   }
 
   function makeTentativeTilesDraggable() {

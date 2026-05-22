@@ -565,10 +565,9 @@
     Interactions.init(session);
     Interactions.setPlayerTurn(true);
 
-    var p1Score = session.currentPlayer === 1 ? session.playerScore : session.aiScore;
-    var p2Score = session.currentPlayer === 1 ? session.aiScore : session.playerScore;
-    UI.renderScore(session.uiParts.playerScoreBox, 'P' + session.currentPlayer, session.currentPlayer === 1 ? session.playerScore : session.aiScore);
-    UI.renderScore(session.uiParts.opponentScoreBox, 'P' + (3 - session.currentPlayer), session.currentPlayer === 1 ? session.aiScore : session.playerScore);
+    // P1 score always at bottom, P2 always at top
+    UI.renderScore(session.uiParts.playerScoreBox, 'P1', session.playerScore);
+    UI.renderScore(session.uiParts.opponentScoreBox, 'P2', session.aiScore);
 
     autoSave();
     showStatus('🎲 Player ' + session.currentPlayer + '\'s turn!');
@@ -1344,10 +1343,13 @@
     Interactions.init(session);
     Interactions.setPlayerTurn(true);
 
-    var p1Label = session.isPvP ? 'P' + session.currentPlayer : 'You';
-    var p2Label = session.isPvP ? 'P' + (3 - session.currentPlayer) : 'AI';
-    UI.renderScore(session.uiParts.playerScoreBox, p1Label, session.isPvP && session.currentPlayer === 2 ? session.aiScore : session.playerScore);
-    UI.renderScore(session.uiParts.opponentScoreBox, p2Label, session.isPvP && session.currentPlayer === 2 ? session.playerScore : session.aiScore);
+    if (session.isPvP) {
+      UI.renderScore(session.uiParts.playerScoreBox, 'P1', session.playerScore);
+      UI.renderScore(session.uiParts.opponentScoreBox, 'P2', session.aiScore);
+    } else {
+      UI.renderScore(session.uiParts.playerScoreBox, 'You', session.playerScore);
+      UI.renderScore(session.uiParts.opponentScoreBox, 'AI', session.aiScore);
+    }
 
     refreshTileTracker();
     refreshDesktopSidePanels();
@@ -1692,13 +1694,24 @@
     Interactions.clearTentativePlacements();
 
     const playerLabel = isPvP ? 'P' + currentP : 'You';
-    UI.renderScore(session.uiParts.playerScoreBox, playerLabel, activeScore);
-
-    // Animate score
-    const Anim = window.AMath.animations;
-    if (Anim) {
-      const scoreEl = session.uiParts.playerScoreBox.querySelector('.score-value');
-      if (scoreEl) Anim.animateScore(scoreEl, oldScore, activeScore);
+    if (isPvP) {
+      // P1 always bottom, P2 always top
+      UI.renderScore(session.uiParts.playerScoreBox, 'P1', session.playerScore);
+      UI.renderScore(session.uiParts.opponentScoreBox, 'P2', session.aiScore);
+      // Animate the active player's score box
+      var animBox = currentP === 1 ? session.uiParts.playerScoreBox : session.uiParts.opponentScoreBox;
+      var Anim = window.AMath.animations;
+      if (Anim) {
+        var scoreEl = animBox.querySelector('.score-value');
+        if (scoreEl) Anim.animateScore(scoreEl, oldScore, activeScore);
+      }
+    } else {
+      UI.renderScore(session.uiParts.playerScoreBox, 'You', activeScore);
+      var Anim = window.AMath.animations;
+      if (Anim) {
+        var scoreEl = session.uiParts.playerScoreBox.querySelector('.score-value');
+        if (scoreEl) Anim.animateScore(scoreEl, oldScore, activeScore);
+      }
     }
 
     // Score sheet
@@ -1799,14 +1812,19 @@
     Rack.refillFromBag(session.playerRack, session.bag);
 
     // Re-render
-    const aspLabel = aspIsPvP ? 'P' + aspCurrentP : 'You';
     UI.renderBoard(session.uiParts.boardGrid, session.board, session.isFirstMove);
     UI.renderRack(session.uiParts.playerRack, session.playerRack, false);
-    UI.renderScore(session.uiParts.playerScoreBox, aspLabel, aspActiveScore);
+    if (aspIsPvP) {
+      UI.renderScore(session.uiParts.playerScoreBox, 'P1', session.playerScore);
+      UI.renderScore(session.uiParts.opponentScoreBox, 'P2', session.aiScore);
+    } else {
+      UI.renderScore(session.uiParts.playerScoreBox, 'You', aspActiveScore);
+    }
 
     const Anim = window.AMath.animations;
     if (Anim) {
-      const scoreEl = session.uiParts.playerScoreBox.querySelector('.score-value');
+      var aspAnimBox = (aspIsPvP && aspCurrentP === 2) ? session.uiParts.opponentScoreBox : session.uiParts.playerScoreBox;
+      const scoreEl = aspAnimBox.querySelector('.score-value');
       if (scoreEl) Anim.animateScore(scoreEl, oldScore, aspActiveScore);
     }
 
