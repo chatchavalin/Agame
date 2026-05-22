@@ -1402,6 +1402,7 @@
     // Execute search plan
     const stageLogs = [];
     let totalCandidates = 0;
+    let anyStageTimedOut = false;
     let lastYieldTime = Date.now();
     const YIELD_INTERVAL_MS = 30;  // yield to browser every ~30ms for responsive UI
 
@@ -1462,6 +1463,7 @@
       }
 
       const stageElapsed = Date.now() - stageStart;
+      if (stageElapsed >= stage.budgetMs * 0.95) anyStageTimedOut = true;
       const stageCandidates = counter.count;
       totalCandidates += stageCandidates;
       const stageImproved = (bestPlay ? bestPlay.score : -1) > startBest;
@@ -1493,6 +1495,7 @@
       bestPlay._bestBlocking = bestBlockingPlay;
       bestPlay._bestNoBlank = bestNoBlankPlay;
       bestPlay._bestMinBlank = bestMinBlankPlay;
+      bestPlay._timedOut = anyStageTimedOut;
       // Sort top plays by score descending
       topPlays.sort(function (a, b) { return b.score - a.score; });
       bestPlay._topPlays = topPlays;

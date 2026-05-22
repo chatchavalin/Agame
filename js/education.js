@@ -133,7 +133,12 @@
     var result = { plays: [], swapAdvice: null, endgamePlan: null };
 
     try {
+      var searchStart = Date.now();
+      var budgetMs = eduSettings.aiThinkSeconds * 1000;
       var decision = await AI.decideMove(state);
+      var elapsed = Date.now() - searchStart;
+      // Search timed out if it used > 90% of the budget
+      result._searchComplete = elapsed < budgetMs * 0.9;
       if (searchAborted) return result;
 
       if (decision.type === 'play') {
@@ -554,11 +559,13 @@
       html += '</div>';
     }
 
-    // "Search more" button — lets user extend search time
-    html += '<div id="edu-search-more" style="margin-top:10px;text-align:center;">' +
-            '<button onclick="window.AMath.education._extendSearch()" ' +
-            'style="background:none;border:1px solid rgba(107,114,128,0.3);border-radius:6px;' +
-            'padding:5px 14px;font-size:11px;color:#6b7280;cursor:pointer;">🔍 Search 1 min more</button></div>';
+    // "Search more" button — only show when search timed out (not complete)
+    if (!r._searchComplete) {
+      html += '<div id="edu-search-more" style="margin-top:10px;text-align:center;">' +
+              '<button onclick="window.AMath.education._extendSearch()" ' +
+              'style="background:none;border:1px solid rgba(107,114,128,0.3);border-radius:6px;' +
+              'padding:5px 14px;font-size:11px;color:#6b7280;cursor:pointer;">🔍 Search 1 min more</button></div>';
+    }
 
     showPopup(html);
   }
