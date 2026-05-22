@@ -2216,12 +2216,27 @@ body.theme-dark .score-sheet-table th {
   display: none;
 }
 
+/* Show timer bar on tablet (no desktop side panel) */
+@media (min-width: 700px) and (max-width: 1299px) {
+  .timer-bar {
+    display: flex;
+  }
+}
+
 /* Inline tile tracker panel (visible on mobile under the action buttons).
    Hidden on desktop because the right side panel already shows the tracker
    live — having both would be duplicative. The mobile media query later
    re-shows it via `display: block`. */
 #tile-tracker-panel {
   display: none;
+}
+
+/* Show tile tracker on tablet (no side panel) */
+@media (min-width: 700px) and (max-width: 1299px) {
+  #tile-tracker-panel {
+    display: block;
+    margin-top: 8px;
+  }
 }
 
 /* =============================================================================
