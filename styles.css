@@ -98,6 +98,21 @@ h1 {
   margin: 0 auto;
 }
 
+/* Tablet / iPad: maximize board to screen edges */
+@media (min-width: 700px) and (max-width: 1299px) {
+  #app {
+    max-width: 95vw;
+    padding: 0 8px;
+  }
+  :root {
+    /* iPad: no side panels. Board can use most of screen width.
+       Use simpler calc — just divide available width by 15 cells */
+    --cell-size: min(calc((95vw - 52px) / 15), calc((100vh - 280px) / 15), 52px);
+    --tile-size: calc(var(--cell-size) - 2px);
+    --rack-tile-size: 44px;
+  }
+}
+
 /* =============================================================================
    DESKTOP 3-COLUMN LAYOUT
    Hides side panels by default (mobile-first). Activates on wide viewports.
@@ -2179,7 +2194,7 @@ body.theme-dark .score-sheet-table th {
    RESPONSIVE — TABLET
    ============================================================================= */
 
-@media (max-width: 900px) {
+@media (max-width: 699px) {
   :root {
     --cell-size: 32px;
     --tile-size: 30px;
