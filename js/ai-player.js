@@ -269,7 +269,8 @@
     let fastBingoPlay = null;
     if (bingoFeasible && window.AMath.aiBingoFast && state.aiRack.tiles.length === 8 && !state.isFirstMove) {
       const fastStart = Date.now();
-      fastBingoPlay = window.AMath.aiBingoFast.findFastBingo(state, 5000);
+      const fastBingoBudget = getTimeBudgetMs() >= 200000 ? 15000 : 5000;
+      fastBingoPlay = window.AMath.aiBingoFast.findFastBingo(state, fastBingoBudget);
       if (fastBingoPlay) {
         console.log('[AI] Fast Bingo found in ' + (Date.now() - fastStart) + 'ms, score=' + fastBingoPlay.score);
       }
@@ -308,6 +309,11 @@
       const grammarTwoDigits = state.aiRack.tiles.filter(t => t.type === 'twodigit').length;
       if (grammarTwoDigits >= 2) grammarBudget = Math.min(15000, grammarBudget * 1.5);
       else if (grammarTwoDigits >= 1) grammarBudget = Math.min(12000, grammarBudget * 1.2);
+      // Education mode (300s budget) — allow much longer grammar search
+      const totalBudgetMs = getTimeBudgetMs();
+      if (totalBudgetMs >= 200000) {
+        grammarBudget = Math.max(grammarBudget, 30000); // at least 30s for education
+      }
       grammarBingoPlay = window.AMath.aiBingoGrammar.findGrammarBingo(state, grammarBudget);
       if (grammarBingoPlay) {
         console.log('[AI] Grammar Bingo found in ' + (Date.now() - grammarStart) + 'ms, score=' + grammarBingoPlay.score);
@@ -1175,6 +1181,8 @@
     const twoDigitCount = rack.filter(t => t.type === 'twodigit').length;
     if (twoDigitCount >= 2) candidateMultiplier *= 1.5;
     else if (twoDigitCount >= 1) candidateMultiplier *= 1.2;
+    // Education mode (300s budget) — search deeper
+    if (getTimeBudgetMs() >= 200000) candidateMultiplier *= 2;
 
     const maxCandidatesThisRack = Math.floor(MAX_CANDIDATES_PER_STAGE * candidateMultiplier);
     if (candidateMultiplier > 1) {
@@ -2179,10 +2187,47 @@
       return;
     }
 
+    // Early pruning for 6+ tile placements: check partial sequence validity
+    // to avoid exploring billions of dead-end permutations
+    if (numTiles >= 6 && sequence.length >= 2) {
+      var seqLen = sequence.length;
+      var curPos = cellPositions[seqLen - 1];
+      var prevPos = cellPositions[seqLen - 2];
+      // Only prune if cells are actually adjacent (no board tile between)
+      var areAdjacent = (Math.abs(curPos.row - prevPos.row) + Math.abs(curPos.col - prevPos.col)) === 1;
+      if (areAdjacent) {
+        var lastTile = rack[sequence[seqLen - 1]];
+        var prevTile = rack[sequence[seqLen - 2]];
+        var lastFace = lastTile.assigned || lastTile.face;
+        var prevFace = prevTile.assigned || prevTile.face;
+        var isOp = function (f) { return f === '+' || f === '-' || f === '×' || f === '÷' || f === '+/-' || f === '×/÷'; };
+        var lastIsOp = isOp(lastFace);
+        var prevIsOp = isOp(prevFace);
+        // Two operators adjacent → invalid
+        if (lastIsOp && prevIsOp) return;
+        // Two equals adjacent → invalid
+        var lastIsEq = lastFace === '=';
+        var prevIsEq = prevFace === '=';
+        if (lastIsEq && prevIsEq) return;
+      }
+    }
+
     for (let i = 0; i < rack.length; i++) {
       if (counter.abort) return;
       if (used[i]) continue;
       const tile = rack[i];
+
+      // Skip duplicate tiles: if a previous tile at same depth had the same
+      // face+type and wasn't used, swapping them gives identical results.
+      // This can cut 2-4× from the search space (e.g., two +/- tiles).
+      let isDuplicate = false;
+      for (let j = 0; j < i; j++) {
+        if (!used[j] && rack[j].face === tile.face && rack[j].type === tile.type) {
+          isDuplicate = true;
+          break;
+        }
+      }
+      if (isDuplicate) continue;
       const assignedValues = getCandidateAssignments(tile, rack, isFirstMove);
 
       for (const assigned of assignedValues) {

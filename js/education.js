@@ -114,6 +114,9 @@
       }
     } catch (e) { /* */ }
     eduSettings.botLevel = 'hard'; // always give full-strength advice
+    // Education runs in background while player thinks — give MUCH more time
+    // than normal AI turn. Player takes minutes; we can search 5 minutes.
+    eduSettings.aiThinkSeconds = 300;
 
     var state = {
       board: cleanBoard, aiRack: virtualRack, bag: session.bag,
