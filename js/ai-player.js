@@ -2228,7 +2228,8 @@
         }
       }
       if (isDuplicate) continue;
-      const assignedValues = getCandidateAssignments(tile, rack, isFirstMove);
+      const cellPos = cellPositions[sequence.length]; // the cell this tile will go into
+      const assignedValues = getCandidateAssignments(tile, rack, isFirstMove, board, cellPos);
 
       for (const assigned of assignedValues) {
         if (counter.abort) return;
@@ -2249,7 +2250,7 @@
     }
   }
 
-  function getCandidateAssignments(tile, rack, isFirstMove) {
+  function getCandidateAssignments(tile, rack, isFirstMove, board, cellPos) {
     if (tile.type === 'choice') return tile.face.split('/');
     if (tile.type === 'blank') {
       const fullChoices = (C.getBlankChoices ? C.getBlankChoices() : C.BLANK_CHOICES);
@@ -2273,7 +2274,7 @@
       // 1 BLANK: try all ~15 choices
       // 2 BLANKs: try ~10 (skip duplicates of rack faces)
       // 3+ BLANKs: try ~6 most useful (skip dups, prioritize structural symbols)
-      if (rackBlankCount <= 1) return fullChoices;
+      if (rackBlankCount <= 1) return applyCrossConstraint(fullChoices, board, cellPos);
 
       const rackFaces = new Set();
       for (const t of rack) {
@@ -2297,7 +2298,7 @@
       if (!rackFaces.has('1')) needed.push('1');
       if (!rackFaces.has('5')) needed.push('5');
 
-      // For 2 BLANKs: add more variety
+      // For 2 BLANKs: add more variety including two-digit values
       if (rackBlankCount === 2) {
         // Add all operators if not present
         for (const op of ['+', '-', '×', '÷']) {
@@ -2305,36 +2306,101 @@
         }
         // Add small digits not in rack
         for (const d of ['2', '3', '4', '6', '7', '8', '9']) {
-          if (!rackFaces.has(d) && needed.length < 12) needed.push(d);
+          if (!rackFaces.has(d) && needed.length < 15) needed.push(d);
+        }
+        // Add two-digit values from inventory (critical for Mathayom + Prathom)
+        for (const td of ['10', '12', '14', '16', '18', '20', '11', '13', '15']) {
+          if (fullChoices.indexOf(td) >= 0 && !rackFaces.has(td) && needed.length < 18) needed.push(td);
         }
         // Always include = for safety
         if (!needed.includes('=')) needed.push('=');
       }
 
-      // For 3+ BLANKs: keep it lean — only 4 most useful choices
-      // (combinatorial: 4^3 = 64 × permutations, manageable)
+      // For 3+ BLANKs: keep lean but include two-digit options
       if (rackBlankCount >= 3) {
-        // Most useful 4: =, +, 0, 1 — these enable most patterns
-        const top4 = [];
-        if (!hasEquals) top4.push('=');
-        if (!hasOp) top4.push('+');
-        if (!rackFaces.has('0')) top4.push('0');
-        if (!rackFaces.has('1')) top4.push('1');
-        // If we have everything, pick 4 generally useful
-        while (top4.length < 4) {
+        const top6 = [];
+        if (!hasEquals) top6.push('=');
+        if (!hasOp) top6.push('+');
+        if (!rackFaces.has('0')) top6.push('0');
+        if (!rackFaces.has('1')) top6.push('1');
+        // Add a two-digit if available
+        for (const td of ['10', '12', '14']) {
+          if (fullChoices.indexOf(td) >= 0 && !rackFaces.has(td) && top6.length < 6) top6.push(td);
+        }
+        while (top6.length < 6) {
           for (const c of ['=', '+', '-', '0', '1', '2', '5']) {
-            if (!top4.includes(c)) { top4.push(c); break; }
+            if (!top6.includes(c)) { top6.push(c); break; }
           }
         }
-        return top4.slice(0, 4);
+        return applyCrossConstraint(top6.slice(0, 6), board, cellPos);
       }
 
       // Filter to valid faces in active inventory
       const valid = new Set(fullChoices);
       const result = needed.filter(c => valid.has(c));
-      return result.length > 0 ? result : fullChoices.slice(0, 5); // safety floor
+      return applyCrossConstraint(result.length > 0 ? result : fullChoices.slice(0, 5), board, cellPos);
     }
     return [null];
+  }
+
+  /**
+   * Filter BLANK choices based on cross-direction neighbors on the board.
+   * This is SAFE — only eliminates provably impossible assignments.
+   *
+   * Rules:
+   *   - If BOTH cross-neighbors are numbers → BLANK must be operator or =
+   *   - If BOTH cross-neighbors are operators → BLANK must be a number
+   *   - If one cross-neighbor is operator → BLANK must be a number (op needs number next to it)
+   *   - Otherwise: no constraint
+   *
+   * Falls back to full choices if constraint eliminates everything (safety).
+   */
+  function applyCrossConstraint(choices, board, cellPos) {
+    if (!board || !cellPos) return choices;
+
+    var r = cellPos.row, c = cellPos.col;
+    var isNum = function (face) { return /^[0-9]/.test(face); };
+    var isOp = function (face) { return face === '+' || face === '-' || face === '×' || face === '÷' || face === '+/-' || face === '×/÷'; };
+
+    // Check all 4 neighbors
+    var dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+    var neighborTypes = []; // 'num', 'op', 'eq'
+    for (var d = 0; d < dirs.length; d++) {
+      var nr = r + dirs[d][0], nc = c + dirs[d][1];
+      if (!Board.inBounds(nr, nc)) continue;
+      var cell = board.cells[nr][nc];
+      if (!cell.tile) continue;
+      var face = cell.tile.assigned || cell.tile.face;
+      if (isNum(face)) neighborTypes.push('num');
+      else if (isOp(face)) neighborTypes.push('op');
+      else if (face === '=') neighborTypes.push('eq');
+    }
+
+    if (neighborTypes.length === 0) return choices; // no neighbors, no constraint
+
+    // If ANY neighbor is an operator, this cell likely needs to be a number
+    // (operators need numbers on both sides)
+    var hasOpNeighbor = neighborTypes.indexOf('op') >= 0;
+    var hasNumNeighbor = neighborTypes.indexOf('num') >= 0;
+    var allNum = neighborTypes.every(function (t) { return t === 'num'; }) && neighborTypes.length >= 2;
+    var allOp = neighborTypes.every(function (t) { return t === 'op'; }) && neighborTypes.length >= 2;
+
+    var filtered;
+    if (allOp) {
+      // All operator neighbors → must be number
+      filtered = choices.filter(function (ch) { return isNum(ch); });
+    } else if (allNum) {
+      // All number neighbors → must be operator or =
+      filtered = choices.filter(function (ch) { return isOp(ch) || ch === '='; });
+    } else if (hasOpNeighbor && !hasNumNeighbor) {
+      // Only operator neighbors → prefer numbers (but allow = too)
+      filtered = choices.filter(function (ch) { return isNum(ch) || ch === '='; });
+    } else {
+      return choices; // mixed neighbors or only =, no safe constraint
+    }
+
+    // Safety: never return empty — fall back to full choices
+    return filtered.length > 0 ? filtered : choices;
   }
 
   // ============================================================================
