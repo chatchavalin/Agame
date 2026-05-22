@@ -14,6 +14,7 @@
   var verifyBtn = null;
   var popupOverlay = null;
   var currentSession = null;
+  var extraSearchSeconds = 0;  // extra time added by user via "Search more" button
 
   // =========================================================================
   // BACKGROUND SEARCH
@@ -23,6 +24,7 @@
     currentSession = session;
     searchResult = { plays: [], swapAdvice: null, endgamePlan: null, status: 'searching' };
     searchAborted = false;
+    extraSearchSeconds = 0;
     var thisGen = ++searchGeneration;
     ensureVerifyButton();
     setVerifyFaded(true);
@@ -116,7 +118,7 @@
     eduSettings.botLevel = 'hard'; // always give full-strength advice
     // Education runs in background while player thinks — give MUCH more time
     // than normal AI turn. Player takes minutes; we can search 5 minutes.
-    eduSettings.aiThinkSeconds = 300;
+    eduSettings.aiThinkSeconds = 300 + extraSearchSeconds;
 
     var state = {
       board: cleanBoard, aiRack: virtualRack, bag: session.bag,
@@ -552,6 +554,12 @@
       html += '</div>';
     }
 
+    // "Search more" button — lets user extend search time
+    html += '<div id="edu-search-more" style="margin-top:10px;text-align:center;">' +
+            '<button onclick="window.AMath.education._extendSearch()" ' +
+            'style="background:none;border:1px solid rgba(107,114,128,0.3);border-radius:6px;' +
+            'padding:5px 14px;font-size:11px;color:#6b7280;cursor:pointer;">🔍 Search 1 min more</button></div>';
+
     showPopup(html);
   }
 
@@ -631,6 +639,41 @@
     }
   }
 
+  function extendSearch() {
+    if (!currentSession) {
+      // Session ended — need the stored session
+      var s = window.AMath._getSession ? window.AMath._getSession() : null;
+      if (!s) return;
+      currentSession = s;
+    }
+
+    // Update button to show searching
+    var btn = document.getElementById('edu-search-more');
+    if (btn) btn.innerHTML = '<span style="font-size:11px;color:#6b7280;">⏳ Searching...</span>';
+
+    extraSearchSeconds += 60;
+    searchResult.status = 'searching';
+    setVerifyFaded(true);
+    var thisGen = ++searchGeneration;
+
+    runFullAnalysis(currentSession).then(function (result) {
+      if (searchAborted || thisGen !== searchGeneration) return;
+      searchResult = result;
+      searchResult.status = 'done';
+      setVerifyFaded(false);
+      // Refresh popup if still open
+      if (popupOverlay && document.contains(popupOverlay)) {
+        showResultsPopup();
+      }
+    }).catch(function (err) {
+      console.error('[Education] extend search error:', err);
+      if (!searchAborted && thisGen === searchGeneration) {
+        searchResult.status = 'done';
+        setVerifyFaded(false);
+      }
+    });
+  }
+
   // =========================================================================
   // EXPORTS
   // =========================================================================
@@ -649,5 +692,6 @@
     },
     _autoSwap: autoSwap,
     _autoPass: autoPass,
+    _extendSearch: extendSearch,
   };
 })();
