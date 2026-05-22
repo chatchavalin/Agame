@@ -2097,34 +2097,54 @@
       }
     }
 
-    // OPTIMIZATION: order anchors by "promise" — premium-adjacent first.
-    // Anchors near 3E/2E squares often yield higher-scoring plays.
-    // We compute a simple heuristic score per anchor and sort descending.
+    // OPTIMIZATION: order anchors by "promise" — premium lines first.
+    // Priority: ×9 lines > ×4 lines > single 3E > single 2E > 3T > 2T > plain
     anchors.forEach(function (a) {
       let promise = 0;
-      // Walk up to 7 cells in each direction; bonus for premium cells nearby
-      const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0]];
-      for (const [dr, dc] of dirs) {
-        for (let d = 1; d <= 7; d++) {
-          const nr = a.row + dr * d;
-          const nc = a.col + dc * d;
-          if (!Board.inBounds(nr, nc)) break;
-          const cell = board.cells[nr][nc];
-          if (cell && !cell.tile) {
-            // Empty cell — could be part of placement; weight by distance
-            const w = 1 / d;
-            const prem = cell.premium;
-            if (prem === '3E') promise += 5 * w;
-            else if (prem === '2E') promise += 2 * w;
-            else if (prem === '3T') promise += 1 * w;
-            else if (prem === '2T') promise += 0.5 * w;
-          } else if (cell && cell.tile) {
-            // Existing tile — slight bonus (more equation context)
-            promise += 0.3 * (1 / d);
-            // (don't break; keep walking past)
+
+      // Check each direction for premium cells on the same line
+      var directions = [
+        { dr: 0, dc: 1, name: 'horiz' },   // horizontal
+        { dr: 1, dc: 0, name: 'vert' },     // vertical
+      ];
+
+      for (var di = 0; di < directions.length; di++) {
+        var dir = directions[di];
+        var premiums3E = 0, premiums2E = 0, premiums3T = 0, premiums2T = 0;
+
+        // Scan both directions along this line (up to 14 cells = full board)
+        for (var sign = -1; sign <= 1; sign += 2) {
+          for (var d = 1; d <= 14; d++) {
+            var nr = a.row + dir.dr * d * sign;
+            var nc = a.col + dir.dc * d * sign;
+            if (!Board.inBounds(nr, nc)) break;
+            var cell = board.cells[nr][nc];
+            if (!cell) break;
+            // Only count UNUSED premiums (tile not placed or premium not consumed)
+            var prem = cell.premium;
+            if (prem && !cell.premiumUsed) {
+              if (prem === '3E') premiums3E++;
+              else if (prem === '2E') premiums2E++;
+              else if (prem === '3T') premiums3T++;
+              else if (prem === '2T') premiums2T++;
+            }
           }
         }
+
+        // ×9 line: two 3E squares on same line → highest priority
+        if (premiums3E >= 2) promise += 100;
+        else if (premiums3E === 1 && premiums2E >= 1) promise += 50;  // 3E×2E = ×6
+        else if (premiums3E === 1) promise += 30;  // single 3E
+        if (premiums2E >= 2) promise += 40;  // ×4 line
+        else if (premiums2E === 1) promise += 15;
+        if (premiums3T >= 1) promise += 5;
+        if (premiums2T >= 1) promise += 2;
       }
+
+      // Small bonus for nearby existing tiles (more equation context)
+      var adjTiles = Board.getAdjacentTiles(board, a.row, a.col);
+      promise += adjTiles.length * 0.5;
+
       a._promise = promise;
     });
 
