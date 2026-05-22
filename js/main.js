@@ -406,6 +406,15 @@
     undoHistory = [];
     wireUndoHandler();
 
+    // Game log
+    var GL = window.AMath.gameLog;
+    if (GL) {
+      GL.startGame({ mode: 'PvA', tileSet: Settings.get('tileSet'), botLevel: Settings.get('botLevel'), playerFirst: playerGoesFirst });
+      GL.logState('Game Start', session);
+    }
+
+    wireGameLogButton();
+
     if (playerGoesFirst) {
       saveUndoSnapshot();  // snapshot at start of player's first turn
       showStatus(
@@ -532,6 +541,13 @@
     undoHistory = [];
     wireUndoHandler();
     saveUndoSnapshot();  // snapshot at P1's first turn
+
+    // Game log
+    if (window.AMath.gameLog) {
+      window.AMath.gameLog.startGame({ mode: 'PvP', tileSet: Settings.get('tileSet') });
+      window.AMath.gameLog.logState('PvP Start', session);
+    }
+    wireGameLogButton();
 
     // Hide AI-only buttons
     var btnTakeover = document.getElementById('btn-takeover');
@@ -1373,6 +1389,10 @@
 
     showStatus('⏪ Undone! (' + undoHistory.length + ' more available)', 'info');
     if (window.AMath.sounds) window.AMath.sounds.undo();
+    if (window.AMath.gameLog) {
+      window.AMath.gameLog.logUndo(undoHistory.length);
+      window.AMath.gameLog.logState('After undo', session);
+    }
   }
 
   /**
@@ -1460,6 +1480,16 @@
     // (CSS handles desktop hide vs mobile show). Just kick off an initial
     // render so the panel has content.
     refreshTileTracker();
+  }
+
+  var _logBtnWired = null;
+  function wireGameLogButton() {
+    var btn = document.getElementById('btn-gamelog');
+    if (!btn || btn === _logBtnWired) return;
+    btn.addEventListener('click', function () {
+      setTimeout(function () { if (window.AMath.gameLog) window.AMath.gameLog.show(); }, 0);
+    });
+    _logBtnWired = btn;
   }
 
   function toggleTileTracker() {
@@ -1703,6 +1733,13 @@
 
     Rack.refillFromBag(session.playerRack, session.bag);
     Interactions.clearTentativePlacements();
+
+    // Log
+    if (window.AMath.gameLog) {
+      var logWho = isPvP ? 'P' + currentP : 'Player';
+      window.AMath.gameLog.log(logWho + ' scored ' + scoreResult.total + 'pts' + (wasBingo ? ' BINGO!' : ''));
+      window.AMath.gameLog.logState('After play', session);
+    }
 
     const playerLabel = isPvP ? 'P' + currentP : 'You';
     if (isPvP) {
@@ -2117,6 +2154,10 @@
 
     showStatus(session.isPvP ? 'Player ' + (session.currentPlayer || 1) + ' passed.' : 'You passed.');
     if (window.AMath.sounds) window.AMath.sounds.pass();
+    if (window.AMath.gameLog) {
+      window.AMath.gameLog.logPass(session.isPvP ? 'P' + (session.currentPlayer || 1) : 'Player');
+      window.AMath.gameLog.logState('After pass', session);
+    }
 
     autoSave();
 
@@ -2329,6 +2370,13 @@
     const Interactions = window.AMath.interactions;
 
     showThinking(false);
+
+    // Log AI decision
+    if (window.AMath.gameLog) {
+      var aiLogMsg = 'AI ' + decision.type;
+      if (decision.type === 'play') aiLogMsg += ' ' + decision.score + 'pts (' + decision.placements.length + ' tiles)';
+      window.AMath.gameLog.log(aiLogMsg);
+    }
 
     if (decision.type === 'play') {
       // Track premium cells that get marked used (so we can revert if challenged)
@@ -2689,6 +2737,12 @@
     const UI = window.AMath.ui;
 
     session.gameOver = true;
+
+    // Log game end
+    if (window.AMath.gameLog) {
+      window.AMath.gameLog.log('GAME ENDED: ' + reason);
+      window.AMath.gameLog.logState('Final state', session);
+    }
     if (chessClockInterval) {
       clearInterval(chessClockInterval);
       chessClockInterval = null;
