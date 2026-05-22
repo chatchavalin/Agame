@@ -415,15 +415,26 @@
       return;
     }
     if (searchResult.status === 'searching') {
+      // If we have plays from a previous search, show them with a "still searching" note
+      if (searchResult.plays && searchResult.plays.length > 0) {
+        showResultsPopup(true); // true = still searching
+        return;
+      }
       showPopup('<div style="text-align:center;padding:20px;font-size:14px;">⏳ Still analyzing your rack...<br>Press Verify again in a few seconds.</div>');
       return;
     }
-    showResultsPopup();
+    showResultsPopup(false);
   }
 
-  function showResultsPopup() {
+  function showResultsPopup(stillSearching) {
     var r = searchResult;
     var html = '';
+
+    // Show searching indicator if still running
+    if (stillSearching) {
+      html += '<div style="text-align:center;padding:6px;margin-bottom:8px;background:rgba(59,130,246,0.08);' +
+              'border-radius:6px;font-size:12px;color:#3b82f6;">⏳ Still searching... results so far:</div>';
+    }
 
     // Best plays
     if (r.plays.length > 0) {
@@ -560,7 +571,9 @@
     }
 
     // "Search more" button — only show when search timed out (not complete)
-    if (!r._searchComplete) {
+    if (stillSearching) {
+      html += '<div style="margin-top:10px;text-align:center;font-size:11px;color:#6b7280;">⏳ Searching...</div>';
+    } else if (!r._searchComplete) {
       html += '<div id="edu-search-more" style="margin-top:10px;text-align:center;">' +
               '<button onclick="window.AMath.education._extendSearch()" ' +
               'style="background:none;border:1px solid rgba(107,114,128,0.3);border-radius:6px;' +
