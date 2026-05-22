@@ -627,8 +627,20 @@
     if (bingoYoyoOnlyMode) {
       // Check bestPlay (might be bingo or yoyo from blankAwarePick)
       if (bestPlay && (bestPlay.placements.length === 8 || bestPlay.type === 'yoyo')) {
-        recordPlay(rackOwner);
-        return makePlayResult(bestPlay);
+        // Bingo trap check: if bag is low, playing all 8 tiles might leave us stuck
+        if (bestPlay.placements.length === 8 && bagSize > 0 && bagSize <= 5) {
+          const trapDrawn = predictBagContents(state);
+          if (trapDrawn && !isLikelyPlayable(trapDrawn, state.board)) {
+            console.log('[AI] Bingo-only: bingo trap! After bingo, drawn tiles unplayable');
+            // Fall through to yoyo or shorter play below
+          } else {
+            recordPlay(rackOwner);
+            return makePlayResult(bestPlay);
+          }
+        } else {
+          recordPlay(rackOwner);
+          return makePlayResult(bestPlay);
+        }
       }
 
       // bestPlay might be a short equation — check yoyoPlay separately
@@ -1079,6 +1091,36 @@
 
       recordPlay(rackOwner);
       return makePlayResult(bestPlay);
+    }
+
+    // === 7c. Endgame Bingo Trap Check ===
+    // When bag has few tiles (1-5) and bot plays bingo (all 8 tiles),
+    // bot draws those few tiles. If they're unplayable → bot is stuck → loses.
+    // Better: play shorter equation, keep some good tiles, plan bingo next turn.
+    if (bestPlay && bestPlay.placements.length === 8 && bagSize > 0 && bagSize <= 5 && !state.isFirstMove) {
+      const afterBingoDrawn = predictBagContents(state);
+      if (afterBingoDrawn && !isLikelyPlayable(afterBingoDrawn, state.board)) {
+        console.log('[AI] Bingo trap detected! After bingo, would draw ' + afterBingoDrawn.length +
+                    ' tiles that are likely unplayable: ' + afterBingoDrawn.map(t => t.face).join(','));
+
+        // Find best non-bingo play (shorter equation that keeps strategic tiles)
+        const shortAlts = [
+          bingoPlay && bingoPlay._bestNonRim,
+          bingoPlay && bingoPlay._bestNoBlank,
+          bingoPlay && bingoPlay._bestMinBlank,
+        ].filter(p => p && p.placements.length < 8 && p.placements.length >= 3 && p.score >= 10);
+
+        if (shortAlts.length > 0) {
+          shortAlts.sort((a, b) => b.score - a.score);
+          const saferPlay = shortAlts[0];
+          console.log('[AI] Playing shorter equation (' + saferPlay.score + 'pts, ' +
+                      saferPlay.placements.length + ' tiles) instead of bingo to avoid trap');
+          recordPlay(rackOwner);
+          return makePlayResult(saferPlay);
+        }
+        // No good alternative — play the bingo anyway (it's still better than nothing)
+        console.log('[AI] No good short alternative — playing bingo despite trap risk');
+      }
     }
 
     // Strategic swap
@@ -3134,6 +3176,86 @@
   }
 
   window.AMath = window.AMath || {};
+  /**
+   * Predict what tiles remain in the bag.
+   * Since we know: total inventory − board tiles − AI rack − (opponent rack estimated) = bag
+   * We can compute exact bag contents when bag is small.
+   */
+  function predictBagContents(state) {
+    const inventory = C.getActiveInventory ? C.getActiveInventory() : C.TILE_INVENTORY;
+    const counts = {};
+    for (const def of inventory) {
+      counts[def.face] = { count: def.count, type: def.type, points: def.points };
+    }
+
+    // Subtract board tiles
+    for (let r = 0; r < C.BOARD_SIZE; r++) {
+      for (let c = 0; c < C.BOARD_SIZE; c++) {
+        const cell = state.board.cells[r][c];
+        if (cell.tile) {
+          const face = cell.tile.assigned || cell.tile.face;
+          if (counts[face]) counts[face].count--;
+        }
+      }
+    }
+
+    // Subtract AI rack
+    for (const t of state.aiRack.tiles) {
+      const face = t.assigned || t.face;
+      if (counts[face]) counts[face].count--;
+    }
+
+    // Subtract opponent rack (if known)
+    if (state.opponentRack && state.opponentRack.tiles) {
+      for (const t of state.opponentRack.tiles) {
+        const face = t.assigned || t.face;
+        if (counts[face]) counts[face].count--;
+      }
+    }
+
+    // Remaining = bag contents
+    const bagTiles = [];
+    for (const face in counts) {
+      for (let i = 0; i < Math.max(0, counts[face].count); i++) {
+        bagTiles.push({ face: face, type: counts[face].type, points: counts[face].points });
+      }
+    }
+    return bagTiles;
+  }
+
+  /**
+   * Check if a set of tiles is likely playable on the board.
+   * "Playable" = has at least 1 number + 1 operator/equals to form a minimal equation,
+   * AND there are anchor cells available to place next to.
+   */
+  function isLikelyPlayable(tiles, board) {
+    if (!tiles || tiles.length === 0) return false;
+
+    let hasNumber = false, hasOp = false, hasEquals = false, hasBlank = false;
+    for (const t of tiles) {
+      if (t.type === 'digit' || t.type === 'twodigit') hasNumber = true;
+      else if (t.type === 'op' || t.type === 'choice') hasOp = true;
+      else if (t.type === 'equals') hasEquals = true;
+      else if (t.type === 'blank') { hasBlank = true; hasNumber = true; hasOp = true; }
+    }
+
+    // Need at least: a number AND (an operator or equals or blank) to extend existing equations
+    if (!hasNumber) return false;
+    if (!hasOp && !hasEquals && !hasBlank) return false;
+
+    // Also check there are anchor cells on the board (empty cells adjacent to tiles)
+    let anchors = 0;
+    for (let r = 0; r < C.BOARD_SIZE && anchors < 3; r++) {
+      for (let c = 0; c < C.BOARD_SIZE && anchors < 3; c++) {
+        if (board.cells[r][c].tile) continue;
+        const adj = Board.getAdjacentTiles(board, r, c);
+        if (adj.length > 0) anchors++;
+      }
+    }
+
+    return anchors > 0;
+  }
+
   window.AMath.aiPlayer = {
     decideMove: decideMove,
     resetPlayCount: resetPlayCount,
