@@ -1998,6 +1998,10 @@
   function wouldCreateX9Threat(board, placements) {
     if (!window.AMath.aiX9) return false;
 
+    // Detect threats BEFORE placement
+    const threatsBefore = window.AMath.aiX9.detectAllThreats(board);
+    const beforeCount = threatsBefore ? threatsBefore.length : 0;
+
     // Simulate: place tiles, check threats, undo
     const placedAt = [];
     try {
@@ -2010,7 +2014,20 @@
 
       // Detect threats AFTER simulated placement
       const threatsAfter = window.AMath.aiX9.detectAllThreats(board);
-      return threatsAfter && threatsAfter.length > 0;
+      const afterCount = threatsAfter ? threatsAfter.length : 0;
+
+      // NEW threat = more threats after than before
+      if (afterCount > beforeCount) return true;
+
+      // Also check if severity increased (same count but worse threats)
+      if (afterCount > 0 && beforeCount > 0) {
+        var maxBefore = 0, maxAfter = 0;
+        for (var i = 0; i < threatsBefore.length; i++) maxBefore = Math.max(maxBefore, threatsBefore[i].severity || 0);
+        for (var j = 0; j < threatsAfter.length; j++) maxAfter = Math.max(maxAfter, threatsAfter[j].severity || 0);
+        if (maxAfter > maxBefore + 30) return true;
+      }
+
+      return false;
     } catch (err) {
       console.error('[AI] wouldCreateX9Threat error:', err);
       return false;
