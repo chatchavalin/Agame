@@ -139,7 +139,7 @@
     // Determine keep targets based on scenario + bag prediction
     let keepOpsTarget = 1;
     let keepSmallTarget = hasEquals ? 2 : 1;
-    let keepEqualsTarget = hasEquals ? 1 : 0;
+    let keepEqualsTarget = hasEquals ? 1 : 0;  // keep 1 = for equations; 2nd = kept situationally
 
     // Bag prediction overlay
     if (bagInfo.opRatio < 0.15) {

@@ -1752,8 +1752,9 @@
         }
         // Excess operators (>2 in rack)
         if ((p.tile.type === 'op' || p.tile.type === 'choice') && rackInfo.ops + rackInfo.choices > 2) dumpScore += 2;
-        // Excess equals (>1 in rack) — in endgame, 1 = is enough
-        if (p.tile.type === 'equals' && rackInfo.eq > 1) dumpScore += 4;
+        // Excess equals (>2 in rack) — 1-2 = is useful for chained equations (e.g. 2+3=5=4+1)
+        // Only 3+ equals is truly excess
+        if (p.tile.type === 'equals' && rackInfo.eq > 2) dumpScore += 3;
         // Bag=0: every tile dumped avoids penalty — bonus for tile points
         if (Bag.bagSize(state.bag) === 0) dumpScore += (p.tile.points || 0);
       }
