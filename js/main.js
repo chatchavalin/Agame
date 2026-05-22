@@ -434,6 +434,15 @@
     const Settings = window.AMath.settings;
     const Interactions = window.AMath.interactions;
 
+    if (chessClockInterval) { clearInterval(chessClockInterval); chessClockInterval = null; }
+    stopStallingWatch();
+    if (window.AMath.saveResume) window.AMath.saveResume.clearSave();
+    if (window.AMath.scoreSheet) window.AMath.scoreSheet.reset();
+    if (window.AMath.modes) window.AMath.modes.setAiTakeover(false);
+
+    const existingPopup = document.querySelector('.game-end-overlay');
+    if (existingPopup) existingPopup.remove();
+
     const board = Board.createBoard();
     const bag = Bag.createBag();
     const p1Rack = Rack.createRack('player1');
@@ -443,6 +452,9 @@
 
     const chessClockEnabled = Settings.get('chessClockEnabled');
     const clockMinutes = Settings.get('chessClockMinutes') || 22;
+
+    const container = document.getElementById('game-container');
+    const uiParts = UI.buildGameLayout(container);
 
     session = {
       board: board,
@@ -467,26 +479,32 @@
       bagEmptyTaunted: false,
       aiActualPlayCount: 0,
       lastOpponentAction: null,
+      uiParts: uiParts,
       onSubmit: handleSubmit,
       onReset: handleReset,
       onPass: handlePass,
       onSwap: handleSwap,
     };
 
-    const uiParts = UI.buildGameLayout(document.getElementById('game-root'), session, {
-      showAiHand: true,
-      opponentLabel: 'Player 2',
-      playerLabel: 'Player 1',
-    });
-    session.uiParts = uiParts;
+    UI.renderScore(uiParts.playerScoreBox, 'P1', 0);
+    UI.renderScore(uiParts.opponentScoreBox, 'P2', 0);
 
     Interactions.init(session);
     Interactions.setPlayerTurn(true);
 
-    UI.renderScore(uiParts.playerScoreBox, 'P1', 0);
-    UI.renderScore(uiParts.opponentScoreBox, 'P2', 0);
+    // Timer display
+    if (chessClockEnabled) {
+      renderTimerWithMirror(uiParts, 'ai', 'P2 Time', clockMinutes * 60);
+      renderTimerWithMirror(uiParts, 'player', 'P1 Time', clockMinutes * 60);
+      startChessClock();
+    } else {
+      setTimerNoClockText(uiParts, 'ai', 'P2 Time');
+      setTimerNoClockText(uiParts, 'player', 'P1 Time');
+    }
 
-    if (chessClockEnabled) startChessClock();
+    // Wire score-pause handlers
+    wireScorePauseHandlers();
+    refreshDesktopSidePanels();
 
     const btnNewGame = document.getElementById('btn-new-game');
     if (btnNewGame) {
@@ -1526,14 +1544,16 @@
       if (session.isPlayerTurn) {
         if (session.playerTimerPaused) return; // pause-by-double-click
         session.playerTimeSeconds -= elapsedSeconds;
+        var pLabel = session.isPvP ? ('P' + (session.currentPlayer || 1) + ' Time') : 'Your Time';
         renderTimerWithMirror(
-          session.uiParts, 'player', 'Your Time', session.playerTimeSeconds
+          session.uiParts, 'player', pLabel, session.playerTimeSeconds
         );
       } else {
         if (session.aiTimerPaused) return; // pause-by-double-click
         session.aiTimeSeconds -= elapsedSeconds;
+        var aLabel = session.isPvP ? ('P' + (3 - (session.currentPlayer || 1)) + ' Time') : 'AI Time';
         renderTimerWithMirror(
-          session.uiParts, 'ai', 'AI Time', session.aiTimeSeconds
+          session.uiParts, 'ai', aLabel, session.aiTimeSeconds
         );
       }
     }, 1000);

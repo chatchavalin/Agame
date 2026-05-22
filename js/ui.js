@@ -385,14 +385,20 @@
 
     // Check if Show AI Hand setting is ON
     let showAiHand = false;
+    let isPvP = false;
     try {
       if (window.AMath && window.AMath.settings && window.AMath.settings.get) {
         showAiHand = window.AMath.settings.get('showAiHand') === true;
       }
+      // PvP mode: always show both racks face-up
+      if (window.AMath._getSession) {
+        var sess = window.AMath._getSession();
+        if (sess) isPvP = !!sess.isPvP;
+      }
     } catch (e) {}
 
-    // If isOpponent (AI rack) AND showAiHand is ON, render face-up
-    const faceDown = isOpponent && !showAiHand;
+    // PvP: both racks face-up. PvA: opponent face-down unless showAiHand is ON
+    const faceDown = isOpponent && !showAiHand && !isPvP;
 
     // Render all RACK_SIZE slots in their physical positions. The rack's
     // slotMap records each tile's assigned slot (0..7); tilesBySlot()
