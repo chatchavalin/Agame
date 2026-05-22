@@ -209,16 +209,14 @@ const BLANK_CHOICES = BLANK_CHOICES_FAST;
 function getBlankChoices() {
   const inventory = getActiveInventory ? getActiveInventory() : TILE_INVENTORY;
   const validFaces = new Set();
-  let hasTwoDigit = false;
   for (const def of inventory) {
     if (def.face !== 'BLANK') validFaces.add(def.face);
-    if (def.type === 'twodigit') hasTwoDigit = true;
   }
-  // Use FULL choices if inventory has two-digit tiles (Mathayom)
-  const baseChoices = hasTwoDigit ? BLANK_CHOICES_FULL : BLANK_CHOICES_FAST;
   // Always-valid: operators and =
   const alwaysValid = new Set(['=', '+', '-', '×', '÷']);
-  return baseChoices.filter(c => alwaysValid.has(c) || validFaces.has(c));
+  // Always use FULL list — inventory filter removes faces not in this tile set
+  // (e.g., Prathom has no 17/18/19 so those are excluded automatically)
+  return BLANK_CHOICES_FULL.filter(c => alwaysValid.has(c) || validFaces.has(c));
 }
 
 // =============================================================================
