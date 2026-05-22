@@ -622,17 +622,32 @@
     }
 
     // === 5. Bingo/YoYo-only mode ===
+    // Both bingo (8 tiles, +40 bonus) and yoyo (×9 line, huge multiplier) yield
+    // high scores. Treat them with EQUAL priority.
     if (bingoYoyoOnlyMode) {
-      // Only allow Bingo or YoYo plays
-      if (bestPlay && (bestPlay.type === 'bingo' || bestPlay.type === 'yoyo' ||
-                       bestPlay.placements.length === 8)) {
+      // Check bestPlay (might be bingo or yoyo from blankAwarePick)
+      if (bestPlay && (bestPlay.placements.length === 8 || bestPlay.type === 'yoyo')) {
         recordPlay(rackOwner);
-        return {
-          type: 'play',
-          placements: bestPlay.placements,
-          score: bestPlay.score,
-          equations: bestPlay.equations,
-        };
+        return makePlayResult(bestPlay);
+      }
+
+      // bestPlay might be a short equation — check yoyoPlay separately
+      if (yoyoPlay && yoyoPlay.score >= 10) {
+        console.log('[AI] Bingo/YoYo-only: yoyo found (' + yoyoPlay.score + ' pts)');
+        recordPlay(rackOwner);
+        return makePlayResult(yoyoPlay);
+      }
+
+      // Check fastBingo and grammarBingo directly
+      if (fastBingoPlay && fastBingoPlay.placements.length === 8) {
+        console.log('[AI] Bingo/YoYo-only: fast bingo (' + fastBingoPlay.score + ' pts)');
+        recordPlay(rackOwner);
+        return makePlayResult(fastBingoPlay);
+      }
+      if (grammarBingoPlay && grammarBingoPlay.placements.length === 8) {
+        console.log('[AI] Bingo/YoYo-only: grammar bingo (' + grammarBingoPlay.score + ' pts)');
+        recordPlay(rackOwner);
+        return makePlayResult(grammarBingoPlay);
       }
 
       // EXCEPTIONS to bingo-only rule — when bingo is unlikely or impossible.
@@ -677,14 +692,13 @@
       //   (b) Bingo composition infeasible
       // AND the best play is worth its BLANK cost.
       //
-      // IMPORTANT: This override is DISABLED during the first 4 actual turns
-      // UNLESS the rack has NO blanks (nothing to preserve by swapping).
-      // The strategy spec is strict: first 4 turns → bingo/yoyo or SWAP.
-      // But if the rack has zero blanks, swapping to "get blanks" is random luck.
-      // Better to play a solid equation than gamble on the draw.
-      const allowOverride = !isFirstFewPlays || blanksInRack === 0;
+      // IMPORTANT: This override is DISABLED during the first few actual turns.
+      // The strategy spec is strict: first turns → bingo/yoyo or SWAP.
+      // The override only applies when bingoYoyoOnly mode was triggered by
+      // being behind 100+ points (after the initial turns).
+      const allowOverride = !isFirstFewPlays;
       const shouldOverride = allowOverride && bestPlay && bestPlay.score >= scoreThreshold &&
-                             (blanksInRack >= 2 || bingoInfeasible || blanksInRack === 0);
+                             (blanksInRack >= 2 || bingoInfeasible);
 
       if (shouldOverride) {
         const reason = blanksInRack >= 2
@@ -744,19 +758,7 @@
         console.log('[AI] Swapping non-BLANKs to preserve BLANKs for yoyo.');
       }
 
-      // No Bingo/YoYo found — but if bestPlay scores decently and uses NO blanks,
-      // play it instead of swapping (nothing to preserve)
-      if (bestPlay && bestPlay.score >= 10) {
-        const bestBlanks = countBlanksInPlay(bestPlay);
-        if (bestBlanks === 0) {
-          console.log('[AI] Bingo-only: no bingo found, but best play uses 0 blanks for ' +
-                      bestPlay.score + ' pts — playing instead of swapping');
-          recordPlay(rackOwner);
-          return makePlayResult(bestPlay);
-        }
-      }
-
-      // Swap if possible, otherwise pass
+      // No Bingo or YoYo found — swap to fish for better tiles
       if (bagSize > C.SWAP_FORBIDDEN_BAG_THRESHOLD) {
         return smartSwap(state);
       }
