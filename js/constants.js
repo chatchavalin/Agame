@@ -203,16 +203,22 @@ const BLANK_CHOICES = BLANK_CHOICES_FAST;
  * regardless of inventory, since they represent abstract math operations.
  * Number assignments are filtered by inventory (in prathom, no 17/18/19 tile faces exist
  * so BLANK can't represent those values).
+ *
+ * For Mathayom: includes two-digit values (10-20) since they are real tiles.
  */
 function getBlankChoices() {
   const inventory = getActiveInventory ? getActiveInventory() : TILE_INVENTORY;
   const validFaces = new Set();
+  let hasTwoDigit = false;
   for (const def of inventory) {
     if (def.face !== 'BLANK') validFaces.add(def.face);
+    if (def.type === 'twodigit') hasTwoDigit = true;
   }
+  // Use FULL choices if inventory has two-digit tiles (Mathayom)
+  const baseChoices = hasTwoDigit ? BLANK_CHOICES_FULL : BLANK_CHOICES_FAST;
   // Always-valid: operators and =
   const alwaysValid = new Set(['=', '+', '-', '×', '÷']);
-  return BLANK_CHOICES.filter(c => alwaysValid.has(c) || validFaces.has(c));
+  return baseChoices.filter(c => alwaysValid.has(c) || validFaces.has(c));
 }
 
 // =============================================================================
