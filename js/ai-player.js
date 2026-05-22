@@ -195,18 +195,22 @@
       ? state.aiActualPlayCount
       : getPlayCount(rackOwner);
     const botLevel = getBotLevel();
+    const tileSet = getStateSetting('tileSet', 'prathom') || 'prathom';
+    const isMathayom = tileSet === 'mathayom';
 
     // Bot level affects bingo enforcement:
     //   easy: no bingo enforcement (play any equation)
     //   normal: first 2 turns only
-    //   hard: first 4 turns (full enforcement)
-    const bingoTurns = botLevel === 'easy' ? 0 : botLevel === 'normal' ? 2 : C.AI_BINGO_MODE_TURNS;
+    //   hard: first 4 turns (prathom) / 3 turns (mathayom — two-digit tiles make bingo harder)
+    const bingoTurns = botLevel === 'easy' ? 0 : botLevel === 'normal' ? 2 : (isMathayom ? 3 : C.AI_BINGO_MODE_TURNS);
     const isFirstFewPlays = aiPlayCount < bingoTurns;
     const isBehind100 = deficit > C.AI_BEHIND_FOR_BINGO_MODE;
     const isBehind140 = deficit >= C.AI_LEAD_FOR_OFFENSE;
     const isLead150 = lead >= C.AI_LEAD_FOR_CLOSE;
     const bingoYoyoOnlyMode = botLevel !== 'easy' && (isFirstFewPlays || isBehind100) && lead <= C.AI_LEAD_FOR_CLOSE;
     const bagSize = Bag.bagSize(state.bag);
+    // Late-game threshold: Mathayom (100 tiles) needs higher threshold to match ~20% of game
+    const lateGameBagThreshold = isMathayom ? 20 : 15;
 
     // === 1. Detect ×9 threat from opponent ===
     let threats = [];
@@ -921,7 +925,7 @@
     //   3. Leading 60+, bad swap odds → play short eq, dump worst tiles
     //   4. Leading <60 / tied → play with rack balance focus
     //   5. Behind → swap for bingo chance
-    if (bagSize > 0 && bagSize <= 15 && !state.isFirstMove && !bingoYoyoOnlyMode && botLevel !== 'easy') {
+    if (bagSize > 0 && bagSize <= lateGameBagThreshold && !state.isFirstMove && !bingoYoyoOnlyMode && botLevel !== 'easy') {
       const lateGameResult = lateGameStrategy(state, bestPlay, bingoPlay, yoyoPlay, bagSize);
       if (lateGameResult) {
         if (lateGameResult.type === 'play') recordPlay(rackOwner);
@@ -988,7 +992,7 @@
       //   3. Bag too small to swap (≤ SWAP_FORBIDDEN_BAG_THRESHOLD) — forced.
       const blanksUsed = bestPlay.placements.filter(p => p.tile && p.tile.type === 'blank').length;
       const isBingo = bestPlay.placements.length === 8;
-      const isEndgame = bagSize <= 15 && !state.isFirstMove;
+      const isEndgame = bagSize <= lateGameBagThreshold && !state.isFirstMove;
 
       if (blanksUsed > 0 && !isBingo && !x9DefenseActive && !isEndgame && botLevel === 'hard') {
         console.log('[AI] BLANK protection: best play uses ' + blanksUsed +
@@ -1093,7 +1097,7 @@
     // If we're about to pass and the bag is small (≤ 15), try a ×0 chain play.
     // Even a 2-point dump is better than passing when the alternative is
     // the 6-pass death spiral or losing the endgame race.
-    if (bagSize <= 15 && !state.isFirstMove) {
+    if (bagSize <= lateGameBagThreshold && !state.isFirstMove) {
       const zeroChains = findZeroChainPlays(state.board, state.aiRack.tiles, false);
       if (zeroChains.length > 0) {
         const best = zeroChains[0]; // sorted by tiles used desc
@@ -1626,7 +1630,9 @@
 
     // Add ×0 chain plays as dump candidates
     const bagSize = Bag.bagSize(state.bag);
-    if (bagSize <= 15) {
+    const dumpTileSet = getStateSetting('tileSet', 'prathom') || 'prathom';
+    const dumpLateThreshold = dumpTileSet === 'mathayom' ? 20 : 15;
+    if (bagSize <= dumpLateThreshold) {
       const zeroChains = findZeroChainPlays(state.board, rack, state.isFirstMove);
       for (const zp of zeroChains) candidates.push(zp);
     }
@@ -1634,6 +1640,7 @@
     // Score each candidate by how many "bad" tiles it dumps
     let best = null;
     let bestDumpScore = -1;
+    const dumpIsMathayom = (getStateSetting('tileSet', 'prathom') || 'prathom') === 'mathayom';
 
     for (const play of candidates) {
       if (play.score < 3) continue; // too weak
@@ -1641,6 +1648,12 @@
       for (const p of play.placements) {
         if (!p.tile) continue;
         if (isHardTile(p.tile)) dumpScore += 3;
+        // Mathayom: extra bonus for dumping hard two-digit tiles (prime/÷5)
+        if (dumpIsMathayom && p.tile.type === 'twodigit') {
+          var face = p.tile.face;
+          if (face === '19' || face === '17' || face === '13' || face === '11') dumpScore += 4; // prime
+          else if (face === '15' || face === '20') dumpScore += 3; // ÷5
+        }
         // Excess operators (>2 in rack)
         if ((p.tile.type === 'op' || p.tile.type === 'choice') && rackInfo.ops + rackInfo.choices > 2) dumpScore += 2;
         // Excess equals (>1 in rack)

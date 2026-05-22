@@ -32,6 +32,20 @@
     '0', '5', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20',
   ]);
 
+  // In Mathayom, two-digit tiles vary in difficulty:
+  //   Easy to use (many factors, keep these): 10, 12, 14, 16, 18
+  //   Hard to use (prime/÷5, swap first): 11, 13, 15, 17, 19, 20
+  const MATHAYOM_EASY_TWODIGIT = new Set(['10', '12', '14', '16', '18']);
+  const MATHAYOM_HARD_TWODIGIT = new Set(['11', '13', '15', '17', '19', '20']);
+
+  // Expendability score for Mathayom two-digit tiles (higher = swap sooner)
+  const MATHAYOM_TWODIGIT_SWAP_PRIORITY = {
+    '19': 100, '17': 95, '13': 90, '11': 85, // primes — hardest to use
+    '15': 80, '20': 75,                        // ÷5 — need a 5 tile
+    '14': 40, '16': 35, '18': 30,              // even composites — easier
+    '12': 25, '10': 20,                         // very flexible — keep longest
+  };
+
   function isSmallNumber(tile) {
     if (!tile || tile.type !== 'digit') return false;
     return SMALL_NUMBER_PRIORITY[tile.face] !== undefined;
@@ -192,6 +206,28 @@
       }
     }
 
+    // 5. Mathayom: keep 1 "easy" two-digit tile IF we have × or ÷ to pair with it
+    const tileSet = (C.getStateSetting || function () { return 'prathom'; })('tileSet', 'prathom');
+    const isMathayom = (function () {
+      try { return (window.AMath.settings.get('tileSet') || 'prathom') === 'mathayom'; } catch (e) { return false; }
+    })();
+    if (isMathayom) {
+      const hasMulDiv = rack.some(function (t) {
+        return t.face === '×' || t.face === '÷' || t.face === '×/÷' || t.type === 'blank';
+      });
+      if (hasMulDiv) {
+        // Keep 1 easy two-digit tile (prefer lowest swap priority = most useful)
+        const easyTwoDigits = rack.filter(function (t) {
+          return t.type === 'twodigit' && MATHAYOM_EASY_TWODIGIT.has(t.face) && !keepIds.has(t.id);
+        }).sort(function (a, b) {
+          return (MATHAYOM_TWODIGIT_SWAP_PRIORITY[a.face] || 50) - (MATHAYOM_TWODIGIT_SWAP_PRIORITY[b.face] || 50);
+        });
+        if (easyTwoDigits.length > 0) {
+          keepIds.add(easyTwoDigits[0].id);
+        }
+      }
+    }
+
     // Swap = everything NOT in keepIds
     const toSwap = rack.filter(function (t) { return !keepIds.has(t.id); }).map(function (t) { return t.id; });
 
@@ -230,7 +266,12 @@
 
         let score; // higher = more swap-worthy
         if (isHardTile(t)) {
-          score = 1000; // most expendable
+          // In Mathayom, differentiate two-digit tiles by difficulty
+          if (isMathayom && t.type === 'twodigit' && MATHAYOM_TWODIGIT_SWAP_PRIORITY[t.face] !== undefined) {
+            score = 900 + MATHAYOM_TWODIGIT_SWAP_PRIORITY[t.face]; // 920-1000 range
+          } else {
+            score = 1000; // most expendable
+          }
         } else if (isEquals(t)) {
           // Duplicate = (face kept elsewhere, but not this id): very expendable
           // Kept = : barely expendable
