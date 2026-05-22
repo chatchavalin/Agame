@@ -801,6 +801,7 @@
 
     wireExportImportButtons();
     wireTileTrackerButton();
+    wireGameLogButton();
 
     // Disable buttons not relevant to AI vs AI
     const btnSubmit = document.getElementById('btn-submit');
@@ -1087,6 +1088,7 @@
 
     wireExportImportButtons();
     wireTileTrackerButton();
+    wireGameLogButton();
     undoHistory = [];
     wireUndoHandler();
 
