@@ -2526,18 +2526,6 @@ body.theme-neon .amath-tile.tile-tentative .tile-points {
   color: #1e293b !important;
 }
 
-/* All tiles on board: ensure readable on dark themes */
-body.theme-dark .amath-cell .amath-tile .tile-face,
-body.theme-dark .amath-cell .amath-tile .tile-points,
-body.theme-ocean .amath-cell .amath-tile .tile-face,
-body.theme-ocean .amath-cell .amath-tile .tile-points,
-body.theme-forest .amath-cell .amath-tile .tile-face,
-body.theme-forest .amath-cell .amath-tile .tile-points,
-body.theme-neon .amath-cell .amath-tile .tile-face,
-body.theme-neon .amath-cell .amath-tile .tile-points {
-  color: #1e293b !important;
-}
-
 /* Auto (takeover) button active state */
 .btn.btn-active {
   background: #dc2626 !important;
