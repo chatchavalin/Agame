@@ -1160,23 +1160,33 @@
     }
 
     // === LAST RESORT: ×0 chain ===
-    // If we're about to pass and the bag is small (≤ 15), try a ×0 chain play.
-    // Even a 2-point dump is better than passing when the alternative is
-    // the 6-pass death spiral or losing the endgame race.
     if (bagSize <= lateGameBagThreshold && !state.isFirstMove) {
       const zeroChains = findZeroChainPlays(state.board, state.aiRack.tiles, false);
       if (zeroChains.length > 0) {
-        const best = zeroChains[0]; // sorted by tiles used desc
+        const best = zeroChains[0];
         console.log('[AI] ×0 chain last resort: ' + best.score + ' pts, ' +
                     best.placements.length + ' tiles (' + (best._chainType || '') + ')');
         recordPlay(rackOwner);
-        return {
-          type: 'play',
-          placements: best.placements,
-          score: best.score,
-          equations: best.equations,
-        };
+        return makePlayResult(best);
       }
+    }
+
+    // === ENDGAME DUMP: bag=0, any play beats passing ===
+    // When bag is empty, tiles in hand = penalty at game end.
+    // Even a 1-point play that dumps 1 tile is worth it.
+    // Re-search with extended time if the main search missed something.
+    if (bagSize === 0 && !state.isFirstMove) {
+      console.log('[AI] Bag=0 emergency: searching for ANY valid dump play...');
+      const dumpStart = Date.now();
+      const dumpPlay = await findBestPlay(state.board, state.aiRack, state.isFirstMove,
+        dumpStart, null, false);
+      if (dumpPlay) {
+        console.log('[AI] Bag=0 dump found: ' + dumpPlay.score + ' pts, ' +
+                    dumpPlay.placements.length + ' tiles');
+        recordPlay(rackOwner);
+        return makePlayResult(dumpPlay);
+      }
+      console.log('[AI] Bag=0: truly no valid play — must pass');
     }
 
     return { type: 'pass' };
