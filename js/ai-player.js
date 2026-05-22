@@ -1630,8 +1630,8 @@
 
     // Add ×0 chain plays as dump candidates
     const bagSize = Bag.bagSize(state.bag);
-    const dumpTileSet = getStateSetting('tileSet', 'prathom') || 'prathom';
-    const dumpLateThreshold = dumpTileSet === 'mathayom' ? 20 : 15;
+    const dumpIsMathayom = (getStateSetting('tileSet', 'prathom') || 'prathom') === 'mathayom';
+    const dumpLateThreshold = dumpIsMathayom ? 20 : 15;
     if (bagSize <= dumpLateThreshold) {
       const zeroChains = findZeroChainPlays(state.board, rack, state.isFirstMove);
       for (const zp of zeroChains) candidates.push(zp);
@@ -1640,7 +1640,6 @@
     // Score each candidate by how many "bad" tiles it dumps
     let best = null;
     let bestDumpScore = -1;
-    const dumpIsMathayom = (getStateSetting('tileSet', 'prathom') || 'prathom') === 'mathayom';
 
     for (const play of candidates) {
       if (play.score < 3) continue; // too weak
