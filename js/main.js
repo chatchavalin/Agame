@@ -537,6 +537,11 @@
     var btnTakeover = document.getElementById('btn-takeover');
     if (btnTakeover) btnTakeover.style.display = 'none';
 
+    // Education mode: start background analysis for P1
+    if (window.AMath.education && window.AMath.settings && window.AMath.settings.get('educationMode')) {
+      window.AMath.education.startBackgroundSearch(session);
+    }
+
     showStatus('🎲 Player vs Player! Player 1 goes first.');
   }
 
@@ -571,6 +576,12 @@
 
     autoSave();
     showStatus('🎲 Player ' + session.currentPlayer + '\'s turn!');
+    if (window.AMath.sounds) window.AMath.sounds.turnStart();
+
+    // Education mode: start background analysis for the new active player
+    if (window.AMath.education && window.AMath.settings && window.AMath.settings.get('educationMode')) {
+      window.AMath.education.startBackgroundSearch(session);
+    }
   }
 
   /**
