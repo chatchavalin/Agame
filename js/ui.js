@@ -336,9 +336,50 @@
     btn.textContent = 'New Game';
     btn.addEventListener('click', function () {
       overlay.remove();
+      // Also remove floating "Show Results" button if present
+      var floatingBtn = document.getElementById('game-end-floating-btn');
+      if (floatingBtn) floatingBtn.remove();
       if (info.onNewGame) info.onNewGame();
     });
     dialog.appendChild(btn);
+
+    // View Board button — hides popup so player can see the final board
+    const viewBoardBtn = document.createElement('button');
+    viewBoardBtn.className = 'btn btn-secondary';
+    viewBoardBtn.textContent = '🔍 View Board';
+    viewBoardBtn.style.marginTop = '8px';
+    viewBoardBtn.style.width = '100%';
+    viewBoardBtn.addEventListener('click', function () {
+      overlay.style.display = 'none';
+      // Show floating button to return to results
+      var existing = document.getElementById('game-end-floating-btn');
+      if (existing) existing.remove();
+      var floatingBar = document.createElement('div');
+      floatingBar.id = 'game-end-floating-btn';
+      floatingBar.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);' +
+        'display:flex;gap:8px;z-index:5000;';
+      var showResultsBtn = document.createElement('button');
+      showResultsBtn.className = 'btn btn-primary';
+      showResultsBtn.textContent = '📊 Show Results';
+      showResultsBtn.style.cssText = 'box-shadow:0 4px 12px rgba(0,0,0,0.3);font-size:14px;padding:10px 20px;';
+      showResultsBtn.addEventListener('click', function () {
+        floatingBar.remove();
+        if (overlay.parentNode) overlay.style.display = '';
+      });
+      var newGameBtn2 = document.createElement('button');
+      newGameBtn2.className = 'btn btn-secondary';
+      newGameBtn2.textContent = '🔄 New Game';
+      newGameBtn2.style.cssText = 'box-shadow:0 4px 12px rgba(0,0,0,0.3);font-size:14px;padding:10px 20px;';
+      newGameBtn2.addEventListener('click', function () {
+        floatingBar.remove();
+        overlay.remove();
+        if (info.onNewGame) info.onNewGame();
+      });
+      floatingBar.appendChild(showResultsBtn);
+      floatingBar.appendChild(newGameBtn2);
+      document.body.appendChild(floatingBar);
+    });
+    dialog.appendChild(viewBoardBtn);
 
     // View Score Sheet button
     const scoreSheetBtn = document.createElement('button');
