@@ -52,10 +52,13 @@
     const cells = getLineCells(board, line);
 
     // 3 patterns: (0,7), (7,14), (0,14)
+    // maxEmpty = max empty cells BETWEEN endpoints that still allow a threat
+    // Player has 8 tiles. Pattern (0,7): 8 cells (0-7), between = 6. All 6 can be empty.
+    // Pattern (7,14): same. Pattern (0,14): 15 cells, 8 tiles can't fill all.
     const patterns = [
-      { a: 0, b: 7, maxEmpty: 5 },
-      { a: 7, b: 14, maxEmpty: 5 },
-      { a: 0, b: 14, maxEmpty: 6 }, // entire line allows ≤6
+      { a: 0, b: 7, maxEmpty: 6 },
+      { a: 7, b: 14, maxEmpty: 6 },
+      { a: 0, b: 14, maxEmpty: 6 },
     ];
 
     for (const p of patterns) {
@@ -70,11 +73,14 @@
       const totalBetween = p.b - p.a - 1;
       const nonEmptyBetween = totalBetween - emptyBetween;
 
-      // Skip if too few empty cells between (whole span filled = no threat)
-      // Or all empty (no adjacent tile to hook onto)
-      if (nonEmptyBetween < 1 && p.a !== 0 && p.b !== 14) {
-        // Need subrim check (Case 3.2)
-        if (!hasSubrimAdjacent(board, line, p.a, p.b)) continue;
+      // Need a hook: at least one tile between, OR a tile adjacent to either endpoint,
+      // OR a subrim tile adjacent to the line
+      if (nonEmptyBetween < 1) {
+        // Check for tiles just outside the pattern range (e.g., position 8 for pattern 0-7)
+        const hasHookBeyondA = p.a > 0 && cells[p.a - 1].tile;
+        const hasHookBeyondB = p.b < 14 && cells[p.b + 1].tile;
+        const hasSubrim = hasSubrimAdjacent(board, line, p.a, p.b);
+        if (!hasHookBeyondA && !hasHookBeyondB && !hasSubrim) continue;
       }
 
       // Apply max empty constraint
