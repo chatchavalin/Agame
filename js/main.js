@@ -2322,7 +2322,14 @@
     }
   }
 
+  var _aiTurnRunning = false;
+
   function runAiTurn() {
+    if (_aiTurnRunning) {
+      console.warn('[AI] runAiTurn called while already running — skipping');
+      return;
+    }
+    _aiTurnRunning = true;
     const Interactions = window.AMath.interactions;
     const workerAvailable = window.AMath.aiWorkerClient && window.AMath.aiWorkerClient.isAvailable();
     const AI = workerAvailable ? window.AMath.aiWorkerClient : window.AMath.aiPlayer;
@@ -2330,7 +2337,7 @@
       console.warn('[AI] Web Worker unavailable — running on main thread (UI may lag)');
     }
 
-    if (session.gameOver) return;
+    if (session.gameOver) { _aiTurnRunning = false; return; }
 
     showThinking(true);
 
@@ -2361,6 +2368,7 @@
         // Detect stale decision (game was reset/ended/undone during AI thinking)
         if (session !== sessionAtStart || !session || session.gameOver || undoGeneration !== genAtStart) {
           console.log('[AI] decision dropped — session changed during thinking');
+          _aiTurnRunning = false;
           return;
         }
 
@@ -2374,11 +2382,14 @@
         }
 
         executeAiDecision(aiDecision);
+        _aiTurnRunning = false;
       } catch (err) {
+        _aiTurnRunning = false;
         // If game was reset during AI thinking (worker terminated, session changed),
         // silently drop this stale error rather than disrupting the new game.
         if (session !== sessionAtStart || !session || session.gameOver || undoGeneration !== genAtStart) {
           console.log('[AI] stale error dropped (game ended/reset during thinking)');
+          _aiTurnRunning = false;
           return;
         }
         console.error('AI error:', err);
@@ -2387,16 +2398,25 @@
         showStatus('AI error — your turn. (' + (err && err.message || 'unknown') + ')', 'error');
         saveUndoSnapshot();
         Interactions.setPlayerTurn(true);
+        _aiTurnRunning = false;
       }
     }, 100);
   }
 
   function executeAiDecision(decision) {
+    // Guard: don't execute if it's the player's turn AND auto mode is OFF (stale AI result)
+    const Interactions = window.AMath.interactions;
+    var Modes = window.AMath.modes;
+    var isTakeover = Modes && Modes.isAiTakeover && Modes.isAiTakeover();
+    if (!isTakeover && Interactions && Interactions.getState && Interactions.getState().isPlayerTurn) {
+      console.warn('[AI] executeAiDecision called during player turn — dropping stale result');
+      showThinking(false);
+      return;
+    }
     const Board = window.AMath.board;
     const Rack = window.AMath.rack;
     const Bag = window.AMath.bag;
     const UI = window.AMath.ui;
-    const Interactions = window.AMath.interactions;
 
     showThinking(false);
 
@@ -2587,8 +2607,7 @@
     }
 
     // If AI Takeover toggle is ON, play the player's turn automatically
-    const Modes = window.AMath.modes;
-    if (Modes.isAiTakeover() && !session.gameOver) {
+    if (Modes && Modes.isAiTakeover() && !session.gameOver) {
       setTimeout(runAiTakeoverTurn, 800);
     }
   }

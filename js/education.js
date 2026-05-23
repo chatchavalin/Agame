@@ -64,14 +64,18 @@
     if (!AI || !AI.decideMove) return { plays: [], swapAdvice: null, endgamePlan: null };
 
     // Build complete rack (including tentative tiles)
-    var virtualRack = { owner: 'player', tiles: session.playerRack.tiles.slice() };
+    // CRITICAL: deep clone tiles — AI search mutates .assigned during permutation
+    var virtualRack = { owner: 'player', tiles: session.playerRack.tiles.map(function(t) {
+      return { id: t.id, face: t.face, type: t.type, points: t.points, assigned: t.assigned };
+    }) };
     var tentativeIds = new Set();
     if (session.tentativePlacements) {
       for (var i = 0; i < session.tentativePlacements.length; i++) {
         var tp = session.tentativePlacements[i];
         var cell = session.board.cells[tp.row][tp.col];
         if (cell && cell.tile) {
-          virtualRack.tiles.push(cell.tile);
+          virtualRack.tiles.push({ id: cell.tile.id, face: cell.tile.face, type: cell.tile.type,
+            points: cell.tile.points, assigned: cell.tile.assigned });
           tentativeIds.add(cell.tile.id);
         }
       }
