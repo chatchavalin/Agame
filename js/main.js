@@ -2020,8 +2020,11 @@
     // Revert the play 1.2s after the reveal
     setTimeout(function () {
       if (!stillCurrent()) return;
-      // Return tiles from board to rack
+      // Return tiles from board to rack AND restore premium squares
       for (const p of submittedPlacements) {
+        // Restore premium square before removing tile
+        const cell = Board.getCell(sess.board, p.row, p.col);
+        if (cell) cell.premiumUsed = false;
         const tile = Board.removeTile(sess.board, p.row, p.col);
         if (tile) {
           tile.assigned = null;

@@ -22,6 +22,7 @@
   const Rack = window.AMath.rack;
   const Placement = window.AMath.placement;
   const Evaluator = window.AMath.evaluator;
+  const C = window.AMath.constants;
 
   /**
    * Verify whether a play was legitimate by re-running validation on a snapshot.
@@ -52,6 +53,23 @@
   function revertPlay(state, playRecord) {
     // Remove tiles from board, return to opponent's rack
     const targetRack = playRecord.wasOpponent === 'player' ? state.playerRack : state.aiRack;
+    const Bag = window.AMath.bag;
+
+    // If rack is full (was refilled after the play), return excess tiles to bag first
+    // to make room for the reverted tiles
+    const tilesNeeded = playRecord.placements.length;
+    const excessTiles = [];
+    while (targetRack.tiles.length + tilesNeeded > C.RACK_SIZE && targetRack.tiles.length > 0) {
+      const excessTile = targetRack.tiles.pop();
+      // Remove from slotMap
+      if (targetRack.slotMap) delete targetRack.slotMap[excessTile.id];
+      excessTiles.push(excessTile);
+    }
+    // Return excess tiles to bag
+    if (excessTiles.length > 0 && Bag && state.bag) {
+      Bag.returnTiles(state.bag, excessTiles);
+    }
+
     for (const p of playRecord.placements) {
       const tile = Board.removeTile(state.board, p.row, p.col);
       if (tile) {
