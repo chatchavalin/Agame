@@ -537,12 +537,12 @@
     const validation = Placement.validatePlay(tempBoard, placements, state.isFirstMove);
     let score = 0;
     let equations = [];
-    let valid = validation.valid;
-    if (valid) {
+    let valid = validation.ok;
+    if (valid && validation.equations) {
       try {
-        const scoreResult = Scoring.computeScore(tempBoard, placements);
+        const scoreResult = Scoring.scorePlay(validation.equations, tempBoard, placements.length);
         score = scoreResult.total;
-        equations = scoreResult.equations || [];
+        equations = validation.equations;
       } catch (e) {
         valid = false;
       }
