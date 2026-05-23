@@ -79,7 +79,7 @@
    */
   function applyTheme(themeName) {
     const body = document.body;
-    body.classList.remove('theme-modern', 'theme-physical', 'theme-dark', 'theme-playful', 'theme-capture', 'theme-ocean', 'theme-forest', 'theme-sunset', 'theme-neon');
+    body.classList.remove('theme-modern', 'theme-physical', 'theme-dark', 'theme-playful', 'theme-capture', 'theme-ocean', 'theme-forest', 'theme-sunset', 'theme-neon', 'theme-sakura', 'theme-volcano', 'theme-arctic');
     body.classList.add('theme-' + themeName);
   }
 
@@ -214,6 +214,9 @@
       '<option value="forest"' + (current.theme === 'forest' ? ' selected' : '') + '>🌲 Forest</option>' +
       '<option value="sunset"' + (current.theme === 'sunset' ? ' selected' : '') + '>🌅 Sunset</option>' +
       '<option value="neon"' + (current.theme === 'neon' ? ' selected' : '') + '>💜 Neon</option>' +
+      '<option value="sakura"' + (current.theme === 'sakura' ? ' selected' : '') + '>🌸 Cherry Blossom</option>' +
+      '<option value="volcano"' + (current.theme === 'volcano' ? ' selected' : '') + '>🔥 Volcano</option>' +
+      '<option value="arctic"' + (current.theme === 'arctic' ? ' selected' : '') + '>❄️ Arctic</option>' +
       '</select>';
     dialog.appendChild(themeRow);
 

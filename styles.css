@@ -1893,7 +1893,11 @@ body.theme-capture .amath-board .amath-tile .tile-points {
   font-size: 16px;
 }
 
-body.theme-dark .score-sheet-totals {
+body.theme-dark .score-sheet-totals,
+body.theme-neon .score-sheet-totals,
+body.theme-ocean .score-sheet-totals,
+body.theme-forest .score-sheet-totals,
+body.theme-volcano .score-sheet-totals {
   background: #0f172a;
 }
 
@@ -1911,7 +1915,11 @@ body.theme-dark .score-sheet-totals {
   border-bottom: 1px solid var(--border-medium);
 }
 
-body.theme-dark .score-sheet-table th {
+body.theme-dark .score-sheet-table th,
+body.theme-neon .score-sheet-table th,
+body.theme-ocean .score-sheet-table th,
+body.theme-forest .score-sheet-table th,
+body.theme-volcano .score-sheet-table th {
   background: #0f172a;
 }
 
@@ -2505,13 +2513,15 @@ body.theme-neon {
 /* Dark-like overrides for ocean, forest, neon (dark background themes) */
 body.theme-ocean .desktop-side-panel,
 body.theme-forest .desktop-side-panel,
-body.theme-neon .desktop-side-panel {
+body.theme-neon .desktop-side-panel,
+body.theme-volcano .desktop-side-panel {
   background: var(--bg-card);
   border-color: var(--border-medium);
 }
 body.theme-ocean .status-card,
 body.theme-forest .status-card,
-body.theme-neon .status-card {
+body.theme-neon .status-card,
+body.theme-volcano .status-card {
   background: var(--bg-card);
   border-color: var(--border-medium);
 }
@@ -2534,12 +2544,15 @@ body.theme-ocean .amath-tile.tile-blank-on-board .tile-points,
 body.theme-forest .amath-tile.tile-blank-on-board .tile-face,
 body.theme-forest .amath-tile.tile-blank-on-board .tile-points,
 body.theme-neon .amath-tile.tile-blank-on-board .tile-face,
-body.theme-neon .amath-tile.tile-blank-on-board .tile-points {
+body.theme-neon .amath-tile.tile-blank-on-board .tile-points,
+body.theme-volcano .amath-tile.tile-blank-on-board .tile-face,
+body.theme-volcano .amath-tile.tile-blank-on-board .tile-points {
   color: #1e293b !important;
 }
 body.theme-ocean .amath-tile.tile-blank-on-board,
 body.theme-forest .amath-tile.tile-blank-on-board,
-body.theme-neon .amath-tile.tile-blank-on-board {
+body.theme-neon .amath-tile.tile-blank-on-board,
+body.theme-volcano .amath-tile.tile-blank-on-board {
   background: #fef3c7;
   border-color: #f97316;
 }
@@ -2552,7 +2565,9 @@ body.theme-ocean .amath-tile.tile-tentative .tile-points,
 body.theme-forest .amath-tile.tile-tentative .tile-face,
 body.theme-forest .amath-tile.tile-tentative .tile-points,
 body.theme-neon .amath-tile.tile-tentative .tile-face,
-body.theme-neon .amath-tile.tile-tentative .tile-points {
+body.theme-neon .amath-tile.tile-tentative .tile-points,
+body.theme-volcano .amath-tile.tile-tentative .tile-face,
+body.theme-volcano .amath-tile.tile-tentative .tile-points {
   color: #1e293b !important;
 }
 
@@ -2561,4 +2576,87 @@ body.theme-neon .amath-tile.tile-tentative .tile-points {
   background: #dc2626 !important;
   color: white !important;
   border-color: #b91c1c !important;
+}
+
+/* =============================================================================
+   🌸 CHERRY BLOSSOM THEME — soft pinks, Japanese aesthetic
+   ============================================================================= */
+body.theme-sakura {
+  --bg-page: #fdf2f8;
+  --bg-card: #fff1f2;
+  --text-primary: #831843;
+  --text-secondary: #be185d;
+  --border-light: #fce7f3;
+  --border-medium: #f9a8d4;
+  --cell-plain: #fff1f2;
+  --cell-border: #fda4af;
+  --cell-3E: #e11d48;
+  --cell-2E: #f9a8d4;
+  --cell-2E-text: #831843;
+  --cell-3T: #be185d;
+  --cell-2T: #f472b6;
+  --tile-bg: #ffe4e6;
+  --tile-border: #fb7185;
+  --tile-text: #881337;
+  --tile-points: #9f1239;
+  --btn-primary-bg: #e11d48;
+  --btn-primary-hover: #f43f5e;
+}
+
+/* =============================================================================
+   🔥 VOLCANO THEME — dark ember, molten lava accents
+   ============================================================================= */
+body.theme-volcano {
+  --bg-page: #1a0a0a;
+  --bg-card: #2d1010;
+  --text-primary: #fef2f2;
+  --text-secondary: #fca5a5;
+  --border-light: #450a0a;
+  --border-medium: #7f1d1d;
+  --cell-plain: #1c0f0f;
+  --cell-border: #450a0a;
+  --cell-3E: #ef4444;
+  --cell-2E: #f97316;
+  --cell-2E-text: #1a0a0a;
+  --cell-3T: #b91c1c;
+  --cell-2T: #ea580c;
+  --tile-bg: #fef3c7;
+  --tile-border: #d97706;
+  --tile-text: #1c1917;
+  --tile-points: #78716c;
+  --score-bg: #2d1010;
+  --score-border: #7f1d1d;
+  --timer-normal: #fef2f2;
+  --btn-primary-bg: #dc2626;
+  --btn-primary-hover: #ef4444;
+  --btn-secondary-bg: #450a0a;
+  --btn-secondary-text: #fef2f2;
+  --btn-secondary-hover: #7f1d1d;
+  --btn-disabled-bg: #1a0a0a;
+  --btn-disabled-text: #450a0a;
+}
+
+/* =============================================================================
+   ❄️ ARCTIC THEME — clean ice blue, crisp whites
+   ============================================================================= */
+body.theme-arctic {
+  --bg-page: #f0f9ff;
+  --bg-card: #f8fafc;
+  --text-primary: #0c4a6e;
+  --text-secondary: #0369a1;
+  --border-light: #bae6fd;
+  --border-medium: #7dd3fc;
+  --cell-plain: #f0f9ff;
+  --cell-border: #bae6fd;
+  --cell-3E: #dc2626;
+  --cell-2E: #38bdf8;
+  --cell-2E-text: #0c4a6e;
+  --cell-3T: #0284c7;
+  --cell-2T: #0ea5e9;
+  --tile-bg: #e0f2fe;
+  --tile-border: #0284c7;
+  --tile-text: #0c4a6e;
+  --tile-points: #0369a1;
+  --btn-primary-bg: #0284c7;
+  --btn-primary-hover: #0ea5e9;
 }
