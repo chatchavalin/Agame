@@ -329,24 +329,45 @@
     const rackBlanks = state.aiRack.tiles.filter(t => t.type === 'blank').length;
     const hasMultiBlanks = rackBlanks >= 2;
 
-    const bingoPlay = await findBestPlay(state.board, state.aiRack, state.isFirstMove, startTime, threats, bingoFeasible);
-    _searchTopPlays = bingoPlay && bingoPlay._topPlays ? bingoPlay._topPlays.slice() : [];
-    _lastTopPlays = _searchTopPlays; // persist at module level for education module
     const timeBudget = getTimeBudgetMs();
+
+    // Reserve 15% of budget (min 10s) for yoyo — it's high-value and must always run
+    const yoyoReserveMs = window.AMath.aiYoyo ? Math.max(10000, Math.floor(timeBudget * 0.15)) : 0;
+    const findBestBudgetMs = timeBudget - yoyoReserveMs;
+
+    // Temporarily reduce time budget so findBestPlay leaves room for yoyo
+    const origThinkSeconds = _stateSettings ? _stateSettings.aiThinkSeconds : null;
+    if (_stateSettings && yoyoReserveMs > 0) {
+      _stateSettings.aiThinkSeconds = Math.floor(findBestBudgetMs / 1000);
+    }
+
+    const bingoPlay = await findBestPlay(state.board, state.aiRack, state.isFirstMove, startTime, threats, bingoFeasible);
+
+    // Restore original time budget
+    if (_stateSettings && origThinkSeconds !== null) {
+      _stateSettings.aiThinkSeconds = origThinkSeconds;
+    }
+
+    _searchTopPlays = bingoPlay && bingoPlay._topPlays ? bingoPlay._topPlays.slice() : [];
+    _lastTopPlays = _searchTopPlays;
+
+    // Yoyo search — ALWAYS runs with reserved budget
     let yoyoPlay = null;
-    if (window.AMath.aiYoyo && (Date.now() - startTime) < timeBudget - 5000) {
-      const baseRemaining = Math.max(2000, timeBudget - (Date.now() - startTime));
-      // With 2+ blanks: give yoyo 50% more time — it's the priority play type
-      // Cap at total remaining so we don't exceed AI time budget
-      const yoyoBudget = hasMultiBlanks
-        ? Math.min(baseRemaining * 1.5, timeBudget - (Date.now() - startTime))
-        : baseRemaining;
+    if (window.AMath.aiYoyo) {
+      const yoyoTimeLeft = Math.max(yoyoReserveMs, timeBudget - (Date.now() - startTime));
+      const yoyoBudget = hasMultiBlanks ? yoyoTimeLeft : yoyoTimeLeft;
+      console.log('[AI] Yoyo search: budget=' + Math.round(yoyoBudget / 1000) + 's');
       yoyoPlay = window.AMath.aiYoyo.findBestYoYo({
         board: state.board,
         aiRack: state.aiRack,
         isFirstMove: state.isFirstMove,
         _maxTimeMs: yoyoBudget,
       });
+      if (yoyoPlay) {
+        console.log('[AI] YoYo found: score=' + yoyoPlay.score + ' tiles=' + yoyoPlay.placements.length);
+      } else {
+        console.log('[AI] YoYo: no valid extension found');
+      }
     }
 
     // Count blanks used by each play
@@ -386,6 +407,15 @@
     if (grammarBingoPlay) {
       bestPlay = blankAwarePick(bestPlay, grammarBingoPlay);
     }
+
+    // Log comparison for debugging
+    console.log('[AI] Play comparison:',
+      'bingo=' + (bingoPlay ? bingoPlay.score + '/' + bingoPlay.placements.length + 't' : 'none'),
+      'yoyo=' + (yoyoPlay ? yoyoPlay.score + '/' + yoyoPlay.placements.length + 't' : 'none'),
+      'fast=' + (fastBingoPlay ? fastBingoPlay.score : 'none'),
+      'grammar=' + (grammarBingoPlay ? grammarBingoPlay.score : 'none'),
+      '→ best=' + (bestPlay ? bestPlay.score + '/' + bestPlay.placements.length + 't' : 'none')
+    );
 
     if (hasMultiBlanks && bestPlay) {
       console.log('[AI] Multi-blank rack (' + rackBlanks + ' blanks): best=' +

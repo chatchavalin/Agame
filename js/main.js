@@ -2424,7 +2424,13 @@
     if (window.AMath.gameLog) {
       var aiLogMsg = 'AI ' + decision.type;
       if (decision.type === 'play') aiLogMsg += ' ' + decision.score + 'pts (' + decision.placements.length + ' tiles)';
+      if (decision._topPlays && decision._topPlays.length > 0) {
+        aiLogMsg += ' | top: ' + decision._topPlays.slice(0, 3).map(function(p) {
+          return p.score + 'pts/' + p.placements.length + 't';
+        }).join(', ');
+      }
       window.AMath.gameLog.log(aiLogMsg);
+      window.AMath.gameLog.logState('After AI decision', session);
     }
 
     if (decision.type === 'play') {
