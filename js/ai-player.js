@@ -2014,9 +2014,21 @@
   function wouldCreateX9Threat(board, placements) {
     if (!window.AMath.aiX9) return false;
 
+    // Helper: create unique key for a threat (line identity + pattern endpoints)
+    function threatKey(t) {
+      var line = t.line || {};
+      var lineId = (line.type || '') + (line.index !== undefined ? line.index : '');
+      var a = t.positionA || {};
+      var b = t.positionB || {};
+      return lineId + ':' + a.row + ',' + a.col + '-' + b.row + ',' + b.col;
+    }
+
     // Detect threats BEFORE placement
     const threatsBefore = window.AMath.aiX9.detectAllThreats(board);
-    const beforeCount = threatsBefore ? threatsBefore.length : 0;
+    const beforeKeys = new Set();
+    if (threatsBefore) {
+      for (var i = 0; i < threatsBefore.length; i++) beforeKeys.add(threatKey(threatsBefore[i]));
+    }
 
     // Simulate: place tiles, check threats, undo
     const placedAt = [];
@@ -2030,17 +2042,19 @@
 
       // Detect threats AFTER simulated placement
       const threatsAfter = window.AMath.aiX9.detectAllThreats(board);
-      const afterCount = threatsAfter ? threatsAfter.length : 0;
+      if (!threatsAfter || threatsAfter.length === 0) return false;
 
-      // NEW threat = more threat LINES after than before
-      // Don't compare severity — placing tiles on an already-threatened line
-      // increases severity but actually BLOCKS it (more tiles = less room for opponent)
-      return afterCount > beforeCount;
+      // Check for NEW threats — keys that didn't exist before
+      for (var j = 0; j < threatsAfter.length; j++) {
+        if (!beforeKeys.has(threatKey(threatsAfter[j]))) {
+          return true; // genuinely new threat
+        }
+      }
+      return false;
     } catch (err) {
       console.error('[AI] wouldCreateX9Threat error:', err);
       return false;
     } finally {
-      // Always restore the board, even on error
       for (const pa of placedAt) {
         window.AMath.board.removeTile(board, pa.row, pa.col);
       }

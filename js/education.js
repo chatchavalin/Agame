@@ -168,7 +168,19 @@
         function checkThreats(play) {
           var X9 = window.AMath.aiX9;
           if (!X9 || !Board) return { x9: false, x4: false };
+
+          function threatKey(t) {
+            var line = t.line || {};
+            var lineId = (line.type || '') + (line.index !== undefined ? line.index : '');
+            var a = t.positionA || {};
+            var b = t.positionB || {};
+            return lineId + ':' + a.row + ',' + a.col + '-' + b.row + ',' + b.col;
+          }
+
           var threatsBefore = X9.detectAllThreats(cleanBoard);
+          var beforeKeys = new Set();
+          for (var bi = 0; bi < threatsBefore.length; bi++) beforeKeys.add(threatKey(threatsBefore[bi]));
+
           for (var pi = 0; pi < play.placements.length; pi++) {
             Board.placeTile(cleanBoard, play.placements[pi].row, play.placements[pi].col, play.placements[pi].tile);
           }
@@ -176,9 +188,12 @@
           for (var ri = play.placements.length - 1; ri >= 0; ri--) {
             Board.removeTile(cleanBoard, play.placements[ri].row, play.placements[ri].col);
           }
-          // Only count NEW threat lines — don't compare severity
-          // Placing tiles on already-threatened line blocks it, not worsens it
-          return { x9: threatsAfter.length > threatsBefore.length };
+
+          var hasNew = false;
+          for (var ai = 0; ai < threatsAfter.length; ai++) {
+            if (!beforeKeys.has(threatKey(threatsAfter[ai]))) { hasNew = true; break; }
+          }
+          return { x9: hasNew };
         }
 
         // Primary play (always included)
