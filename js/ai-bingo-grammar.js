@@ -858,7 +858,7 @@
           if (!valid || placements.length !== 8) continue;
 
           const validation = validateFirstMove(state.board, placements);
-          if (!validation.valid) continue;
+          if (!validation.ok) continue;
 
           const score = scoreBingoOnBoard(state.board, placements, validation.equations);
           if (score > bestScore) {
@@ -1081,7 +1081,7 @@
 
           // Validate on board
           const validation = validatePlacementsOnBoard(state.board, placements);
-          if (!validation.valid) continue;
+          if (!validation.ok) continue;
 
           // Score
           const score = scoreBingo(state.board, placements, validation.equations);
@@ -1291,7 +1291,7 @@
         if (!placements || placements.length !== 8) continue;
 
         const validation = validatePlacementsOnBoard(state.board, placements);
-        if (!validation.valid) continue;
+        if (!validation.ok) continue;
 
         const score = scoreBingo(state.board, placements, validation.equations);
         if (score > bestScore) {

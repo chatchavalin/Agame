@@ -235,7 +235,7 @@
 
         // Final validation
         const validation = validatePlacements(state.board, placements);
-        if (!validation.valid) {
+        if (!validation.ok) {
           if (window._FAST_DEBUG) console.log('[Debug] pattern', tmplStr, '→', result.faces.join(' '), 'validation failed:', validation.reason);
           continue;
         }
