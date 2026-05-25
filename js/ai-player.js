@@ -434,6 +434,36 @@
     _stateSettings = state._settings || null;
     _isEducationMode = !!(state && state._isEducation);
 
+    // =====================================================================
+    // CRITICAL: deep-clone the AI rack so the search can mutate tile.assigned
+    // freely without ever touching the live player-visible rack.
+    //
+    // The AI's search paths (findBestPlay, ai-yoyo, ai-bingo-fast,
+    // ai-bingo-grammar, pattern engines) all temporarily assign faces to
+    // BLANK and CHOICE tiles during permutation, then restore. If ANY
+    // early-return path leaves a tile mid-mutation — even briefly — the
+    // user's UI can render a blank as a permanent number, or a +/- tile
+    // can flip face mid-game.
+    //
+    // Education mode already clones (js/education.js). The real-game path
+    // must do the same. See PROJECT-BIBLE §6, §15 and the regression
+    // history (Blank changes face — Education used .slice()).
+    //
+    // We rebind `state.aiRack` locally; the caller's session.aiRack is
+    // untouched. Tile identity is preserved via `id`, so downstream
+    // main.js commit (Rack.removeTile by id) still works.
+    // =====================================================================
+    if (state && state.aiRack && state.aiRack.tiles) {
+      state = Object.assign({}, state, {
+        aiRack: {
+          owner: state.aiRack.owner,
+          tiles: state.aiRack.tiles.map(function (t) {
+            return { id: t.id, face: t.face, type: t.type, points: t.points, assigned: t.assigned };
+          }),
+        },
+      });
+    }
+
     // Top plays tracked during search — attached to the final decision for education mode
     var _searchTopPlays = null;
 
@@ -3558,26 +3588,35 @@
   // ============================================================================
 
   function tryPlay(board, placements, isFirstMove) {
-    for (const p of placements) Board.placeTile(board, p.row, p.col, p.tile);
+    // Track which placements actually made it onto the board so we can ALWAYS
+    // remove them in `finally`, even if Board.placeTile / validatePlay /
+    // scorePlay throws partway through. Without this guard, a throw between
+    // the place loop and the remove loop would leave phantom tiles on the
+    // live board, silently corrupting later searches.
+    const applied = [];
+    try {
+      for (const p of placements) {
+        Board.placeTile(board, p.row, p.col, p.tile);
+        applied.push(p);
+      }
 
-    const validate = Placement.validatePlay(board, placements, isFirstMove);
+      const validate = Placement.validatePlay(board, placements, isFirstMove);
+      if (!validate.ok) return null;
 
-    if (!validate.ok) {
-      for (const p of placements) Board.removeTile(board, p.row, p.col);
-      return null;
+      const scoreResult = Scoring.scorePlay(validate.equations, board, placements.length);
+
+      return {
+        placements: placements.map((p) => ({
+          row: p.row, col: p.col, tile: p.tile, assigned: p.tile.assigned,
+        })),
+        equations: validate.equations,
+        score: scoreResult.total,
+      };
+    } finally {
+      // Remove only what we actually placed — leaves the board exactly as it
+      // was on entry, no matter which line above threw.
+      for (const p of applied) Board.removeTile(board, p.row, p.col);
     }
-
-    const scoreResult = Scoring.scorePlay(validate.equations, board, placements.length);
-
-    for (const p of placements) Board.removeTile(board, p.row, p.col);
-
-    return {
-      placements: placements.map((p) => ({
-        row: p.row, col: p.col, tile: p.tile, assigned: p.tile.assigned,
-      })),
-      equations: validate.equations,
-      score: scoreResult.total,
-    };
   }
 
   window.AMath = window.AMath || {};
@@ -3593,12 +3632,23 @@
       counts[def.face] = { count: def.count, type: def.type, points: def.points };
     }
 
+    // Helper: get the inventory key for a tile.
+    // Inventory is keyed by the ORIGINAL face — 'BLANK', '+/-', '×/÷', '5', '+', etc.
+    // For a played blank (face='BLANK', assigned='5'), we must subtract from
+    // the BLANK slot, NOT the '5' slot. Same for choice tiles. Using
+    // `tile.assigned || tile.face` is wrong here (it was a bug — would
+    // miscount the bag composition by attributing played blanks/choices to
+    // the assigned face's inventory slot).
+    function inventoryKey(tile) {
+      return tile.face;
+    }
+
     // Subtract board tiles
     for (let r = 0; r < C.BOARD_SIZE; r++) {
       for (let c = 0; c < C.BOARD_SIZE; c++) {
         const cell = state.board.cells[r][c];
         if (cell.tile) {
-          const face = cell.tile.assigned || cell.tile.face;
+          const face = inventoryKey(cell.tile);
           if (counts[face]) counts[face].count--;
         }
       }
@@ -3606,14 +3656,14 @@
 
     // Subtract AI rack
     for (const t of state.aiRack.tiles) {
-      const face = t.assigned || t.face;
+      const face = inventoryKey(t);
       if (counts[face]) counts[face].count--;
     }
 
     // Subtract opponent rack (if known)
     if (state.opponentRack && state.opponentRack.tiles) {
       for (const t of state.opponentRack.tiles) {
-        const face = t.assigned || t.face;
+        const face = inventoryKey(t);
         if (counts[face]) counts[face].count--;
       }
     }
