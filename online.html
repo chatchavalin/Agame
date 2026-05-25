@@ -56,13 +56,10 @@
       <div class="room-code-display" id="room-code" onclick="copyRoomCode()">…</div>
     </div>
 
-    <div class="mvp-warning">
-      ⚠️ <b>Beta — MVP build:</b> 2P online uses Firestore for sync.
-      Room creation, joining, and live status update work.
-      Full move synchronization in the board is the next iteration.
-      For now, this screen confirms the connection and shows live presence.
-    </div>
-
+    <!-- Player cards & MVP warning hidden when the game is in progress -
+         the PvA-style layout below shows player names + scores natively.
+         These cards are still rendered (for the waiting screen) but hidden
+         while playing. -->
     <div class="players-row" id="players-row">
       <div class="player-card" id="host-card">
         <div style="width:36px;height:36px;border-radius:50%;background:#334155;"></div>
@@ -92,20 +89,20 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <script src="js/firebase-config.js?v=20260525n"></script>
+  <script src="js/firebase-config.js?v=20260525o"></script>
   <!-- Game-core modules required by the online controller -->
-  <script src="js/constants.js?v=20260525n"></script>
-  <script src="js/utils.js?v=20260525n"></script>
-  <script src="js/evaluator.js?v=20260525n"></script>
-  <script src="js/bag.js?v=20260525n"></script>
-  <script src="js/rack.js?v=20260525n"></script>
-  <script src="js/board.js?v=20260525n"></script>
-  <script src="js/scoring.js?v=20260525n"></script>
-  <script src="js/placement.js?v=20260525n"></script>
-  <script src="js/ui.js?v=20260525n"></script>
-  <script src="js/online-room.js?v=20260525n"></script>
-  <script src="js/game-bridge.js?v=20260525n"></script>
-  <script src="js/online-game.js?v=20260525n"></script>
+  <script src="js/constants.js?v=20260525o"></script>
+  <script src="js/utils.js?v=20260525o"></script>
+  <script src="js/evaluator.js?v=20260525o"></script>
+  <script src="js/bag.js?v=20260525o"></script>
+  <script src="js/rack.js?v=20260525o"></script>
+  <script src="js/board.js?v=20260525o"></script>
+  <script src="js/scoring.js?v=20260525o"></script>
+  <script src="js/placement.js?v=20260525o"></script>
+  <script src="js/ui.js?v=20260525o"></script>
+  <script src="js/online-room.js?v=20260525o"></script>
+  <script src="js/game-bridge.js?v=20260525o"></script>
+  <script src="js/online-game.js?v=20260525o"></script>
   <script>
     var roomCode = new URLSearchParams(window.location.search).get('room');
     var role = new URLSearchParams(window.location.search).get('role');

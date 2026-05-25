@@ -311,7 +311,17 @@
     if (window.AMathOnlineHeader && window.AMathOnlineHeader.render) {
       window.AMathOnlineHeader.render(data);
     }
+    // While playing, the PvA-style layout below has its own player score
+    // boxes — hide the duplicate cards + status to avoid visual redundancy.
+    var playersRow = document.getElementById('players-row');
+    var roomStatus = document.getElementById('room-status');
+    var inGame = (data.status === 'playing' || data.status === 'finished') && data.gameState;
+    if (playersRow) playersRow.style.display = inGame ? 'none' : '';
+    if (roomStatus) roomStatus.style.display = inGame ? 'none' : '';
   }
+
+  var _uiBuilt = false;
+  var _uiParts = null;
 
   function renderGameUI() {
     var UI = window.AMath.ui;
@@ -324,12 +334,108 @@
     var existingInput = document.getElementById('online-chat-input');
     if (existingInput) preservedChatInput = existingInput.value;
 
-    container.innerHTML =
-      '<div id="online-opp-rack" style="margin:8px 0;"></div>' +
-      '<div id="online-board-container" style="margin:10px 0;"></div>' +
-      '<div id="online-rack-container" style="margin:10px 0;"></div>' +
-      '<div id="online-action-buttons" style="display:flex;gap:6px;justify-content:center;margin:8px 0;flex-wrap:wrap;"></div>' +
-      '<div id="online-last-move" style="margin:8px 0;font-size:13px;color:#94a3b8;"></div>' +
+    if (!_uiBuilt) {
+      buildOnlineUI(container);
+      _uiBuilt = true;
+    }
+
+    // Update the PvA-style layout sub-regions from current state
+    if (UI && UI.renderBoard) UI.renderBoard(localSession.board, _uiParts.boardArea);
+    // My rack via the standard PvA rack renderer (slot-stable, themed tiles)
+    if (UI && UI.renderRack) UI.renderRack(localSession.playerRack, _uiParts.playerRack, false);
+    // Opponent rack: render via the same renderer with isOpponent=true so it
+    // displays face-down tiles, matching the PvA visual exactly
+    if (UI && UI.renderRack) UI.renderRack(localSession.aiRack, _uiParts.opponentRack, true);
+    // Scores
+    var myName = (myRole === 'host')
+      ? (roomData && roomData.hostName || 'You')
+      : (roomData && roomData.guestName || 'You');
+    var oppName = (myRole === 'host')
+      ? (roomData && roomData.guestName || 'Opponent')
+      : (roomData && roomData.hostName || 'Opponent');
+    if (UI && UI.renderScore) {
+      UI.renderScore(_uiParts.playerScoreBox, myName, localSession.playerScore);
+      UI.renderScore(_uiParts.opponentScoreBox, oppName, localSession.aiScore);
+    }
+
+    // Re-wire board click + drag because renderBoard wipes children & handlers
+    wireBoardClicks(_uiParts.boardArea);
+    highlightTentativeCells(_uiParts.boardArea);
+
+    // Re-wire rack tile drag/click (renderRack also wiped them)
+    wireRackTileHandlers();
+
+    // Turn indicator — matches PvA's interactions.js .is-active-turn class.
+    // The CSS handles the visual glow/pulse on whichever area has the class.
+    var playerArea = document.querySelector('.player-area');
+    var opponentArea = document.querySelector('.opponent-area');
+    if (playerArea && opponentArea) {
+      if (localSession.isPlayerTurn && !localSession.gameOver) {
+        playerArea.classList.add('is-active-turn');
+        opponentArea.classList.remove('is-active-turn');
+      } else if (!localSession.gameOver) {
+        opponentArea.classList.add('is-active-turn');
+        playerArea.classList.remove('is-active-turn');
+      } else {
+        playerArea.classList.remove('is-active-turn');
+        opponentArea.classList.remove('is-active-turn');
+      }
+    }
+
+    // Action button state
+    updateActionButtonStates();
+
+    // Last-move text + chat
+    renderLastMove();
+    renderChatMessages();
+    wireChatInput(preservedChatInput);
+  }
+
+  /**
+   * First-time mount: insert PvA-style layout into the room-content container,
+   * append our chat panel below it, hide PvA-only buttons that don't belong
+   * in online play, and wire all action handlers.
+   */
+  function buildOnlineUI(container) {
+    var UI = window.AMath.ui;
+    container.innerHTML = '';
+
+    // Container that the PvA layout will fill
+    var gameRoot = document.createElement('div');
+    gameRoot.id = 'online-game-root';
+    container.appendChild(gameRoot);
+
+    _uiParts = UI.buildGameLayout(gameRoot);
+
+    // Hide PvA-only action buttons that don't make sense in 2P online
+    var hideIds = ['btn-takeover', 'btn-new-game', 'btn-export', 'btn-import',
+                   'btn-score-sheet', 'btn-settings', 'file-import-input'];
+    for (var hi = 0; hi < hideIds.length; hi++) {
+      var el = document.getElementById(hideIds[hi]);
+      if (el) el.style.display = 'none';
+    }
+    // Show challenge button (PvA layout hides it by default)
+    var chBtn = document.getElementById('btn-challenge');
+    if (chBtn) chBtn.style.display = '';
+    // Add a "Back to lobby" button so players can leave the room
+    var lobbyBtn = document.getElementById('btn-lobby');
+    if (lobbyBtn) lobbyBtn.style.display = '';
+
+    // Wire action buttons. PvA's interactions.js does this normally; we own
+    // it ourselves in online mode.
+    var submitBtn = document.getElementById('btn-submit');
+    var resetBtn = document.getElementById('btn-reset');
+    var passBtn = document.getElementById('btn-pass');
+    var swapBtn = document.getElementById('btn-swap');
+    var challengeBtn = document.getElementById('btn-challenge');
+    if (submitBtn) submitBtn.onclick = onSubmitClick;
+    if (resetBtn) resetBtn.onclick = onResetClick;
+    if (passBtn) passBtn.onclick = onPassClick;
+    if (swapBtn) swapBtn.onclick = onSwapClick;
+    if (challengeBtn) challengeBtn.onclick = onChallengeClick;
+
+    // Chat panel sits below everything else — same look as before
+    var chatHtml =
       '<div id="online-chat" style="margin:14px 0;background:#1e293b;border-radius:8px;' +
         'border:1px solid #334155;overflow:hidden;">' +
         '<div id="online-chat-header" onclick="window.AMath.onlineGame.toggleChat()" ' +
@@ -352,88 +458,69 @@
               'Send</button>' +
           '</div>' +
         '</div>' +
-      '</div>';
-
-    var boardEl = document.getElementById('online-board-container');
-    if (UI && UI.renderBoard) UI.renderBoard(localSession.board, boardEl);
-    wireBoardClicks(boardEl);
-    highlightTentativeCells(boardEl);
-
-    renderOpponentRack();
-    renderMyRack();
-    renderActionButtons();
-    renderLastMove();
-    renderChatMessages();
-    wireChatInput(preservedChatInput);
+      '</div>' +
+      '<div id="online-last-move" style="margin:8px 0;font-size:13px;color:#94a3b8;"></div>';
+    var chatWrap = document.createElement('div');
+    chatWrap.innerHTML = chatHtml;
+    while (chatWrap.firstChild) container.appendChild(chatWrap.firstChild);
   }
 
   /**
-   * Render the opponent's rack as face-down tiles. We only know the COUNT
-   * of their tiles, not their faces — the face-down tile visual hides the
-   * face entirely. Bag count is shown too so players know endgame is near.
+   * Wire pointer-based drag-and-drop + click-to-select on every tile in
+   * the freshly-rendered player rack. renderRack creates the tile DOM nodes
+   * but doesn't attach our handlers; we do it here on every re-render.
    */
-  function renderOpponentRack() {
-    var UI = window.AMath.ui;
-    var el = document.getElementById('online-opp-rack');
-    if (!el) return;
-
-    var oppTiles = (localSession.aiRack && localSession.aiRack.tiles) || [];
-    var oppName = (myRole === 'host')
-      ? (roomData && roomData.guestName || 'Guest')
-      : (roomData && roomData.hostName || 'Host');
-    var bagCount = ((localSession.bag && localSession.bag.tiles) || []).length;
-    var oppTurn = !localSession.isPlayerTurn && !localSession.gameOver;
-
-    el.innerHTML = '';
-
-    var label = document.createElement('div');
-    label.style.cssText =
-      'font-size:12px;color:' + (oppTurn ? '#fbbf24' : '#94a3b8') +
-      ';margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;';
-    label.innerHTML =
-      '<span>' + escapeHtml(oppName) + '\u2019s rack ' +
-      (oppTurn ? '<span style="font-weight:600;">— their turn</span>' : '') +
-      '</span>' +
-      '<span style="color:#64748b;font-size:11px;">' +
-        oppTiles.length + ' tile' + (oppTiles.length === 1 ? '' : 's') +
-        ' · bag: ' + bagCount +
-      '</span>';
-    el.appendChild(label);
-
-    var wrap = document.createElement('div');
-    wrap.style.cssText =
-      'display:flex;gap:4px;flex-wrap:wrap;background:#1e293b;padding:8px;' +
-      'border-radius:8px;min-height:48px;' +
-      (oppTurn ? 'border:1px solid #fbbf24;' : 'border:1px solid transparent;');
-
-    if (oppTiles.length === 0) {
-      var empty = document.createElement('div');
-      empty.style.cssText = 'color:#64748b;font-size:12px;padding:4px;';
-      empty.textContent = '(empty)';
-      wrap.appendChild(empty);
-    } else {
-      for (var i = 0; i < oppTiles.length; i++) {
-        // Use UI.renderTile with faceDown=true to get the proper tile-back styling
-        var tileEl = (UI && UI.renderTile)
-          ? UI.renderTile({ id: 'opp_' + i, face: '?', type: 'digit', points: 0 }, true, false)
-          : makeFallbackTileBack();
-        // Shrink slightly so face-down rack feels distinct from yours
-        tileEl.style.transform = 'scale(0.85)';
-        tileEl.style.transformOrigin = 'top left';
-        wrap.appendChild(tileEl);
+  function wireRackTileHandlers() {
+    if (!_uiParts || !_uiParts.playerRack) return;
+    var tileEls = _uiParts.playerRack.querySelectorAll('.amath-tile');
+    tileEls.forEach(function (tileEl) {
+      var tileId = tileEl.dataset.tileId;
+      if (!tileId) return;
+      tileEl.style.cursor = localSession.isPlayerTurn ? 'pointer' : 'default';
+      tileEl.style.touchAction = 'none';
+      if (selectedTileId === tileId) {
+        tileEl.style.outline = '3px solid #fbbf24';
+        tileEl.style.outlineOffset = '-2px';
       }
-    }
-    el.appendChild(wrap);
+      // Click: toggle selection
+      tileEl.addEventListener('click', function () {
+        if (!localSession.isPlayerTurn) return;
+        if (tileEl.dataset.didDrag === '1') { tileEl.dataset.didDrag = '0'; return; }
+        selectedTileId = (selectedTileId === tileId) ? null : tileId;
+        // Refresh just the rack highlight without a full re-render
+        wireRackTileHandlers();
+      });
+      attachDragHandlers(tileEl, tileId);
+    });
   }
 
-  function makeFallbackTileBack() {
-    var d = document.createElement('div');
-    d.className = 'amath-tile tile-back';
-    d.style.cssText =
-      'width:36px;height:36px;background:#475569;border-radius:6px;' +
-      'background-image:repeating-linear-gradient(45deg,#334155 0 4px,#475569 4px 8px);';
-    return d;
+  /**
+   * Update enabled/disabled state of action buttons based on current turn
+   * and whether tentative placements exist. Doesn't rebuild the buttons.
+   */
+  function updateActionButtonStates() {
+    var gs = localSession._rawGameState;
+    var myTurn = localSession.isPlayerTurn;
+    var hasTentative = tentativePlacements.length > 0;
+    var canChallenge = !!(myTurn && gs && gs.prevPlayState
+                          && gs.prevPlayState.who && gs.prevPlayState.who !== myRole
+                          && !hasTentative);
+
+    var setEnabled = function (id, on) {
+      var el = document.getElementById(id);
+      if (el) el.disabled = !on;
+    };
+    setEnabled('btn-submit', myTurn && hasTentative);
+    setEnabled('btn-reset', myTurn && hasTentative);
+    setEnabled('btn-pass', myTurn);
+    setEnabled('btn-swap', myTurn);
+    setEnabled('btn-challenge', canChallenge);
   }
+
+  // -----------------------------------------------------------------------
+  // INPUT (board click + tile drag — board renderer wipes handlers on each
+  // render, so these get re-attached every refresh by renderGameUI)
+  // -----------------------------------------------------------------------
 
   // ---------------------------------------------------------------------
   // CHAT
@@ -635,7 +722,13 @@
     // cancel/reset.
     var placed = Object.assign({}, rackTile);
     if (assignedFace) placed.assigned = assignedFace;
-    tentativePlacements.push({ row: row, col: col, tile: placed });
+    // Remember the original rack slot so returning the tile preserves its
+    // physical position (PvA's slot-stable rack expects this).
+    var originalSlot = (localSession.playerRack.slotMap || {})[rackTile.id];
+    tentativePlacements.push({
+      row: row, col: col, tile: placed,
+      originalSlot: originalSlot,
+    });
     // Remove tile from rack view (locally only — write to Firestore on Submit)
     removeFromRackLocal(rackTile.id);
     selectedTileId = null;
@@ -651,6 +744,12 @@
     // Put back into the rack (clear any picked face)
     var rackTile = Object.assign({}, p.tile, { assigned: null });
     localSession.playerRack.tiles.push(rackTile);
+    // Restore the slot mapping so the rack tile appears in its original
+    // physical position (matches PvA's slot-stable rack behavior).
+    if (p.originalSlot !== undefined && p.originalSlot !== null) {
+      if (!localSession.playerRack.slotMap) localSession.playerRack.slotMap = {};
+      localSession.playerRack.slotMap[rackTile.id] = p.originalSlot;
+    }
     tentativePlacements.splice(idx, 1);
     refreshUIWithoutSync();
   }
@@ -658,82 +757,32 @@
   function removeFromRackLocal(tileId) {
     var tiles = localSession.playerRack.tiles;
     for (var i = 0; i < tiles.length; i++) {
-      if (tiles[i].id === tileId) { tiles.splice(i, 1); return; }
+      if (tiles[i].id === tileId) { tiles.splice(i, 1); break; }
+    }
+    // Also delete the slot mapping so tilesBySlot doesn't render an empty
+    // slot containing a tile that no longer exists in rack.tiles
+    if (localSession.playerRack.slotMap) {
+      delete localSession.playerRack.slotMap[tileId];
     }
   }
 
   /**
    * Re-render after a purely local change (click-place, click-return).
    * Avoids round-trip to Firestore.
+   *
+   * Re-renders the board + my rack using the PvA-shaped sub-regions stored
+   * in _uiParts, then re-wires drag/click handlers (renderBoard/renderRack
+   * wipe DOM children & event listeners on each call).
    */
   function refreshUIWithoutSync() {
     var UI = window.AMath.ui;
-    var boardEl = document.getElementById('online-board-container');
-    if (boardEl && UI && UI.renderBoard) {
-      UI.renderBoard(localSession.board, boardEl);
-      wireBoardClicks(boardEl);
-      highlightTentativeCells(boardEl);
-    }
-    renderMyRack();
-    renderActionButtons();
-  }
-
-  function renderMyRack() {
-    var UI = window.AMath.ui;
-    var rackEl = document.getElementById('online-rack-container');
-    if (!rackEl) return;
-
-    rackEl.innerHTML = '';
-
-    var label = document.createElement('div');
-    label.style.cssText = 'font-size:12px;color:#94a3b8;margin-bottom:4px;';
-    label.textContent = localSession.isPlayerTurn
-      ? 'Your tiles — click or drag a tile onto the board'
-      : 'Your tiles — waiting on opponent';
-    rackEl.appendChild(label);
-
-    var rackWrap = document.createElement('div');
-    rackWrap.id = 'online-rack-tiles';
-    rackWrap.style.cssText =
-      'display:flex;gap:4px;flex-wrap:wrap;background:#1e293b;padding:8px;border-radius:8px;' +
-      'min-height:60px;touch-action:none;';
-
-    var tiles = (localSession.playerRack && localSession.playerRack.tiles) || [];
-    if (tiles.length === 0) {
-      var empty = document.createElement('div');
-      empty.style.cssText = 'color:#64748b;font-size:12px;padding:4px;';
-      empty.textContent = '(rack empty)';
-      rackWrap.appendChild(empty);
-    }
-    for (var i = 0; i < tiles.length; i++) {
-      var t = tiles[i];
-      var tileEl = UI && UI.renderTile ? UI.renderTile(t, false, false)
-                                       : makeFallbackTile(t);
-      tileEl.dataset.tileId = t.id;
-      tileEl.style.cursor = localSession.isPlayerTurn ? 'pointer' : 'default';
-      tileEl.style.touchAction = 'none';
-      if (selectedTileId === t.id) {
-        tileEl.style.outline = '3px solid #fbbf24';
-      }
-      (function (tid, tileNode) {
-        // Click → toggle selection (existing behavior, still useful as a
-        // fallback for users who prefer tap-to-place over drag).
-        tileNode.addEventListener('click', function (ev) {
-          if (!localSession.isPlayerTurn) return;
-          // Don't fire click if we just finished a drag (handled by pointer code)
-          if (tileNode.dataset.didDrag === '1') {
-            tileNode.dataset.didDrag = '0';
-            return;
-          }
-          selectedTileId = (selectedTileId === tid) ? null : tid;
-          renderMyRack();
-        });
-        // Pointer-based drag from rack tile to board cell
-        attachDragHandlers(tileNode, tid);
-      })(t.id, tileEl);
-      rackWrap.appendChild(tileEl);
-    }
-    rackEl.appendChild(rackWrap);
+    if (!_uiParts) return;
+    if (UI && UI.renderBoard) UI.renderBoard(localSession.board, _uiParts.boardArea);
+    if (UI && UI.renderRack) UI.renderRack(localSession.playerRack, _uiParts.playerRack, false);
+    wireBoardClicks(_uiParts.boardArea);
+    highlightTentativeCells(_uiParts.boardArea);
+    wireRackTileHandlers();
+    updateActionButtonStates();
   }
 
   /**
@@ -751,25 +800,21 @@
 
     function onPointerDown(ev) {
       if (!localSession || !localSession.isPlayerTurn) return;
-      // Allow primary button only (mouse) or any touch
       if (ev.button !== undefined && ev.button !== 0) return;
       dragging = true;
       moved = false;
       startX = ev.clientX;
       startY = ev.clientY;
-      // Capture pointer so we keep receiving events even if it leaves the element
       try { tileEl.setPointerCapture(ev.pointerId); } catch (e) {}
       ev.preventDefault();
     }
-
     function onPointerMove(ev) {
       if (!dragging) return;
       var dx = ev.clientX - startX;
       var dy = ev.clientY - startY;
-      if (!moved && Math.abs(dx) + Math.abs(dy) < 6) return; // dead zone
+      if (!moved && Math.abs(dx) + Math.abs(dy) < 6) return;
       moved = true;
       if (!ghost) {
-        // Create a floating clone the first time we move past the dead zone
         ghost = tileEl.cloneNode(true);
         ghost.style.position = 'fixed';
         ghost.style.pointerEvents = 'none';
@@ -782,7 +827,6 @@
       ghost.style.left = (ev.clientX - 20) + 'px';
       ghost.style.top = (ev.clientY - 20) + 'px';
     }
-
     function onPointerUp(ev) {
       if (!dragging) return;
       dragging = false;
@@ -790,10 +834,8 @@
       if (ghost) { document.body.removeChild(ghost); ghost = null; }
       tileEl.style.opacity = '';
       try { tileEl.releasePointerCapture(ev.pointerId); } catch (e) {}
-      if (!didMove) return; // treat as click — let onClick handle
-      // Mark so click handler doesn't double-fire
+      if (!didMove) return;
       tileEl.dataset.didDrag = '1';
-      // Find the board cell under the pointer
       var dropTarget = document.elementFromPoint(ev.clientX, ev.clientY);
       while (dropTarget && !dropTarget.classList.contains('amath-cell')) {
         dropTarget = dropTarget.parentElement;
@@ -802,64 +844,18 @@
       var r = parseInt(dropTarget.dataset.row, 10);
       var c = parseInt(dropTarget.dataset.col, 10);
       if (isNaN(r) || isNaN(c)) return;
-      // Reuse the click placement path
       selectedTileId = tileId;
       onCellClick(r, c);
     }
-
     function onPointerCancel() {
       dragging = false;
       if (ghost) { document.body.removeChild(ghost); ghost = null; }
       tileEl.style.opacity = '';
     }
-
     tileEl.addEventListener('pointerdown', onPointerDown);
     tileEl.addEventListener('pointermove', onPointerMove);
     tileEl.addEventListener('pointerup', onPointerUp);
     tileEl.addEventListener('pointercancel', onPointerCancel);
-  }
-
-  function makeFallbackTile(t) {
-    var d = document.createElement('div');
-    d.className = 'amath-tile';
-    d.style.cssText =
-      'width:40px;height:40px;background:#fef3c7;color:#1e293b;border-radius:6px;' +
-      'display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;';
-    d.textContent = t.assigned || t.face;
-    return d;
-  }
-
-  function renderActionButtons() {
-    var btns = document.getElementById('online-action-buttons');
-    if (!btns) return;
-    var myTurn = localSession.isPlayerTurn;
-    var hasTentative = tentativePlacements.length > 0;
-    var gs = localSession._rawGameState;
-    // Challenge is available when it's my turn AND the opponent just played
-    // (prevPlayState is set, and it was THEM who played).
-    var canChallenge = !!(myTurn && gs && gs.prevPlayState
-                          && gs.prevPlayState.who && gs.prevPlayState.who !== myRole
-                          && !hasTentative);
-    btns.innerHTML =
-      '<button class="replay-btn" id="online-btn-reset" ' + ((myTurn && hasTentative) ? '' : 'disabled') + '>Reset</button>' +
-      '<button class="replay-btn" id="online-btn-pass" ' + (myTurn ? '' : 'disabled') + '>Pass</button>' +
-      '<button class="replay-btn" id="online-btn-swap" ' + (myTurn ? '' : 'disabled') + '>Swap…</button>' +
-      (canChallenge
-        ? '<button class="replay-btn" id="online-btn-challenge" ' +
-          'style="background:#7f1d1d;color:#fecaca;">Challenge</button>'
-        : '') +
-      '<button class="replay-btn replay-btn-primary" id="online-btn-submit" ' + ((myTurn && hasTentative) ? '' : 'disabled') + '>Submit move</button>';
-
-    var resetBtn = document.getElementById('online-btn-reset');
-    var passBtn = document.getElementById('online-btn-pass');
-    var swapBtn = document.getElementById('online-btn-swap');
-    var submitBtn = document.getElementById('online-btn-submit');
-    var challengeBtn = document.getElementById('online-btn-challenge');
-    if (resetBtn) resetBtn.onclick = onResetClick;
-    if (passBtn) passBtn.onclick = onPassClick;
-    if (swapBtn) swapBtn.onclick = onSwapClick;
-    if (submitBtn) submitBtn.onclick = onSubmitClick;
-    if (challengeBtn) challengeBtn.onclick = onChallengeClick;
   }
 
   function onResetClick() {
@@ -918,7 +914,12 @@
         (function (t) {
           var tileEl = UI && UI.renderTile
             ? UI.renderTile(t, false, false)
-            : makeFallbackTile(t);
+            : (function () {
+                var d = document.createElement('div');
+                d.className = 'amath-tile';
+                d.textContent = t.assigned || t.face;
+                return d;
+              })();
           tileEl.style.cursor = 'pointer';
           tileEl.style.transition = 'transform .15s';
           if (selected[t.id]) {
@@ -1006,15 +1007,25 @@
         id: orig.id, face: orig.face, type: orig.type,
         points: orig.points, assigned: null,
       });
+      // Drop the swapped tile's slot mapping so the slot becomes available
+      if (newRack.slotMap) delete newRack.slotMap[orig.id];
     }
     // Shuffle bag (simple Fisher-Yates)
     for (var s = newBag.tiles.length - 1; s > 0; s--) {
       var swapIdx = Math.floor(Math.random() * (s + 1));
       var tmp = newBag.tiles[s]; newBag.tiles[s] = newBag.tiles[swapIdx]; newBag.tiles[swapIdx] = tmp;
     }
-    // Refill rack from bag
+    // Refill rack from bag, assigning fresh tiles to vacated slots so the
+    // visual rack stays slot-stable.
+    if (!newRack.slotMap) newRack.slotMap = {};
     while (newRack.tiles.length < 8 && newBag.tiles.length > 0) {
-      newRack.tiles.push(newBag.tiles.pop());
+      var freshTile = newBag.tiles.pop();
+      newRack.tiles.push(freshTile);
+      var usedSlotsSwap = {};
+      for (var sk2 in newRack.slotMap) usedSlotsSwap[newRack.slotMap[sk2]] = true;
+      for (var si2 = 0; si2 < 8; si2++) {
+        if (!usedSlotsSwap[si2]) { newRack.slotMap[freshTile.id] = si2; break; }
+      }
     }
 
     var newConsec = (gs.consecutiveNonScoring || 0) + 1;
@@ -1100,9 +1111,18 @@
     var myRackKey = (myRole === 'host') ? 'hostRack' : 'guestRack';
     var newRack = JSON.parse(JSON.stringify(gs[myRackKey]));
     var newBag = JSON.parse(JSON.stringify(gs.bag));
-    // Refill rack from bag up to 8
+    if (!newRack.slotMap) newRack.slotMap = {};
+    // Refill rack from bag up to 8, assigning each new tile to an empty slot
+    // so UI.renderRack (slot-stable) shows it in a stable position.
     while (newRack.tiles.length < 8 && newBag.tiles.length > 0) {
-      newRack.tiles.push(newBag.tiles.pop());
+      var t = newBag.tiles.pop();
+      newRack.tiles.push(t);
+      // Find lowest empty slot 0..7
+      var usedSlots = {};
+      for (var sk in newRack.slotMap) usedSlots[newRack.slotMap[sk]] = true;
+      for (var si = 0; si < 8; si++) {
+        if (!usedSlots[si]) { newRack.slotMap[t.id] = si; break; }
+      }
     }
 
     // Update scores
