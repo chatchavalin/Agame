@@ -165,7 +165,14 @@
     btn.textContent = 'Saving...';
 
     try {
-      var photoURL = await uploadAvatar(currentUser.uid, avatarDataUrl);
+      var photoURL = null;
+      try {
+        photoURL = await uploadAvatar(currentUser.uid, avatarDataUrl);
+      } catch (uploadErr) {
+        console.error('Avatar upload failed, using direct URL:', uploadErr);
+        // Fallback: use Google photo URL directly or skip
+        photoURL = (avatarDataUrl && avatarDataUrl.startsWith('http')) ? avatarDataUrl : '';
+      }
       var school = document.getElementById('input-school').value.trim();
 
       var profile = {
@@ -189,7 +196,8 @@
       userProfile = profile;
       showLobby();
     } catch (err) {
-      showError('profile-error', err.message);
+      console.error('Save profile error:', err);
+      showError('profile-error', 'Save failed: ' + err.message);
     } finally {
       btn.disabled = false;
       btn.textContent = 'Save & Continue';
