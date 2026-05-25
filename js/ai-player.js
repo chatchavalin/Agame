@@ -524,6 +524,24 @@
       const needEq = Math.max(0, 1 - eqCount);
       bingoFeasible = blankCount >= (needNums + needOps + needEq);
 
+      // Extra infeasibility checks:
+      // - 3+ equals tiles → practically impossible to bingo (need 3 valid chained equations)
+      // - 3+ two-digit tiles → too few slots left for operators/equals
+      // - 4+ operators → not enough numbers
+      if (bingoFeasible) {
+        const twoDigitCount = tiles.filter(t => t.type === 'twodigit').length;
+        if (eqCount >= 3) {
+          bingoFeasible = false;
+          console.log('[AI] Bingo INFEASIBLE: ' + eqCount + ' equals tiles — too many');
+        } else if (twoDigitCount >= 3) {
+          bingoFeasible = false;
+          console.log('[AI] Bingo INFEASIBLE: ' + twoDigitCount + ' two-digit tiles — too many');
+        } else if (opCount >= 4 && numCount < 3) {
+          bingoFeasible = false;
+          console.log('[AI] Bingo INFEASIBLE: ' + opCount + ' ops but only ' + numCount + ' nums');
+        }
+      }
+
       if (!bingoFeasible) {
         console.log('[AI] Bingo INFEASIBLE: rack has ' + numCount + ' nums, ' +
                     opCount + ' ops, ' + eqCount + ' eq, ' + blankCount +
