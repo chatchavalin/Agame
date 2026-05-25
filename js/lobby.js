@@ -92,8 +92,8 @@
       }
     }).catch(function (err) {
       console.error('[Lobby] Load profile error:', err);
-      // Show error instead of silently going to setup
-      showError('login-error', 'Profile load failed: ' + err.message + ' — Try again');
+      // Show error visibly so user can report
+      alert('Firestore read error: ' + err.code + ' — ' + err.message);
       showProfileSetup();
     });
   }
@@ -213,6 +213,15 @@
 
       await firebase.firestore().collection('users').doc(currentUser.uid).set(profile);
       console.log('[Lobby] Profile saved for uid:', currentUser.uid);
+      
+      // Verify save succeeded by reading back
+      var verify = await firebase.firestore().collection('users').doc(currentUser.uid).get();
+      if (!verify.exists) {
+        showError('profile-error', 'Save appeared to succeed but document not found! Check Firestore rules.');
+        return;
+      }
+      console.log('[Lobby] Verified — profile exists in Firestore');
+      
       userProfile = profile;
       showLobby();
     } catch (err) {
