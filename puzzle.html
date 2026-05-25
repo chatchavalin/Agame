@@ -320,12 +320,11 @@
     return { board: board, rack: rackTiles, bag: {tiles:[]}, hint: template.hint };
   }
 
-  function findBestPlay(board, rackTiles) {
-    // Brute force search for best play (simplified — checks 1-6 tile plays)
-    var best = null;
+  function findBestPlays(board, rackTiles, maxResults) {
+    var results = []; // {score, placements, equations, bingo}
+    var seen = {}; // dedup by position key
     var anchors = [];
 
-    // Find anchors (empty cells adjacent to filled cells)
     for (var r = 0; r < 15; r++) {
       for (var c = 0; c < 15; c++) {
         if (board.cells[r][c].tile) continue;
@@ -340,44 +339,36 @@
       }
     }
 
-    // Check if board is empty → center is only anchor
     var boardEmpty = anchors.length === 0;
     if (boardEmpty) anchors = [{row:7, col:7}];
 
-    // For each anchor, try horizontal and vertical plays
-    var maxLen = Math.min(rackTiles.length, 6);
-    var timeLimit = Date.now() + 5000; // 5 second budget
+    var maxLen = Math.min(rackTiles.length, 8);
+    var timeLimit = Date.now() + 8000;
 
     for (var ai = 0; ai < anchors.length && Date.now() < timeLimit; ai++) {
       var anchor = anchors[ai];
-      
-      // Try placing 2-maxLen tiles through this anchor
       for (var len = 2; len <= maxLen && Date.now() < timeLimit; len++) {
-        // Horizontal
         for (var sc = Math.max(0, anchor.col-len+1); sc <= anchor.col && sc+len-1 < 15; sc++) {
-          tryPlacement(board, rackTiles, 7, sc, len, 'h', boardEmpty);
+          tryPlace(board, rackTiles, anchor.row, sc, len, 'h', boardEmpty);
         }
-        // Vertical
         for (var sr = Math.max(0, anchor.row-len+1); sr <= anchor.row && sr+len-1 < 15; sr++) {
-          tryPlacement(board, rackTiles, sr, anchor.col, len, 'v', boardEmpty);
+          tryPlace(board, rackTiles, sr, anchor.col, len, 'v', boardEmpty);
         }
       }
     }
 
-    function tryPlacement(board, tiles, startR, startC, len, dir, isFirst) {
-      // Quick check: do we have enough tiles for empty cells?
+    function tryPlace(board, tiles, startR, startC, len, dir, isFirst) {
       var emptyCells = [];
       for (var i = 0; i < len; i++) {
         var r = dir==='h' ? startR : startR+i;
         var c = dir==='h' ? startC+i : startC;
         if (r>=15 || c>=15) return;
-        if (!board.cells[r][c].tile) emptyCells.push({row:r, col:c, idx:i});
+        if (!board.cells[r][c].tile) emptyCells.push({row:r, col:c});
       }
       if (emptyCells.length === 0 || emptyCells.length > tiles.length) return;
 
-      // Try permutations of tiles for empty cells (limit to avoid explosion)
-      var perms = getSimplePerms(tiles, emptyCells.length, 50);
-      for (var p = 0; p < perms.length; p++) {
+      var perms = getSimplePerms(tiles, emptyCells.length, 100);
+      for (var p = 0; p < perms.length && Date.now() < timeLimit; p++) {
         var perm = perms[p];
         var placements = [];
         for (var e = 0; e < emptyCells.length; e++) {
@@ -387,16 +378,17 @@
         var result = Placement.validatePlay(board, placements, isFirst);
         if (result.ok) {
           var score = Scoring.scorePlay(result.equations, board, placements.length);
-          if (!best || score.total > best.score) {
-            best = {
+          var key = placements.map(function(p){return p.row+','+p.col+':'+p.tile.face;}).sort().join('|');
+          if (!seen[key]) {
+            seen[key] = true;
+            results.push({
               score: score.total,
               placements: placements.map(function(p){return{row:p.row,col:p.col,face:p.tile.assigned||p.tile.face};}),
-              equations: result.equations,
-              bingo: placements.length === 8,
-            };
+              bingo: placements.length >= 8,
+              tilesUsed: placements.length,
+            });
           }
         }
-        // Remove tiles
         for (var e2 = 0; e2 < emptyCells.length; e2++) {
           Board.removeTile(board, emptyCells[e2].row, emptyCells[e2].col);
         }
@@ -404,10 +396,10 @@
     }
 
     function getSimplePerms(arr, k, limit) {
-      var results = [];
+      var res = [];
       function helper(remaining, chosen) {
-        if (results.length >= limit) return;
-        if (chosen.length === k) { results.push(chosen.slice()); return; }
+        if (res.length >= limit) return;
+        if (chosen.length === k) { res.push(chosen.slice()); return; }
         for (var i = 0; i < remaining.length; i++) {
           if (i > 0 && remaining[i].face === remaining[i-1].face && remaining[i].type === remaining[i-1].type) continue;
           chosen.push(remaining[i]);
@@ -416,10 +408,11 @@
         }
       }
       helper(arr, []);
-      return results;
+      return res;
     }
 
-    return best;
+    results.sort(function(a,b){ return b.score - a.score; });
+    return results.slice(0, maxResults || 3);
   }
 
   // === PUBLIC API ===
@@ -472,10 +465,9 @@
     currentPuzzle.answer = null;
     document.getElementById('btn-reveal').textContent = '⏳ Searching...';
     setTimeout(function() {
-      var answer = findBestPlay(puzzle.board, puzzle.rack);
-      currentPuzzle.answer = answer;
+      currentPuzzle.answer = findBestPlays(puzzle.board, puzzle.rack, 3);
       if (!answerRevealed) {
-        document.getElementById('btn-reveal').textContent = '👁️ Show Answer';
+        document.getElementById('btn-reveal').textContent = '👁️ Show Answer (' + (currentPuzzle.answer.length) + ' plays found)';
       }
     }, 100);
 
@@ -495,26 +487,43 @@
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
 
     var box = document.getElementById('answer-box');
-    var answer = currentPuzzle ? currentPuzzle.answer : null;
+    var answers = currentPuzzle ? currentPuzzle.answer : [];
 
-    if (!answer) {
-      document.getElementById('answer-play').textContent = 'No valid play found for this rack/board. Try next puzzle!';
+    if (!answers || answers.length === 0) {
+      document.getElementById('answer-play').innerHTML = 'No valid play found for this rack/board. Try next puzzle!';
       document.getElementById('answer-score').textContent = '';
       document.getElementById('answer-eq').textContent = '';
     } else {
-      var positions = answer.placements.map(function(p){return p.face + ' at ('+p.row+','+p.col+')';}).join(', ');
-      document.getElementById('answer-play').textContent = positions;
-      document.getElementById('answer-score').textContent = answer.score + ' points' + (answer.bingo ? ' 🎉 BINGO!' : '');
-      // Highlight answer on board
-      answer.placements.forEach(function(p) {
-        var idx = p.row * 15 + p.col;
-        var cells = document.getElementById('puzzle-board').children;
-        if (cells[idx]) {
-          cells[idx].style.background = '#34d399';
-          cells[idx].style.color = '#1f2937';
-          cells[idx].textContent = p.face;
+      // Show top 3
+      var html = '';
+      var colors = ['#34d399','#fbbf24','#94a3b8'];
+      var medals = ['🥇','🥈','🥉'];
+      for (var i = 0; i < answers.length; i++) {
+        var a = answers[i];
+        var positions = a.placements.map(function(p){return p.face+'('+p.row+','+p.col+')';}).join(' ');
+        html += '<div style="margin-bottom:12px;padding:10px;background:#0f172a;border-radius:8px;border-left:3px solid '+colors[i]+'">';
+        html += '<div style="font-size:13px;color:#94a3b8">' + medals[i] + ' #' + (i+1) + (a.bingo ? ' 🎉 BINGO!' : '') + ' — ' + a.tilesUsed + ' tiles</div>';
+        html += '<div style="font-size:20px;font-weight:800;color:'+colors[i]+'">' + a.score + ' pts</div>';
+        html += '<div style="font-size:11px;color:#64748b;margin-top:4px">' + positions + '</div>';
+        html += '</div>';
+
+        // Highlight #1 on board only (others shown in text)
+        if (i === 0) {
+          a.placements.forEach(function(p) {
+            var idx = p.row * 15 + p.col;
+            var cells = document.getElementById('puzzle-board').children;
+            if (cells[idx]) {
+              cells[idx].style.background = colors[i];
+              cells[idx].style.color = '#1f2937';
+              cells[idx].style.fontWeight = '800';
+              cells[idx].textContent = p.face;
+            }
+          });
         }
-      });
+      }
+      document.getElementById('answer-play').innerHTML = html;
+      document.getElementById('answer-score').textContent = '';
+      document.getElementById('answer-eq').textContent = '';
     }
     box.classList.add('show');
     document.getElementById('btn-reveal').textContent = '✅ Revealed';
