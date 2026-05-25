@@ -2899,6 +2899,23 @@
       aiLabel: p2Label,
     });
 
+    // Save game result to Firebase (if logged in via lobby)
+    if (!isPvP && window.AMathBridge && !window.AMathBridge.isGuest()) {
+      var playerBingos = 0;
+      if (window.AMath.scoreSheet) {
+        var entries = window.AMath.scoreSheet.getAllEntries();
+        for (var ei = 0; ei < entries.length; ei++) {
+          if (entries[ei].who === 'player' && entries[ei].bingo) playerBingos++;
+        }
+      }
+      window.AMathBridge.saveGameResult({
+        playerScore: session.playerScore,
+        aiScore: session.aiScore,
+        won: session.playerScore > session.aiScore,
+        bingos: playerBingos,
+      });
+    }
+
     // Game end sound + celebration if player won
     if (window.AMath.sounds) window.AMath.sounds.gameEnd();
     if (winnerLabel === 'You' && window.AMath.animations) {
