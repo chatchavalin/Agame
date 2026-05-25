@@ -221,7 +221,7 @@ Dark: Dark Mode, Ocean, Forest, Neon, Volcano
 | อรุษ | เพื่อนร่วมโรงเรียน, แซวริวจิ | 10 |
 | พีซ | โค้ช/เพื่อน | 18 |
 | เพลงรัก | ร้องเพลงแซว | 7 |
-| ปุณ | ตกใจง่าย | 9 |
+| ปุญ | ตกใจง่าย | 9 |
 | จิณตา | จริงจัง | 13 |
 | เทียน1/เทียน2 | คู่หู | 19 |
 | ฟ้า | เงียบๆ | 9 |
@@ -244,7 +244,7 @@ Dark: Dark Mode, Ocean, Forest, Neon, Volcano
 ### Special phrases
 - คนมีแต่ดวง (3 lines) — accusing luck
 - โค้ชตี๋จ้องแล้วนะ (3 lines) — pressure from coach watching
-- ปุณโดนฟรีซ (2 lines) — frozen with shock
+- ปุญโดนฟรีซ (2 lines) — frozen with shock
 - ×9 scare lines — only in BEHIND_200 and LEAD_BIG categories
 
 ### Context rules
