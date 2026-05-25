@@ -67,7 +67,15 @@
 
   /**
    * Call this when game ends.
-   * @param {object} result - { playerScore, aiScore, won, bingos, x9plays }
+   * @param {object} result - {
+   *   playerScore, aiScore, won,
+   *   bingos,        // bingos by this user in the game
+   *   x9plays,       // ×9 plays by this user in the game
+   *   maxDeficit,    // largest deficit this user was behind at any point
+   *   swapCount,     // swaps by this user in the game
+   *   playsMade,     // tile plays by this user in the game
+   *   gameDurationMs,// game length in ms
+   * }
    */
   async function saveGameResult(result) {
     if (!_userId || _userId === 'guest' || !_db) return;
@@ -79,8 +87,9 @@
 
       var profile = doc.data();
       var stats = profile.stats || {};
+      var existingAchievements = profile.achievements || {};
 
-      // Update stats
+      // Update stats — also accumulate the new lifetime fields.
       var newStats = {
         gamesPlayed: (stats.gamesPlayed || 0) + 1,
         wins: (stats.wins || 0) + (result.won ? 1 : 0),
@@ -88,14 +97,47 @@
         highScore: Math.max(stats.highScore || 0, result.playerScore || 0),
         totalScore: (stats.totalScore || 0) + (result.playerScore || 0),
         bingos: (stats.bingos || 0) + (result.bingos || 0),
+        x9Plays: (stats.x9Plays || 0) + (result.x9plays || 0),
         longestWinStreak: result.won
           ? Math.max(stats.longestWinStreak || 0, (stats.currentWinStreak || 0) + 1)
           : (stats.longestWinStreak || 0),
         currentWinStreak: result.won ? (stats.currentWinStreak || 0) + 1 : 0,
       };
 
-      await userRef.update({ stats: newStats });
+      // Compute newly-unlocked achievements against stats AFTER this game.
+      var newlyUnlocked = [];
+      var achievementUpdate = {};
+      if (window.AMath && window.AMath.achievements) {
+        newlyUnlocked = window.AMath.achievements.computeUnlocks(
+          result, newStats, existingAchievements
+        );
+        var now = Date.now();
+        for (var i = 0; i < newlyUnlocked.length; i++) {
+          achievementUpdate['achievements.' + newlyUnlocked[i]] = { unlockedAt: now };
+        }
+      }
+
+      var updatePayload = { stats: newStats };
+      // Merge achievement field-path updates into the same write
+      for (var k in achievementUpdate) {
+        if (achievementUpdate.hasOwnProperty(k)) updatePayload[k] = achievementUpdate[k];
+      }
+
+      await userRef.update(updatePayload);
       console.log('[Bridge] Game result saved:', newStats);
+      if (newlyUnlocked.length > 0) {
+        console.log('[Bridge] Achievements unlocked:', newlyUnlocked);
+        // Stagger toasts so they don't all stack instantly
+        if (window.AMath && window.AMath.achievements) {
+          for (var j = 0; j < newlyUnlocked.length; j++) {
+            (function (id, delay) {
+              setTimeout(function () {
+                window.AMath.achievements.showToast(id);
+              }, delay);
+            })(newlyUnlocked[j], j * 600);
+          }
+        }
+      }
     } catch (err) {
       console.error('[Bridge] Save error:', err);
     }

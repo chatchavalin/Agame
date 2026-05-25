@@ -310,6 +310,12 @@
       bagEmptyTaunted: false,  // bag-empty trash talk fires only once
       playerTimerPaused: false,  // Feature M: double-click pause
       aiTimerPaused: false,
+      // Achievement tracking — accumulated over the whole game
+      gameStartTime: Date.now(),
+      playerSwapCount: 0,
+      playerX9Count: 0,
+      playerPlaysMade: 0,
+      playerMaxDeficit: 0,        // peak (player_score - ai_score) when negative
       onSubmit: handleSubmit,
       onReset: handleReset,
       onPass: handlePass,
@@ -1759,6 +1765,14 @@
 
     const wasBingo = scoreResult.bingoBonus > 0;
 
+    // Achievement tracking — count player plays + x9 (only for PvA, P1 in PvP)
+    if (!isPvP || currentP === 1) {
+      session.playerPlaysMade = (session.playerPlaysMade || 0) + 1;
+      if (isX9Play(session.tentativePlacements)) {
+        session.playerX9Count = (session.playerX9Count || 0) + 1;
+      }
+    }
+
     // Track opponent's last action for late-game AI strategy
     session.lastOpponentAction = {
       type: 'play',
@@ -2264,6 +2278,11 @@
     Interactions.exitSwapMode();
     session.consecutiveNonScoringTurns++;
 
+    // Achievement tracking — count player swaps (PvA, P1 in PvP)
+    if (!session.isPvP || (session.currentPlayer || 1) === 1) {
+      session.playerSwapCount = (session.playerSwapCount || 0) + 1;
+    }
+
     // Track opponent's last action for late-game AI strategy
     session.lastOpponentAction = {
       type: 'swap',
@@ -2483,6 +2502,15 @@
       session.aiActualPlayCount = (session.aiActualPlayCount || 0) + 1;
       session.aiConsecutiveSwaps = 0;
       Rack.refillFromBag(session.aiRack, session.bag);
+
+      // Achievement tracking — track largest deficit the human ever faced.
+      // PvP doesn't apply (no Firebase save).
+      if (!session.isPvP) {
+        var deficit = session.aiScore - session.playerScore;
+        if (deficit > (session.playerMaxDeficit || 0)) {
+          session.playerMaxDeficit = deficit;
+        }
+      }
 
       // Record this play for potential challenge
       session.lastAiPlay = {
@@ -2913,6 +2941,11 @@
         aiScore: session.aiScore,
         won: session.playerScore > session.aiScore,
         bingos: playerBingos,
+        x9plays: session.playerX9Count || 0,
+        maxDeficit: session.playerMaxDeficit || 0,
+        swapCount: session.playerSwapCount || 0,
+        playsMade: session.playerPlaysMade || 0,
+        gameDurationMs: session.gameStartTime ? (Date.now() - session.gameStartTime) : 0,
       });
     }
 

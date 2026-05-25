@@ -117,6 +117,19 @@
       </div>
     </div>
 
+    <!-- Badges row -->
+    <div class="badges-section" style="margin:14px 0;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <h3 style="margin:0;font-size:15px;color:#e2e8f0;">🏆 Badges</h3>
+        <button onclick="AMathLobby.openBadges()"
+                style="background:none;border:1px solid #475569;color:#94a3b8;padding:4px 10px;
+                       border-radius:6px;font-size:12px;cursor:pointer;">View all</button>
+      </div>
+      <div id="badges-preview" style="display:flex;gap:6px;flex-wrap:wrap;min-height:32px;">
+        <span style="color:#64748b;font-size:12px;">No badges yet — play a game!</span>
+      </div>
+    </div>
+
     <!-- Play Buttons -->
     <div class="play-section">
       <button class="btn-play" onclick="AMathLobby.playAI()">
@@ -175,13 +188,27 @@
     </div>
   </div>
 
+  <!-- ============================================================ -->
+  <!-- BADGES MODAL -->
+  <!-- ============================================================ -->
+  <div id="modal-badges" class="modal-overlay" style="display:none" onclick="AMathLobby.closeBadges(event)">
+    <div class="modal-card" onclick="event.stopPropagation()" style="max-width:520px;">
+      <h2>🏆 Achievements</h2>
+      <div id="badges-grid-container" style="max-height:60vh;overflow-y:auto;"></div>
+      <div class="modal-buttons" style="margin-top:12px;">
+        <button class="btn-secondary" onclick="AMathLobby.closeBadges()">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Firebase SDK (compat — no bundler needed) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
   <!-- Storage not needed — avatars stored as data URL in Firestore -->
-  <script src="js/firebase-config.js?v=20260525b"></script>
-  <script src="js/lobby.js?v=20260525b"></script>
+  <script src="js/firebase-config.js?v=20260525c"></script>
+  <script src="js/achievements.js?v=20260525c"></script>
+  <script src="js/lobby.js?v=20260525c"></script>
   <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 </body>
 </html>

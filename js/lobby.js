@@ -302,6 +302,67 @@
     document.getElementById('stat-wins').textContent = s.wins || 0;
     document.getElementById('stat-losses').textContent = s.losses || 0;
     document.getElementById('stat-highscore').textContent = s.highScore || 0;
+    renderBadgesPreview();
+  }
+
+  /**
+   * Render up to 6 most-recent unlocked badges as a horizontal preview.
+   * "View all" opens the modal that shows everything (locked + unlocked).
+   */
+  function renderBadgesPreview() {
+    var preview = document.getElementById('badges-preview');
+    if (!preview) return;
+    var achievements = (userProfile && userProfile.achievements) || {};
+    var defs = (window.AMath && window.AMath.achievements)
+      ? window.AMath.achievements.DEFINITIONS
+      : [];
+
+    // Build list of unlocked, sorted by most recent unlockedAt desc
+    var unlocked = [];
+    for (var i = 0; i < defs.length; i++) {
+      var rec = achievements[defs[i].id];
+      if (rec) unlocked.push({ def: defs[i], unlockedAt: rec.unlockedAt || 0 });
+    }
+    unlocked.sort(function (a, b) { return b.unlockedAt - a.unlockedAt; });
+    unlocked = unlocked.slice(0, 6);
+
+    preview.innerHTML = '';
+    if (unlocked.length === 0) {
+      preview.innerHTML =
+        '<span style="color:#64748b;font-size:12px;">No badges yet — play a game!</span>';
+      return;
+    }
+    for (var j = 0; j < unlocked.length; j++) {
+      var u = unlocked[j];
+      var chip = document.createElement('span');
+      chip.title = u.def.name + ' — ' + u.def.description;
+      chip.style.cssText =
+        'display:inline-flex;align-items:center;gap:4px;' +
+        'background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1e293b;' +
+        'padding:3px 8px;border-radius:14px;font-size:14px;font-weight:600;cursor:default;';
+      chip.textContent = u.def.icon;
+      preview.appendChild(chip);
+    }
+  }
+
+  function openBadges() {
+    var modal = document.getElementById('modal-badges');
+    var container = document.getElementById('badges-grid-container');
+    if (!modal || !container) return;
+    var achievements = (userProfile && userProfile.achievements) || {};
+    if (window.AMath && window.AMath.achievements) {
+      window.AMath.achievements.renderBadges(container, achievements);
+    }
+    modal.style.display = 'flex';
+  }
+
+  function closeBadges(event) {
+    // If called from overlay-click, event.target is the overlay; from button, it's the button
+    if (event && event.target && event.target.id && event.target.id !== 'modal-badges') {
+      // Click was inside the card (not on overlay) — only close if explicit close
+    }
+    var modal = document.getElementById('modal-badges');
+    if (modal) modal.style.display = 'none';
   }
 
   // ============================================================
@@ -406,5 +467,7 @@
     playAI: playAI,
     playOnline: playOnline,
     showLeaderboard: showLeaderboard,
+    openBadges: openBadges,
+    closeBadges: closeBadges,
   };
 })();

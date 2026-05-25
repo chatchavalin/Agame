@@ -84,6 +84,7 @@
         if (loaded === scripts.length) {
           // All Firebase scripts loaded — init
           var s1 = document.createElement('script'); s1.src = 'js/firebase-config.js'; document.body.appendChild(s1);
+          var sA = document.createElement('script'); sA.src = 'js/achievements.js'; document.body.appendChild(sA);
           var s2 = document.createElement('script'); s2.src = 'js/game-bridge.js'; document.body.appendChild(s2);
         }
       };
