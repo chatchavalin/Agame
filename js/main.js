@@ -297,7 +297,9 @@
       selectedTileId: null,
       playerScore: 0,
       aiScore: 0,
-      aiActualPlayCount: 0,        // actual AI plays (not swaps/passes) — for bingo-only enforcement
+      aiActualPlayCount: 0,
+      aiConsecutiveSwaps: 0,
+      opponentSwapHistory: [],        // actual AI plays (not swaps/passes) — for bingo-only enforcement
       isFirstMove: true,
       gameOver: false,
       consecutiveNonScoringTurns: 0,
@@ -495,6 +497,8 @@
       lastAiPlay: null,
       bagEmptyTaunted: false,
       aiActualPlayCount: 0,
+      aiConsecutiveSwaps: 0,
+      opponentSwapHistory: [],
       lastOpponentAction: null,
       uiParts: uiParts,
       onSubmit: handleSubmit,
@@ -745,6 +749,8 @@
       playerScore: 0,
       aiScore: 0,
       aiActualPlayCount: 0,
+      aiConsecutiveSwaps: 0,
+      opponentSwapHistory: [],
       ai1ActualPlayCount: 0,       // AI vs AI: separate counters for each AI
       ai2ActualPlayCount: 0,
       isFirstMove: true,
@@ -1020,6 +1026,8 @@
       playerScore: saved.playerScore,
       aiScore: saved.aiScore,
       aiActualPlayCount: saved.aiActualPlayCount || 0,
+      aiConsecutiveSwaps: saved.aiConsecutiveSwaps || 0,
+      opponentSwapHistory: saved.opponentSwapHistory || [],
       lastOpponentAction: saved.lastOpponentAction || null,
       isFirstMove: saved.isFirstMove,
       gameOver: false,
@@ -1265,6 +1273,8 @@
       isFirstMove: session.isFirstMove,
       consecutiveNonScoringTurns: session.consecutiveNonScoringTurns,
       aiActualPlayCount: session.aiActualPlayCount || 0,
+      aiConsecutiveSwaps: session.aiConsecutiveSwaps || 0,
+      opponentSwapHistory: session.opponentSwapHistory ? session.opponentSwapHistory.slice() : [],
       lastOpponentAction: session.lastOpponentAction
         ? JSON.parse(JSON.stringify(session.lastOpponentAction)) : null,
       bagEmptyTaunted: session.bagEmptyTaunted,
@@ -1358,6 +1368,8 @@
     session.isFirstMove = snap.isFirstMove;
     session.consecutiveNonScoringTurns = snap.consecutiveNonScoringTurns;
     session.aiActualPlayCount = snap.aiActualPlayCount;
+    session.aiConsecutiveSwaps = snap.aiConsecutiveSwaps || 0;
+    session.opponentSwapHistory = snap.opponentSwapHistory || [];
     session.lastOpponentAction = snap.lastOpponentAction;
     session.bagEmptyTaunted = snap.bagEmptyTaunted;
     session.playerTimeSeconds = snap.playerTimeSeconds;
@@ -1754,6 +1766,7 @@
       score: scoreResult.total,
       wasBingo: wasBingo,
     };
+    session.opponentSwapHistory.push({ type: 'play' });
 
     Rack.refillFromBag(session.playerRack, session.bag);
     Interactions.clearTentativePlacements();
@@ -1880,6 +1893,7 @@
       score: total,
       wasBingo: wasBingo,
     };
+    session.opponentSwapHistory.push({ type: 'play' });
 
     Rack.refillFromBag(session.playerRack, session.bag);
 
@@ -2174,6 +2188,7 @@
 
     // Track opponent's last action for late-game AI strategy
     session.lastOpponentAction = { type: 'pass' };
+    session.opponentSwapHistory.push({ type: 'pass' });
 
     if (window.AMath.scoreSheet) {
       var pvpWho = session.isPvP ? ('player' + (session.currentPlayer || 1)) : 'player';
@@ -2254,6 +2269,7 @@
       type: 'swap',
       count: tilesToReturn.length,
     };
+    session.opponentSwapHistory.push({ type: 'swap', count: tilesToReturn.length });
 
     if (window.AMath.scoreSheet) {
       var pvpWho = session.isPvP ? ('player' + (session.currentPlayer || 1)) : 'player';
@@ -2363,6 +2379,8 @@
           playerScore: session.playerScore,
           aiScore: session.aiScore,
           aiActualPlayCount: session.aiActualPlayCount || 0,
+          aiConsecutiveSwaps: session.aiConsecutiveSwaps || 0,
+          opponentSwapHistory: session.opponentSwapHistory || [],
           consecutiveNonScoringTurns: session.consecutiveNonScoringTurns || 0,
           opponentRack: session.playerRack,
           lastOpponentAction: session.lastOpponentAction || null,
@@ -2463,6 +2481,7 @@
       session.isFirstMove = false;
       session.consecutiveNonScoringTurns = 0;
       session.aiActualPlayCount = (session.aiActualPlayCount || 0) + 1;
+      session.aiConsecutiveSwaps = 0;
       Rack.refillFromBag(session.aiRack, session.bag);
 
       // Record this play for potential challenge
@@ -2545,6 +2564,7 @@
       Rack.refillFromBag(session.aiRack, session.bag);
       session.consecutiveNonScoringTurns++;
       session.lastAiPlay = null;
+      session.aiConsecutiveSwaps = (session.aiConsecutiveSwaps || 0) + 1;
 
       if (window.AMath.scoreSheet) {
         window.AMath.scoreSheet.recordTurn('ai', 'swap', 0, false, session.aiScore, { swapCount: swapped.length });

@@ -158,6 +158,236 @@
     return aiFinal <= playerFinal;
   }
 
+  // =========================================================================
+  // BEGINNING STRATEGY HELPERS
+  // =========================================================================
+
+  /**
+   * Check if opponent appears ready for bingo based on swap history.
+   * Ready if: never swapped, or swapped ≥2 turns with each ≤4 tiles.
+   */
+  function isOpponentReadyForBingo(oppHistory) {
+    if (!oppHistory || oppHistory.length === 0) return false; // no data yet
+
+    // Check last 2 opponent swap turns
+    const swapTurns = oppHistory.filter(h => h.type === 'swap');
+    const nonSwapTurns = oppHistory.filter(h => h.type !== 'swap');
+
+    // If opponent never swapped (all plays or passes) → very ready
+    if (swapTurns.length === 0 && oppHistory.length >= 1) return true;
+
+    // If opponent swapped ≥2 turns, check last 2 swap amounts
+    if (swapTurns.length >= 2) {
+      const last2 = swapTurns.slice(-2);
+      return last2.every(s => (s.count || 0) <= 4);
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if hand is too bad for a short play (Scenario B).
+   * Bad hand: ≥2 two-digit tiles OR ≥3 operators.
+   */
+  function isHandBadForShortPlay(tiles) {
+    let twoDigit = 0, ops = 0;
+    for (const t of tiles) {
+      if (t.type === 'twodigit') twoDigit++;
+      if (t.type === 'op' || t.type === 'choice') ops++;
+    }
+    return twoDigit >= 2 || ops >= 3;
+  }
+
+  /**
+   * Find a blocking play for Scenario A (board empty, first move).
+   * Rules:
+   * - Must pass through center ★ (7,7) — required by game rules
+   * - = must be placed at (7,7) — blocks ×9 lines
+   * - Entire equation within safe zone (4,4)-(10,10)
+   * - Length ≤6 tiles
+   * - Don't use blank tiles
+   * - Dump bad tiles (0, two-digit, duplicates)
+   * - If using last =, play longer to increase chance of drawing new =
+   */
+  function findBlockingPlay(state) {
+    const Board = window.AMath.board;
+    const Placement = window.AMath.placement;
+    const Scoring = window.AMath.scoring;
+    const tiles = state.aiRack.tiles;
+
+    // Count = tiles and blanks
+    let eqCount = 0, blankCount = 0;
+    for (const t of tiles) {
+      if (t.type === 'equals') eqCount++;
+      if (t.type === 'blank') blankCount++;
+    }
+
+    // Need at least one = (don't use blank for =)
+    if (eqCount === 0) return null;
+
+    // Determine desired play length
+    // If only 1 =, play longer (5-6 tiles) to draw more tiles
+    // If 2+ =, can play short (3-4 tiles)
+    const minLen = eqCount <= 1 ? 5 : 3;
+    const maxLen = 6;
+
+    // Classify tiles by desirability (lower = dump first)
+    function tileDesirability(t) {
+      if (t.type === 'blank') return 100;       // never use
+      if (t.type === 'equals') return 90;        // keep if possible
+      if (t.face === '0') return 5;              // bad — dump
+      if (t.type === 'twodigit') return 10;      // bad — dump
+      if (t.type === 'choice') return 70;        // flexible — keep
+      if (t.type === 'op') return 60;            // decent — keep
+      // Digits: check for duplicates
+      return 40;
+    }
+
+    // Sort: least desirable first (those we want to dump)
+    const sortedTiles = tiles.slice().sort((a, b) => tileDesirability(a) - tileDesirability(b));
+
+    // Find = tile for center
+    const eqTile = tiles.find(t => t.type === 'equals');
+    if (!eqTile) return null;
+
+    // Available tiles (excluding the = going to center, excluding blanks)
+    const available = tiles.filter(t => t.id !== eqTile.id && t.type !== 'blank');
+
+    // Try equations of various lengths, centered at (7,7)
+    // Format: tiles placed horizontally through (7,7) with = at center
+    const bestPlays = [];
+
+    // Try all lengths from maxLen down to minLen
+    for (let len = maxLen; len >= minLen; len--) {
+      const numOtherTiles = len - 1; // minus the = tile
+      if (numOtherTiles > available.length) continue;
+
+      // Generate combinations of numOtherTiles from available
+      const combos = getCombinations(available, numOtherTiles);
+
+      for (const combo of combos) {
+        if (Date.now() - state._blockSearchStart > 3000) break; // time limit
+        
+        // Try all permutations
+        const perms = getPermutations(combo);
+        for (const perm of perms) {
+          // Build equation: place tiles centered at (7,7)
+          // = goes at col 7, other tiles spread left and right
+          // Try different = positions within the equation
+          for (let eqPos = 1; eqPos < len; eqPos++) {
+            const placements = [];
+            const startCol = 7 - eqPos;
+            let valid = true;
+
+            // Check safe zone bounds
+            for (let i = 0; i < len; i++) {
+              const col = startCol + i;
+              if (col < 4 || col > 10) { valid = false; break; }
+            }
+            if (!valid) continue;
+
+            let permIdx = 0;
+            for (let i = 0; i < len; i++) {
+              const col = startCol + i;
+              const tile = (i === eqPos) ? eqTile : perm[permIdx++];
+              placements.push({ row: 7, col: col, tile: tile });
+            }
+
+            // Place on board and validate
+            const tempBoard = Board.createBoard();
+            for (const p of placements) {
+              Board.placeTile(tempBoard, p.row, p.col, p.tile);
+            }
+
+            const result = Placement.validatePlay(tempBoard, placements, true);
+            if (result.ok) {
+              const score = Scoring.scorePlay(result.equations, tempBoard, placements.length);
+              // Calculate dump quality — higher = dumped more bad tiles
+              let dumpScore = 0;
+              for (const p of placements) {
+                if (p.tile.type !== 'equals') {
+                  dumpScore += (100 - tileDesirability(p.tile));
+                }
+              }
+              bestPlays.push({
+                placements: placements,
+                score: score.total,
+                equations: result.equations,
+                dumpScore: dumpScore,
+                len: len,
+              });
+            }
+
+            // Clean up
+            for (const p of placements) {
+              Board.removeTile(tempBoard, p.row, p.col);
+            }
+          }
+        }
+      }
+    }
+
+    if (bestPlays.length === 0) return null;
+
+    // Pick best: prefer longer (dumps more bad tiles), then higher dump score, then higher points
+    bestPlays.sort((a, b) => {
+      // Prefer longer equations (dump more tiles, get more fresh tiles)
+      if (a.len !== b.len) return b.len - a.len;
+      // Prefer higher dump score (got rid of worse tiles)
+      if (a.dumpScore !== b.dumpScore) return b.dumpScore - a.dumpScore;
+      // Tiebreak by score
+      return b.score - a.score;
+    });
+
+    console.log('[AI] Blocking play candidates: ' + bestPlays.length +
+                ', best: len=' + bestPlays[0].len + ' score=' + bestPlays[0].score +
+                ' dump=' + bestPlays[0].dumpScore);
+    return bestPlays[0];
+  }
+
+  /** Get all k-combinations from an array */
+  function getCombinations(arr, k) {
+    if (k === 0) return [[]];
+    if (arr.length < k) return [];
+    const results = [];
+    // Limit combinations to avoid explosion
+    const maxCombos = 200;
+    function helper(start, chosen) {
+      if (results.length >= maxCombos) return;
+      if (chosen.length === k) { results.push(chosen.slice()); return; }
+      for (let i = start; i < arr.length; i++) {
+        // Skip duplicate tiles (same face+type) to reduce permutations
+        if (i > start && arr[i].face === arr[i-1].face && arr[i].type === arr[i-1].type) continue;
+        chosen.push(arr[i]);
+        helper(i + 1, chosen);
+        chosen.pop();
+      }
+    }
+    helper(0, []);
+    return results;
+  }
+
+  /** Get all permutations of an array (limited to avoid explosion) */
+  function getPermutations(arr) {
+    if (arr.length <= 1) return [arr];
+    const results = [];
+    const maxPerms = 120;
+    function helper(remaining, chosen) {
+      if (results.length >= maxPerms) return;
+      if (remaining.length === 0) { results.push(chosen.slice()); return; }
+      for (let i = 0; i < remaining.length; i++) {
+        // Skip duplicate tiles at same position
+        if (i > 0 && remaining[i].face === remaining[i-1].face && remaining[i].type === remaining[i-1].type) continue;
+        chosen.push(remaining[i]);
+        const next = remaining.slice(0, i).concat(remaining.slice(i + 1));
+        helper(next, chosen);
+        chosen.pop();
+      }
+    }
+    helper(arr, []);
+    return results;
+  }
+
   async function decideMove(state) {
     const startTime = Date.now();
 
@@ -798,6 +1028,45 @@
         }
 
         console.log('[AI] Swapping non-BLANKs to preserve BLANKs for yoyo.');
+      }
+
+      // === BEGINNING STRATEGY ===
+      // After 2+ swaps without bingo/yoyo, consider strategic short plays
+      const aiSwaps = state.aiConsecutiveSwaps || 0;
+      const oppHistory = state.opponentSwapHistory || [];
+      const boardIsEmpty = state.isFirstMove;
+
+      if (aiSwaps >= 2) {
+        console.log('[AI] Beginning strategy: aiSwaps=' + aiSwaps + ', boardEmpty=' + boardIsEmpty);
+
+        if (boardIsEmpty) {
+          // Scenario A: Board empty — check if opponent is ready for bingo
+          const oppReady = isOpponentReadyForBingo(oppHistory);
+          if (oppReady) {
+            state._blockSearchStart = Date.now();
+            const blockPlay = findBlockingPlay(state);
+            if (blockPlay) {
+              console.log('[AI] Beginning: blocking play in safe zone, score=' + blockPlay.score);
+              recordPlay(rackOwner);
+              return makePlayResult(blockPlay);
+            }
+          } else {
+            console.log('[AI] Beginning: opponent not ready, swap continues');
+          }
+        } else {
+          // Scenario B: Board not empty — play ≥40 if hand is decent
+          const handBad = isHandBadForShortPlay(state.aiRack.tiles);
+          if (!handBad && bestPlay && bestPlay.score >= 40) {
+            const blanksUsed = countBlanksInPlay(bestPlay);
+            if (blanksUsed === 0) {
+              console.log('[AI] Beginning: board not empty, playing ≥40 (' + bestPlay.score + ')');
+              recordPlay(rackOwner);
+              return makePlayResult(bestPlay);
+            }
+          } else if (handBad) {
+            console.log('[AI] Beginning: hand too bad for short play, swap');
+          }
+        }
       }
 
       // No Bingo or YoYo found — swap to fish for better tiles
@@ -3329,5 +3598,9 @@
     decideMove: decideMove,
     resetPlayCount: resetPlayCount,
     getLastTopPlays: function () { return _lastTopPlays || []; },
+    // Beginning strategy helpers (exposed for testing)
+    _isOpponentReadyForBingo: isOpponentReadyForBingo,
+    _isHandBadForShortPlay: isHandBadForShortPlay,
+    _findBlockingPlay: findBlockingPlay,
   };
 })();
