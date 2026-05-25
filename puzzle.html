@@ -90,21 +90,21 @@
 
 <!-- TYPE SELECT -->
 <div id="screen-select" class="puzzle-type-select">
-  <button class="type-btn" onclick="startPuzzle('best')">
-    <span class="emoji">🎯</span>Best Play
-    <span class="desc">หาสมการที่ดีที่สุดจาก rack + board</span>
+  <button class="type-btn" onclick="startPuzzle('mixed')">
+    <span class="emoji">🔥</span>Mixed Training
+    <span class="desc">80% Bingo/YoYo + 20% High Score — แนะนำ!</span>
   </button>
   <button class="type-btn" onclick="startPuzzle('bingo')">
-    <span class="emoji">🎰</span>Bingo Challenge
-    <span class="desc">หา Bingo (8 เบี้ย) ให้เจอ</span>
-  </button>
-  <button class="type-btn" onclick="startPuzzle('high')">
-    <span class="emoji">💎</span>High Score
-    <span class="desc">หาสมการที่ได้คะแนนสูงสุด</span>
+    <span class="emoji">🎰</span>Bingo Only
+    <span class="desc">ฝึกหา Bingo (8 เบี้ย)</span>
   </button>
   <button class="type-btn" onclick="startPuzzle('yoyo')">
-    <span class="emoji">🪀</span>YoYo Challenge
+    <span class="emoji">🪀</span>YoYo Only
     <span class="desc">ต่อสมการให้เต็มแถว 15 ช่อง</span>
+  </button>
+  <button class="type-btn" onclick="startPuzzle('best')">
+    <span class="emoji">💎</span>High Score Only
+    <span class="desc">หาสมการ 40+ คะแนน</span>
   </button>
   <button class="type-btn" onclick="goBack()">
     <span class="emoji">🏠</span>Back to Lobby
@@ -127,10 +127,9 @@
     <div id="puzzle-hint" style="color:#64748b;font-size:12px;margin-top:8px;"></div>
   </div>
   <div class="answer-box" id="answer-box">
-    <h3>💡 Best Play</h3>
-    <div class="answer-play" id="answer-play"></div>
-    <div class="answer-score" id="answer-score"></div>
-    <div class="answer-eq" id="answer-eq"></div>
+    <h3>💡 Top Plays</h3>
+    <div id="answer-buttons" style="display:flex;gap:6px;margin-bottom:10px;"></div>
+    <div id="answer-detail"></div>
   </div>
   <div class="puzzle-controls">
     <button class="btn-puzzle btn-reveal" id="btn-reveal" onclick="revealAnswer()">👁️ Show Answer</button>
@@ -291,7 +290,16 @@
       return {id:'p'+Math.random(), face:f, type:d.type, points:d.points, assigned:null};
     }
 
-    var bank = PUZZLE_BANK[type] || PUZZLE_BANK.best;
+    // Mixed mode: 80% bingo/yoyo, 20% best (high score)
+    var actualType = type;
+    if (type === 'mixed') {
+      var roll = Math.random();
+      if (roll < 0.4) actualType = 'bingo';
+      else if (roll < 0.8) actualType = 'yoyo';
+      else actualType = 'best';
+    }
+
+    var bank = PUZZLE_BANK[actualType] || PUZZLE_BANK.best;
     var template = bank[Math.floor(Math.random() * bank.length)];
     var board = Board.createBoard();
 
@@ -429,7 +437,7 @@
     streak = 0;
     document.getElementById('screen-select').style.display = 'none';
     document.getElementById('screen-puzzle').style.display = 'block';
-    var labels = {best:'🎯 Best Play', bingo:'🎰 Bingo Challenge', high:'💎 High Score', yoyo:'🪀 YoYo Challenge'};
+    var labels = {mixed:'🔥 Mixed Training', best:'💎 High Score', bingo:'🎰 Bingo', yoyo:'🪀 YoYo'};
     document.getElementById('puzzle-type-label').textContent = labels[type] || type;
     nextPuzzle();
   };
@@ -482,6 +490,8 @@
     }, 1000);
   };
 
+  var savedBoard = null; // store board HTML before highlighting
+
   window.revealAnswer = function() {
     answerRevealed = true;
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
@@ -489,45 +499,69 @@
     var box = document.getElementById('answer-box');
     var answers = currentPuzzle ? currentPuzzle.answer : [];
 
+    // Save board state for toggling
+    savedBoard = document.getElementById('puzzle-board').innerHTML;
+
     if (!answers || answers.length === 0) {
-      document.getElementById('answer-play').innerHTML = 'No valid play found for this rack/board. Try next puzzle!';
-      document.getElementById('answer-score').textContent = '';
-      document.getElementById('answer-eq').textContent = '';
+      document.getElementById('answer-buttons').innerHTML = '';
+      document.getElementById('answer-detail').innerHTML = '<div style="color:#f87171">No valid play found. Try next puzzle!</div>';
     } else {
-      // Show top 3
-      var html = '';
       var colors = ['#34d399','#fbbf24','#94a3b8'];
       var medals = ['🥇','🥈','🥉'];
+      var btnsHtml = '';
       for (var i = 0; i < answers.length; i++) {
         var a = answers[i];
-        var positions = a.placements.map(function(p){return p.face+'('+p.row+','+p.col+')';}).join(' ');
-        html += '<div style="margin-bottom:12px;padding:10px;background:#0f172a;border-radius:8px;border-left:3px solid '+colors[i]+'">';
-        html += '<div style="font-size:13px;color:#94a3b8">' + medals[i] + ' #' + (i+1) + (a.bingo ? ' 🎉 BINGO!' : '') + ' — ' + a.tilesUsed + ' tiles</div>';
-        html += '<div style="font-size:20px;font-weight:800;color:'+colors[i]+'">' + a.score + ' pts</div>';
-        html += '<div style="font-size:11px;color:#64748b;margin-top:4px">' + positions + '</div>';
-        html += '</div>';
-
-        // Highlight #1 on board only (others shown in text)
-        if (i === 0) {
-          a.placements.forEach(function(p) {
-            var idx = p.row * 15 + p.col;
-            var cells = document.getElementById('puzzle-board').children;
-            if (cells[idx]) {
-              cells[idx].style.background = colors[i];
-              cells[idx].style.color = '#1f2937';
-              cells[idx].style.fontWeight = '800';
-              cells[idx].textContent = p.face;
-            }
-          });
-        }
+        var label = medals[i] + ' ' + a.score + 'pts';
+        if (a.bingo) label += ' 🎉';
+        btnsHtml += '<button onclick="showPlay('+i+')" style="flex:1;padding:10px 6px;border:2px solid '+colors[i]+';background:#0f172a;color:'+colors[i]+';border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif" id="ans-btn-'+i+'">' + label + '</button>';
       }
-      document.getElementById('answer-play').innerHTML = html;
-      document.getElementById('answer-score').textContent = '';
-      document.getElementById('answer-eq').textContent = '';
+      document.getElementById('answer-buttons').innerHTML = btnsHtml;
+      document.getElementById('answer-detail').innerHTML = '';
+      // Auto-show #1
+      showPlay(0);
     }
     box.classList.add('show');
     document.getElementById('btn-reveal').textContent = '✅ Revealed';
     document.getElementById('btn-reveal').disabled = true;
+  };
+
+  window.showPlay = function(idx) {
+    var answers = currentPuzzle ? currentPuzzle.answer : [];
+    if (!answers || idx >= answers.length) return;
+    var a = answers[idx];
+    var colors = ['#34d399','#fbbf24','#94a3b8'];
+
+    // Reset board to saved state
+    document.getElementById('puzzle-board').innerHTML = savedBoard;
+
+    // Highlight selected play on board
+    a.placements.forEach(function(p) {
+      var cellIdx = p.row * 15 + p.col;
+      var cells = document.getElementById('puzzle-board').children;
+      if (cells[cellIdx]) {
+        cells[cellIdx].style.background = colors[idx];
+        cells[cellIdx].style.color = '#1f2937';
+        cells[cellIdx].style.fontWeight = '800';
+        cells[cellIdx].style.fontSize = 'min(3.5vw,15px)';
+        cells[cellIdx].textContent = p.face;
+      }
+    });
+
+    // Update active button style
+    for (var b = 0; b < answers.length; b++) {
+      var btn = document.getElementById('ans-btn-'+b);
+      if (btn) btn.style.opacity = b === idx ? '1' : '0.4';
+    }
+
+    // Show detail
+    var positions = a.placements.map(function(p){return p.face;}).join(' ');
+    var tilesText = a.tilesUsed + ' tiles' + (a.bingo ? ' — BINGO! 🎉' : '');
+    document.getElementById('answer-detail').innerHTML =
+      '<div style="text-align:center;margin-top:8px">' +
+      '<div style="font-size:24px;font-weight:800;color:'+colors[idx]+'">' + a.score + ' points</div>' +
+      '<div style="font-size:14px;color:#e2e8f0;margin-top:4px">' + positions + '</div>' +
+      '<div style="font-size:12px;color:#64748b;margin-top:2px">' + tilesText + '</div>' +
+      '</div>';
   };
 
   window.showSelect = function() {
