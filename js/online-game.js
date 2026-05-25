@@ -167,6 +167,10 @@
       gameOver: false,
       lastMove: null,
       moveCount: 0,
+      moves: [],           // compact replay log; append on every action
+      startedAt: Date.now(),
+      hostBingos: 0,
+      guestBingos: 0,
     };
 
     await window.AMath.onlineRoom.updateRoom(roomCode, {
@@ -436,14 +440,15 @@
     var label = document.createElement('div');
     label.style.cssText = 'font-size:12px;color:#94a3b8;margin-bottom:4px;';
     label.textContent = localSession.isPlayerTurn
-      ? 'Your tiles — your turn (click a tile, then an empty cell)'
+      ? 'Your tiles — click or drag a tile onto the board'
       : 'Your tiles — waiting on opponent';
     rackEl.appendChild(label);
 
     var rackWrap = document.createElement('div');
+    rackWrap.id = 'online-rack-tiles';
     rackWrap.style.cssText =
       'display:flex;gap:4px;flex-wrap:wrap;background:#1e293b;padding:8px;border-radius:8px;' +
-      'min-height:60px;';
+      'min-height:60px;touch-action:none;';
 
     var tiles = (localSession.playerRack && localSession.playerRack.tiles) || [];
     if (tiles.length === 0) {
@@ -458,19 +463,112 @@
                                        : makeFallbackTile(t);
       tileEl.dataset.tileId = t.id;
       tileEl.style.cursor = localSession.isPlayerTurn ? 'pointer' : 'default';
+      tileEl.style.touchAction = 'none';
       if (selectedTileId === t.id) {
         tileEl.style.outline = '3px solid #fbbf24';
       }
-      (function (tid) {
-        tileEl.addEventListener('click', function () {
+      (function (tid, tileNode) {
+        // Click → toggle selection (existing behavior, still useful as a
+        // fallback for users who prefer tap-to-place over drag).
+        tileNode.addEventListener('click', function (ev) {
           if (!localSession.isPlayerTurn) return;
+          // Don't fire click if we just finished a drag (handled by pointer code)
+          if (tileNode.dataset.didDrag === '1') {
+            tileNode.dataset.didDrag = '0';
+            return;
+          }
           selectedTileId = (selectedTileId === tid) ? null : tid;
           renderMyRack();
         });
-      })(t.id);
+        // Pointer-based drag from rack tile to board cell
+        attachDragHandlers(tileNode, tid);
+      })(t.id, tileEl);
       rackWrap.appendChild(tileEl);
     }
     rackEl.appendChild(rackWrap);
+  }
+
+  /**
+   * Pointer-based drag handlers. Works on touch + mouse. While dragging:
+   *  - A floating clone of the tile follows the pointer
+   *  - When pointerup lands over a board cell that is empty AND on the
+   *    current player's turn, we trigger placeTentative (with picker for
+   *    blank/choice).
+   */
+  function attachDragHandlers(tileEl, tileId) {
+    var dragging = false;
+    var ghost = null;
+    var startX = 0, startY = 0;
+    var moved = false;
+
+    function onPointerDown(ev) {
+      if (!localSession || !localSession.isPlayerTurn) return;
+      // Allow primary button only (mouse) or any touch
+      if (ev.button !== undefined && ev.button !== 0) return;
+      dragging = true;
+      moved = false;
+      startX = ev.clientX;
+      startY = ev.clientY;
+      // Capture pointer so we keep receiving events even if it leaves the element
+      try { tileEl.setPointerCapture(ev.pointerId); } catch (e) {}
+      ev.preventDefault();
+    }
+
+    function onPointerMove(ev) {
+      if (!dragging) return;
+      var dx = ev.clientX - startX;
+      var dy = ev.clientY - startY;
+      if (!moved && Math.abs(dx) + Math.abs(dy) < 6) return; // dead zone
+      moved = true;
+      if (!ghost) {
+        // Create a floating clone the first time we move past the dead zone
+        ghost = tileEl.cloneNode(true);
+        ghost.style.position = 'fixed';
+        ghost.style.pointerEvents = 'none';
+        ghost.style.zIndex = '99999';
+        ghost.style.opacity = '0.85';
+        ghost.style.transform = 'scale(1.15)';
+        document.body.appendChild(ghost);
+        tileEl.style.opacity = '0.3';
+      }
+      ghost.style.left = (ev.clientX - 20) + 'px';
+      ghost.style.top = (ev.clientY - 20) + 'px';
+    }
+
+    function onPointerUp(ev) {
+      if (!dragging) return;
+      dragging = false;
+      var didMove = moved;
+      if (ghost) { document.body.removeChild(ghost); ghost = null; }
+      tileEl.style.opacity = '';
+      try { tileEl.releasePointerCapture(ev.pointerId); } catch (e) {}
+      if (!didMove) return; // treat as click — let onClick handle
+      // Mark so click handler doesn't double-fire
+      tileEl.dataset.didDrag = '1';
+      // Find the board cell under the pointer
+      var dropTarget = document.elementFromPoint(ev.clientX, ev.clientY);
+      while (dropTarget && !dropTarget.classList.contains('amath-cell')) {
+        dropTarget = dropTarget.parentElement;
+      }
+      if (!dropTarget) return;
+      var r = parseInt(dropTarget.dataset.row, 10);
+      var c = parseInt(dropTarget.dataset.col, 10);
+      if (isNaN(r) || isNaN(c)) return;
+      // Reuse the click placement path
+      selectedTileId = tileId;
+      onCellClick(r, c);
+    }
+
+    function onPointerCancel() {
+      dragging = false;
+      if (ghost) { document.body.removeChild(ghost); ghost = null; }
+      tileEl.style.opacity = '';
+    }
+
+    tileEl.addEventListener('pointerdown', onPointerDown);
+    tileEl.addEventListener('pointermove', onPointerMove);
+    tileEl.addEventListener('pointerup', onPointerUp);
+    tileEl.addEventListener('pointercancel', onPointerCancel);
   }
 
   function makeFallbackTile(t) {
@@ -513,37 +611,109 @@
 
   function onSwapClick() {
     if (!localSession || !localSession.isPlayerTurn) return;
-    // Simple swap UX: ask the player which tile faces to swap, comma-separated.
-    // Full picker UI deferred — this is the minimum to make swap work end-to-end.
-    var rackFaces = localSession.playerRack.tiles
-      .map(function (t) { return (t.assigned || t.face); })
-      .join(' ');
-    var input = prompt(
-      'Your rack: ' + rackFaces + '\n\n' +
-      'Type the FACES to swap, separated by spaces (e.g., "5 + 3"). Cancel to abort.'
-    );
-    if (input === null) return;
-    var wanted = input.trim().split(/\s+/).filter(Boolean);
-    if (wanted.length === 0) return;
-
-    // Match wanted faces to actual rack tiles (by face/assigned, FIRST match wins)
-    var tilesToSwap = [];
-    var remaining = localSession.playerRack.tiles.slice();
-    for (var i = 0; i < wanted.length; i++) {
-      var w = wanted[i];
-      var idx = -1;
-      for (var j = 0; j < remaining.length; j++) {
-        var face = remaining[j].assigned || remaining[j].face;
-        if (face === w) { idx = j; break; }
-      }
-      if (idx === -1) {
-        alert('Tile "' + w + '" not found in your rack. Aborting swap.');
-        return;
-      }
-      tilesToSwap.push(remaining[idx]);
-      remaining.splice(idx, 1);
+    var C = window.AMath.constants;
+    var bagSize = (localSession._rawGameState.bag.tiles || []).length;
+    if (bagSize < (C.SWAP_FORBIDDEN_BAG_THRESHOLD + 1)) {
+      alert('Swap not allowed: bag has ' + bagSize + ' tile(s) remaining ' +
+            '(minimum ' + (C.SWAP_FORBIDDEN_BAG_THRESHOLD + 1) + ' required).');
+      return;
     }
-    submitSwap(tilesToSwap);
+    showSwapModal();
+  }
+
+  /**
+   * Modal that lets the player tap tiles to add/remove them from a swap set,
+   * then confirm. Replaces the previous prompt()-based picker.
+   */
+  function showSwapModal() {
+    var UI = window.AMath.ui;
+    var selected = {}; // tileId -> true
+    var tiles = localSession.playerRack.tiles.slice();
+
+    var overlay = document.createElement('div');
+    overlay.style.cssText =
+      'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99999;' +
+      'display:flex;align-items:center;justify-content:center;padding:14px;';
+
+    var card = document.createElement('div');
+    card.style.cssText =
+      'background:#1e293b;padding:18px;border-radius:12px;max-width:420px;' +
+      'width:100%;color:#e2e8f0;';
+    card.innerHTML =
+      '<div style="font-weight:700;font-size:16px;margin-bottom:6px;">Swap tiles</div>' +
+      '<div style="font-size:12px;color:#94a3b8;margin-bottom:12px;">' +
+      'Tap the tiles you want to return to the bag. You\'ll draw the same ' +
+      'number of fresh tiles. Tap a selected tile again to unselect it.' +
+      '</div>';
+
+    var rackWrap = document.createElement('div');
+    rackWrap.style.cssText =
+      'display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:#0f172a;' +
+      'border-radius:8px;margin-bottom:12px;justify-content:center;';
+    card.appendChild(rackWrap);
+
+    function rerender() {
+      rackWrap.innerHTML = '';
+      for (var i = 0; i < tiles.length; i++) {
+        (function (t) {
+          var tileEl = UI && UI.renderTile
+            ? UI.renderTile(t, false, false)
+            : makeFallbackTile(t);
+          tileEl.style.cursor = 'pointer';
+          tileEl.style.transition = 'transform .15s';
+          if (selected[t.id]) {
+            tileEl.style.outline = '3px solid #ef4444';
+            tileEl.style.transform = 'scale(0.92)';
+            tileEl.style.opacity = '0.7';
+          }
+          tileEl.addEventListener('click', function () {
+            if (selected[t.id]) delete selected[t.id];
+            else selected[t.id] = true;
+            rerender();
+            updateConfirmLabel();
+          });
+          rackWrap.appendChild(tileEl);
+        })(tiles[i]);
+      }
+    }
+
+    var btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:8px;margin-top:6px;';
+    var cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.style.cssText =
+      'flex:1;background:#334155;color:#e2e8f0;border:none;padding:10px;' +
+      'border-radius:6px;cursor:pointer;';
+    cancelBtn.onclick = function () { document.body.removeChild(overlay); };
+
+    var confirmBtn = document.createElement('button');
+    confirmBtn.style.cssText =
+      'flex:2;background:#fbbf24;color:#1e293b;border:none;padding:10px;' +
+      'border-radius:6px;font-weight:700;cursor:pointer;';
+
+    function updateConfirmLabel() {
+      var n = Object.keys(selected).length;
+      confirmBtn.textContent = n === 0 ? 'Select tiles…' : 'Swap ' + n + ' tile' + (n === 1 ? '' : 's');
+      confirmBtn.disabled = (n === 0);
+      confirmBtn.style.opacity = (n === 0) ? '0.5' : '1';
+      confirmBtn.style.cursor = (n === 0) ? 'not-allowed' : 'pointer';
+    }
+
+    confirmBtn.onclick = function () {
+      var toSwap = tiles.filter(function (t) { return !!selected[t.id]; });
+      if (toSwap.length === 0) return;
+      document.body.removeChild(overlay);
+      submitSwap(toSwap);
+    };
+
+    btnRow.appendChild(cancelBtn);
+    btnRow.appendChild(confirmBtn);
+    card.appendChild(btnRow);
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    rerender();
+    updateConfirmLabel();
   }
 
   async function submitSwap(tilesToSwap) {
@@ -590,11 +760,15 @@
     var newConsec = (gs.consecutiveNonScoring || 0) + 1;
     var newTurn = (gs.turn === 'host') ? 'guest' : 'host';
     var gameOver = newConsec >= 6;
+    var moveRec = buildMoveRecord(gs, { who: myRole, type: 'swap', count: tilesToSwap.length });
+    var newMoves = (gs.moves || []).slice();
+    newMoves.push(moveRec);
     var newGs = Object.assign({}, gs, {
       bag: newBag,
       turn: newTurn,
       consecutiveNonScoring: newConsec,
       lastMove: { who: myRole, type: 'swap', count: tilesToSwap.length, timestamp: Date.now() },
+      moves: newMoves,
       moveCount: (gs.moveCount || 0) + 1,
       gameOver: gameOver,
     });
@@ -611,6 +785,7 @@
     selectedTileId = null;
     try {
       await window.AMath.onlineRoom.updateRoom(roomCode, update);
+      if (gameOver) await saveReplayDoc(newGs, roomData);
     } catch (err) {
       alert('Swap failed: ' + err.message);
     } finally {
@@ -680,12 +855,43 @@
       return eq.map(function (c) { return c.tile ? (c.tile.assigned || c.tile.face) : '?'; });
     });
 
+    var isBingo = scoreResult.bingoBonus > 0;
+    var playPlacements = placementsToValidate.map(function (p) {
+      return {
+        r: p.row, c: p.col,
+        f: p.tile.face,
+        p: p.tile.points,
+        ty: p.tile.type,
+        a: p.tile.assigned || null,
+      };
+    });
+
+    // Append move record for replay
+    var moveRec = buildMoveRecord(gs, {
+      who: myRole,
+      type: 'play',
+      score: scoreResult.total,
+      bingo: isBingo,
+      placements: playPlacements,
+      equations: equationFaces,
+    });
+    var newMoves = (gs.moves || []).slice();
+    newMoves.push(moveRec);
+
     var newTurn = (gs.turn === 'host') ? 'guest' : 'host';
+    var newHostBingos = gs.hostBingos || 0;
+    var newGuestBingos = gs.guestBingos || 0;
+    if (isBingo) {
+      if (myRole === 'host') newHostBingos++;
+      else newGuestBingos++;
+    }
     var newGs = Object.assign({}, gs, {
       board: newBoard,
       bag: newBag,
       hostScore: newHostScore,
       guestScore: newGuestScore,
+      hostBingos: newHostBingos,
+      guestBingos: newGuestBingos,
       turn: newTurn,
       isFirstMove: false,
       consecutiveNonScoring: 0,
@@ -693,19 +899,12 @@
         who: myRole,
         type: 'play',
         score: scoreResult.total,
-        bingo: scoreResult.bingoBonus > 0,
-        placements: placementsToValidate.map(function (p) {
-          return {
-            r: p.row, c: p.col,
-            f: p.tile.face,
-            p: p.tile.points,
-            ty: p.tile.type,
-            a: p.tile.assigned || null,
-          };
-        }),
+        bingo: isBingo,
+        placements: playPlacements,
         equations: equationFaces,
         timestamp: Date.now(),
       },
+      moves: newMoves,
       moveCount: (gs.moveCount || 0) + 1,
     });
     newGs[myRackKey] = newRack;
@@ -746,6 +945,7 @@
     selectedTileId = null;
     try {
       await window.AMath.onlineRoom.updateRoom(roomCode, update);
+      if (update.status === 'finished') await saveReplayDoc(newGs, roomData);
     } catch (err) {
       alert('Submit failed: ' + err.message);
     } finally {
@@ -844,6 +1044,10 @@
     var newTurn = (gs.turn === 'host') ? 'guest' : 'host';
     var gameOver = newConsec >= 6;
 
+    var moveRec = buildMoveRecord(gs, { who: myRole, type: 'pass' });
+    var newMoves = (gs.moves || []).slice();
+    newMoves.push(moveRec);
+
     var update = {
       gameState: Object.assign({}, gs, {
         turn: newTurn,
@@ -853,6 +1057,7 @@
           type: 'pass',
           timestamp: Date.now(),
         },
+        moves: newMoves,
         moveCount: (gs.moveCount || 0) + 1,
         gameOver: gameOver,
       }),
@@ -869,6 +1074,7 @@
     }
     try {
       await window.AMath.onlineRoom.updateRoom(roomCode, update);
+      if (gameOver) await saveReplayDoc(update.gameState, roomData);
     } catch (err) {
       alert('Failed to send pass: ' + err.message);
     }
@@ -882,6 +1088,60 @@
     if (s == null) return '';
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  /**
+   * Build a compact move record in the same shape used by replay-recorder.js,
+   * so the saved replay docs are compatible with replay-player.js.
+   * @param gs current gameState (pre-move) — used to compute t-offset from start
+   */
+  function buildMoveRecord(gs, info) {
+    var t = gs.startedAt ? (Date.now() - gs.startedAt) : 0;
+    var move = { t: t, who: info.who, type: info.type };
+    if (info.type === 'play') {
+      move.score = info.score || 0;
+      move.bingo = !!info.bingo;
+      move.placements = info.placements || [];
+      if (info.equations) move.equations = info.equations;
+    } else if (info.type === 'swap') {
+      move.count = info.count || 0;
+    }
+    return move;
+  }
+
+  /**
+   * After a game finishes, save it as a `games/{id}` doc so it appears in
+   * Recent Games and is playable in replay.html. Called by both players;
+   * idempotent-ish (we tag the doc with roomCode so dedup is possible later).
+   */
+  async function saveReplayDoc(gs, data) {
+    if (!window.AMathBridge || !window.AMathBridge.saveReplay) return;
+    // The bridge attaches userId/displayName/photoURL of the CALLER, so each
+    // side saves its own replay. That's deliberate — each player's Recent
+    // Games tab shows the game from their perspective.
+    var isHost = (myRole === 'host');
+    var doc = {
+      // Replay schema fields used by replay-player.js
+      startedAt: gs.startedAt || Date.now(),
+      tileSet: roomData && roomData.tileSet || 'prathom',
+      botLevel: 'online',
+      isPvP: false,
+      moves: gs.moves || [],
+      playerScore: isHost ? gs.hostScore : gs.guestScore,
+      aiScore: isHost ? gs.guestScore : gs.hostScore,
+      won: (gs.winner === myRole),
+      bingos: isHost ? (gs.hostBingos || 0) : (gs.guestBingos || 0),
+      // Extra metadata so users can tell this was an online game
+      online: true,
+      opponentName: isHost ? data.guestName : data.hostName,
+      roomCode: roomCode,
+    };
+    try {
+      var id = await window.AMathBridge.saveReplay(doc);
+      console.log('[OnlineGame] Replay saved as ' + id);
+    } catch (err) {
+      console.error('[OnlineGame] saveReplay failed', err);
+    }
   }
 
   // -----------------------------------------------------------------------
