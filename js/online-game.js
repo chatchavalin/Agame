@@ -167,10 +167,11 @@
       gameOver: false,
       lastMove: null,
       moveCount: 0,
-      moves: [],           // compact replay log; append on every action
+      moves: [],
       startedAt: Date.now(),
       hostBingos: 0,
       guestBingos: 0,
+      chat: [],          // append-only [{ from, text, ts }], pruned to last 50
     };
 
     await window.AMath.onlineRoom.updateRoom(roomCode, {
@@ -293,23 +294,176 @@
     var container = document.getElementById('room-content');
     if (!container) return;
 
+    // Preserve a chat-input value if the panel is already mounted (re-renders
+    // happen on every onSnapshot). Otherwise the user loses what they're typing.
+    var preservedChatInput = '';
+    var existingInput = document.getElementById('online-chat-input');
+    if (existingInput) preservedChatInput = existingInput.value;
+
     container.innerHTML =
       '<div id="online-board-container" style="margin:10px 0;"></div>' +
       '<div id="online-rack-container" style="margin:10px 0;"></div>' +
       '<div id="online-action-buttons" style="display:flex;gap:6px;justify-content:center;margin:8px 0;flex-wrap:wrap;"></div>' +
-      '<div id="online-last-move" style="margin:8px 0;font-size:13px;color:#94a3b8;"></div>';
+      '<div id="online-last-move" style="margin:8px 0;font-size:13px;color:#94a3b8;"></div>' +
+      '<div id="online-chat" style="margin:14px 0;background:#1e293b;border-radius:8px;' +
+        'border:1px solid #334155;overflow:hidden;">' +
+        '<div id="online-chat-header" onclick="window.AMath.onlineGame.toggleChat()" ' +
+            'style="padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;' +
+                   'align-items:center;background:#0f172a;font-size:13px;color:#e2e8f0;font-weight:600;">' +
+          '<span>💬 Chat <span id="online-chat-unread" style="display:none;color:#fbbf24;"></span></span>' +
+          '<span id="online-chat-caret" style="font-size:12px;color:#94a3b8;">▼</span>' +
+        '</div>' +
+        '<div id="online-chat-body" style="display:none;">' +
+          '<div id="online-chat-messages" style="height:180px;overflow-y:auto;padding:8px 12px;' +
+                  'display:flex;flex-direction:column;gap:6px;font-size:13px;"></div>' +
+          '<div style="display:flex;gap:6px;padding:8px;border-top:1px solid #334155;">' +
+            '<input id="online-chat-input" type="text" maxlength="200" ' +
+                   'placeholder="Type a message…" ' +
+                   'style="flex:1;background:#0f172a;border:1px solid #334155;color:#e2e8f0;' +
+                          'padding:6px 10px;border-radius:6px;font-size:13px;outline:none;">' +
+            '<button id="online-chat-send" ' +
+                   'style="background:#fbbf24;color:#1e293b;border:none;padding:6px 14px;' +
+                          'border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;">' +
+              'Send</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
 
     var boardEl = document.getElementById('online-board-container');
     if (UI && UI.renderBoard) UI.renderBoard(localSession.board, boardEl);
-
-    // Wire board click handling for placement
     wireBoardClicks(boardEl);
-    // Mark tentative tiles so the user can see what they've placed but not submitted
     highlightTentativeCells(boardEl);
 
     renderMyRack();
     renderActionButtons();
     renderLastMove();
+    renderChatMessages();
+    wireChatInput(preservedChatInput);
+  }
+
+  // ---------------------------------------------------------------------
+  // CHAT
+  // ---------------------------------------------------------------------
+
+  var _chatOpen = false;
+  var _lastSeenChatCount = 0;
+
+  function toggleChat() {
+    _chatOpen = !_chatOpen;
+    var body = document.getElementById('online-chat-body');
+    var caret = document.getElementById('online-chat-caret');
+    if (body) body.style.display = _chatOpen ? '' : 'none';
+    if (caret) caret.textContent = _chatOpen ? '▲' : '▼';
+    if (_chatOpen) {
+      // Reset unread counter and scroll to bottom
+      _lastSeenChatCount = currentChatCount();
+      updateChatUnreadBadge();
+      var msgs = document.getElementById('online-chat-messages');
+      if (msgs) msgs.scrollTop = msgs.scrollHeight;
+      var input = document.getElementById('online-chat-input');
+      if (input) setTimeout(function () { input.focus(); }, 50);
+    }
+  }
+
+  function currentChatCount() {
+    var gs = localSession && localSession._rawGameState;
+    return (gs && gs.chat) ? gs.chat.length : 0;
+  }
+
+  function updateChatUnreadBadge() {
+    var unread = currentChatCount() - _lastSeenChatCount;
+    var badge = document.getElementById('online-chat-unread');
+    if (!badge) return;
+    if (unread > 0 && !_chatOpen) {
+      badge.textContent = '(' + unread + ' new)';
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  function renderChatMessages() {
+    var msgs = document.getElementById('online-chat-messages');
+    if (!msgs) return;
+    var chat = (localSession._rawGameState.chat) || [];
+    if (chat.length === 0) {
+      msgs.innerHTML =
+        '<div style="color:#64748b;text-align:center;padding:14px 0;">' +
+        'No messages yet. Say hi 👋</div>';
+    } else {
+      var html = '';
+      for (var i = 0; i < chat.length; i++) {
+        var m = chat[i];
+        var mine = (m.from === myRole);
+        var name = m.from === 'host'
+          ? (roomData && roomData.hostName || 'Host')
+          : (roomData && roomData.guestName || 'Guest');
+        var when = m.ts ? new Date(m.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        var align = mine ? 'flex-end' : 'flex-start';
+        var bg = mine ? '#fbbf24' : '#334155';
+        var fg = mine ? '#1e293b' : '#e2e8f0';
+        html +=
+          '<div style="display:flex;flex-direction:column;align-items:' + align + ';">' +
+            '<div style="font-size:10px;color:#64748b;margin-bottom:2px;">' +
+              escapeHtml(mine ? 'You' : name) + (when ? ' · ' + when : '') +
+            '</div>' +
+            '<div style="background:' + bg + ';color:' + fg + ';padding:6px 10px;' +
+                       'border-radius:10px;max-width:80%;word-wrap:break-word;' +
+                       'white-space:pre-wrap;">' +
+              escapeHtml(m.text || '') +
+            '</div>' +
+          '</div>';
+      }
+      msgs.innerHTML = html;
+      // Auto-scroll to bottom when new messages arrive AND chat is open
+      if (_chatOpen) msgs.scrollTop = msgs.scrollHeight;
+    }
+    // Update unread badge — if chat is closed, show count of new since last open
+    updateChatUnreadBadge();
+  }
+
+  function wireChatInput(preservedValue) {
+    var input = document.getElementById('online-chat-input');
+    var sendBtn = document.getElementById('online-chat-send');
+    if (input && preservedValue) input.value = preservedValue;
+    if (sendBtn) sendBtn.onclick = sendChatMessage;
+    if (input) {
+      input.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          sendChatMessage();
+        }
+      });
+    }
+  }
+
+  async function sendChatMessage() {
+    var input = document.getElementById('online-chat-input');
+    if (!input) return;
+    var text = (input.value || '').trim();
+    if (!text) return;
+    if (text.length > 200) text = text.substring(0, 200);
+    input.value = '';
+
+    var gs = localSession._rawGameState;
+    var newChat = ((gs && gs.chat) || []).slice();
+    newChat.push({
+      from: myRole,
+      text: text,
+      ts: Date.now(),
+    });
+    // Cap at last 50 messages to keep doc size bounded
+    if (newChat.length > 50) newChat = newChat.slice(newChat.length - 50);
+
+    try {
+      await window.AMath.onlineRoom.updateRoom(roomCode, {
+        gameState: Object.assign({}, gs, { chat: newChat }),
+      });
+    } catch (err) {
+      console.error('[OnlineGame] chat send failed', err);
+      alert('Failed to send: ' + err.message);
+      input.value = text; // restore so user can retry
+    }
   }
 
   /**
@@ -1153,6 +1307,7 @@
     boot: boot,
     getRoomCode: function () { return roomCode; },
     getRole: function () { return myRole; },
+    toggleChat: toggleChat,
   };
 
   if (document.readyState === 'loading') {
