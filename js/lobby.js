@@ -84,13 +84,16 @@
     db.collection('users').doc(uid).get().then(function (doc) {
       if (doc.exists) {
         userProfile = doc.data();
+        console.log('[Lobby] Profile loaded:', userProfile.displayName);
         showLobby();
       } else {
-        // First time — show profile setup
+        console.log('[Lobby] No profile found for uid:', uid);
         showProfileSetup();
       }
     }).catch(function (err) {
-      console.error('Load profile error:', err);
+      console.error('[Lobby] Load profile error:', err);
+      // Show error instead of silently going to setup
+      showError('login-error', 'Profile load failed: ' + err.message + ' — Try again');
       showProfileSetup();
     });
   }
@@ -209,6 +212,7 @@
       };
 
       await firebase.firestore().collection('users').doc(currentUser.uid).set(profile);
+      console.log('[Lobby] Profile saved for uid:', currentUser.uid);
       userProfile = profile;
       showLobby();
     } catch (err) {
