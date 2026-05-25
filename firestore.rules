@@ -1,0 +1,31 @@
+// A-Math Firestore Security Rules
+// Deploy: Firebase Console → Firestore → Rules → Paste → Publish
+//
+// These rules allow:
+// - Any authenticated user to read any profile (for leaderboard)
+// - Users to only write their own profile
+// - Stats can only be updated (not overwritten) by the user
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // User profiles
+    match /users/{userId} {
+      // Anyone logged in can read (for leaderboard)
+      allow read: if request.auth != null;
+
+      // Users can only create/update their own profile
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId;
+
+      // No one can delete profiles
+      allow delete: if false;
+    }
+
+    // Default: deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

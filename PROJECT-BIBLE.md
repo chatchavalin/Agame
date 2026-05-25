@@ -305,7 +305,128 @@ git push origin main
 
 ---
 
-## 13. CRITICAL BUGS HISTORY (learn from these)
+## 13. FIREBASE LOBBY
+
+### Architecture
+```
+lobby.html (login, profile, stats, leaderboard)
+    │
+    └── "Play vs AI" → index.html?userId=xxx&userName=xxx&userPhoto=xxx
+                              │
+                              ├── game-bridge.js reads URL params
+                              ├── shows profile image + name in game
+                              ├── shows 🏠 lobby button in toolbar
+                              └── game end → saves stats to Firestore
+```
+
+Game core (index.html) works independently — guest play without login still works.
+
+### Firebase Project
+- Project ID: `amath-52dd0`
+- Auth: Google + Email/Password
+- Database: Firestore (asia-southeast3)
+- Storage: NOT used (avatars stored as data URL in Firestore)
+- Plan: Spark (free, $0/month)
+
+### Files
+```
+lobby.html           — Login / Profile setup / Lobby with stats + leaderboard
+lobby.css            — Dark polished theme, Outfit font, mobile-first
+js/firebase-config.js — Firebase init (compat SDK, try-catch wrapped)
+js/lobby.js          — Auth, profile CRUD, stats display, leaderboard queries
+js/game-bridge.js    — Connects game → Firebase (async load, guest-safe)
+firestore.rules      — Security rules (deploy manually in Firebase Console)
+```
+
+### Database Schema
+```
+users/{userId}:
+  displayName: "ริวจิ"
+  photoURL: "https://..." or "data:image/jpeg;base64,..."
+  school: "สาธิตจุฬา"
+  createdAt: timestamp
+  stats:
+    gamesPlayed: 42
+    wins: 28
+    losses: 14
+    highScore: 312
+    totalScore: 8450
+    bingos: 15
+    longestWinStreak: 7
+    currentWinStreak: 3
+```
+
+### Security Rules
+Deploy `firestore.rules` in Firebase Console → Firestore → Rules → Publish.
+Test mode expires after 30 days — deploy rules before then!
+
+Rules allow:
+- Authenticated users can read any profile (leaderboard)
+- Users can only write their own profile
+- No deletes
+
+### Avatar Storage
+- Google login: uses Google profile photo URL directly
+- Custom upload: resized to 128×128, JPEG 70%, stored as data URL in Firestore
+- No Firebase Storage needed (stays on free Spark plan)
+
+### Cache Busting
+Scripts in lobby.html use `?v=20260525b` query params.
+Update version string when deploying changes to force browser reload.
+
+### Known Issues
+- Firebase config `appId` may be truncated — verify in Firebase Console → Project Settings
+- GitHub Pages CDN can take 2-10 minutes to propagate changes
+- First Google login on new device triggers popup which may be blocked by browser
+
+---
+
+## 14. BEGINNING STRATEGY
+
+### Scenario A (Board Empty)
+```
+Try bingo/yoyo → not found
+AI swapped ≥2 turns?
+  ├─ No → swap
+  └─ Yes → check opponent readiness:
+       ├─ Never swapped / passed → READY → BLOCK
+       ├─ Swapped ≥2 turns, each ≤4 tiles → READY → BLOCK
+       └─ Swapped >4 tiles/turn → NOT READY → swap
+
+BLOCK rules:
+  - = at ★(7,7) — blocks ×9 lines
+  - Safe zone only: (4,4)-(10,10)
+  - ≤6 tiles, no blanks
+  - Dump bad tiles (0, two-digit, duplicates)
+  - 1 = left → play longer (5-6 tiles)
+  - 2+ = → play short (3 tiles)
+```
+
+### Scenario B (Board Not Empty)
+```
+Try bingo/yoyo → not found
+AI swapped ≥2 turns?
+  ├─ No → swap
+  └─ Yes → check hand quality:
+       ├─ Bad (≥2 two-digit OR ≥3 ops) → swap
+       └─ OK → find play ≥40pts, no blanks → PLAY
+                not found → swap
+```
+
+### Swap Brain (Beginning Phase)
+- `keepOpsTarget = 2` (keep both operators for bingo)
+- `keepEqualsTarget = 1` (always swap 2nd = tile)
+- Dump priority: 0, two-digit tiles, duplicates, high-value single digits
+
+### Bingo Feasibility
+- 3+ equals: HARD (not infeasible) — reduced budget 33%→15% in normal game
+- 3+ two-digit: INFEASIBLE
+- 4+ ops with <3 numbers: INFEASIBLE
+- Education mode: NO budget reduction (accuracy over speed)
+
+---
+
+## 15. CRITICAL BUGS HISTORY (learn from these)
 
 | Bug | Root Cause | Detection |
 |-----|-----------|-----------|
@@ -319,3 +440,5 @@ git push origin main
 | Yoyo skipped | findBestPlay consumed entire budget | User report |
 | Challenge crash | revertPlay on full rack | Simulation test |
 | Premium not restored | Challenge revert didn't reset premiumUsed | Simulation test |
+| Lobby crash loop | `showLeaderboard` used `event.target` without event | Debug alert |
+| Bingo search too slow (3+ =) | Full budget on infeasible racks | User screenshot |
