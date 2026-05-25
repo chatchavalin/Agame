@@ -2658,6 +2658,7 @@
       lastScore: extras && extras.lastScore,
       force: extras && extras.force,
       playerTiles: extras && extras.playerTiles,
+      isEarlyGame: (session.playerScore + session.aiScore) < 100,
     });
   }
 

@@ -628,7 +628,7 @@
    * unusually long; staying silent across multiple 30s buckets would feel like
    * the feature is broken.
    */
-  function selectMessage(context, force) {
+  function selectMessage(context, force, isEarlyGame) {
     // Challenge sequence messages MUST fire (drama interruption — no skipping).
     // STALLING fires often (70%). Everything else uses the default FIRE_CHANCE.
     let chance = FIRE_CHANCE;
@@ -648,6 +648,14 @@
     // Fallback: if the language filter empties the pool for this context,
     // try the OTHER language so the AI doesn't fall silent on a rare context.
     if (pool.length === 0) pool = rawPool;
+
+    // In early game, filter out ×9 scare lines — not relevant yet
+    if (isEarlyGame) {
+      var filtered = pool.filter(function(m) {
+        return m.indexOf('×9') < 0 && m.indexOf('x9') < 0 && m.indexOf('×3 สมการ') < 0;
+      });
+      if (filtered.length > 0) pool = filtered;
+    }
 
     // Filter out recently used
     const candidates = pool.filter((m) => !recentMessages.includes(m));
@@ -746,7 +754,8 @@
 
     const ctx = pickContext(event, state);
     const force = !!(state && state.force);
-    const msg = selectMessage(ctx, force);
+    const isEarly = !!(state && state.isEarlyGame);
+    const msg = selectMessage(ctx, force, isEarly);
     if (msg) showToast(msg);
   }
 
