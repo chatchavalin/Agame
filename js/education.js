@@ -132,6 +132,7 @@
       consecutiveNonScoringTurns: session.consecutiveNonScoringTurns || 0,
       opponentRack: session.aiRack, lastOpponentAction: null,
       _settings: eduSettings,
+      _isEducation: true,
     };
 
     var result = { plays: [], swapAdvice: null, endgamePlan: null };

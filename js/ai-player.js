@@ -25,6 +25,7 @@
   // Worker-compatible: prefers _settings passed in state, falls back to window.
   // (In Worker context, window is aliased to self by the worker bootstrap.)
   let _stateSettings = null;
+  let _isEducationMode = false;
   let _lastTopPlays = [];  // Top plays from last search — survives any return path
   function getTimeBudgetMs() {
     try {
@@ -431,6 +432,7 @@
 
     // Worker-compatibility: pick up settings from state if passed
     _stateSettings = state._settings || null;
+    _isEducationMode = !!(state && state._isEducation);
 
     // Top plays tracked during search — attached to the final decision for education mode
     var _searchTopPlays = null;
@@ -560,7 +562,7 @@
     let fastBingoPlay = null;
     if (bingoFeasible && window.AMath.aiBingoFast && state.aiRack.tiles.length === 8 && !state.isFirstMove) {
       const fastStart = Date.now();
-      const fastBingoBudget = bingoIsHard ? 3000 : (getTimeBudgetMs() >= 200000 ? 15000 : 5000);
+      const fastBingoBudget = (bingoIsHard && !_isEducationMode) ? 3000 : (getTimeBudgetMs() >= 200000 ? 15000 : 5000);
       fastBingoPlay = window.AMath.aiBingoFast.findFastBingo(state, fastBingoBudget);
       if (fastBingoPlay) {
         console.log('[AI] Fast Bingo found in ' + (Date.now() - fastStart) + 'ms, score=' + fastBingoPlay.score);
@@ -1745,7 +1747,8 @@
     const totalBudgetMs = getTimeBudgetMs();
     // Hard racks (3+ equals): reduce bingo budget to 15% (chained search only needs structured attempt)
     // Normal: 33% of budget for bingo stage
-    const bingoBudgetPct = bingoIsHard ? 0.15 : 0.33;
+    // Education mode: never reduce — accuracy matters more than speed
+    const bingoBudgetPct = (bingoIsHard && !_isEducationMode) ? 0.15 : 0.33;
     const bingoStageMs = Math.floor(totalBudgetMs * bingoBudgetPct * Math.min(candidateMultiplier, 1.5));
     const otherStageMs = Math.floor(totalBudgetMs * 0.08 * Math.min(candidateMultiplier, 1.5));
     const singleTileMs = Math.floor(totalBudgetMs * 0.05);
