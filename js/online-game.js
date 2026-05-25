@@ -301,6 +301,7 @@
     if (existingInput) preservedChatInput = existingInput.value;
 
     container.innerHTML =
+      '<div id="online-opp-rack" style="margin:8px 0;"></div>' +
       '<div id="online-board-container" style="margin:10px 0;"></div>' +
       '<div id="online-rack-container" style="margin:10px 0;"></div>' +
       '<div id="online-action-buttons" style="display:flex;gap:6px;justify-content:center;margin:8px 0;flex-wrap:wrap;"></div>' +
@@ -334,11 +335,80 @@
     wireBoardClicks(boardEl);
     highlightTentativeCells(boardEl);
 
+    renderOpponentRack();
     renderMyRack();
     renderActionButtons();
     renderLastMove();
     renderChatMessages();
     wireChatInput(preservedChatInput);
+  }
+
+  /**
+   * Render the opponent's rack as face-down tiles. We only know the COUNT
+   * of their tiles, not their faces — the face-down tile visual hides the
+   * face entirely. Bag count is shown too so players know endgame is near.
+   */
+  function renderOpponentRack() {
+    var UI = window.AMath.ui;
+    var el = document.getElementById('online-opp-rack');
+    if (!el) return;
+
+    var oppTiles = (localSession.aiRack && localSession.aiRack.tiles) || [];
+    var oppName = (myRole === 'host')
+      ? (roomData && roomData.guestName || 'Guest')
+      : (roomData && roomData.hostName || 'Host');
+    var bagCount = ((localSession.bag && localSession.bag.tiles) || []).length;
+    var oppTurn = !localSession.isPlayerTurn && !localSession.gameOver;
+
+    el.innerHTML = '';
+
+    var label = document.createElement('div');
+    label.style.cssText =
+      'font-size:12px;color:' + (oppTurn ? '#fbbf24' : '#94a3b8') +
+      ';margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;';
+    label.innerHTML =
+      '<span>' + escapeHtml(oppName) + '\u2019s rack ' +
+      (oppTurn ? '<span style="font-weight:600;">— their turn</span>' : '') +
+      '</span>' +
+      '<span style="color:#64748b;font-size:11px;">' +
+        oppTiles.length + ' tile' + (oppTiles.length === 1 ? '' : 's') +
+        ' · bag: ' + bagCount +
+      '</span>';
+    el.appendChild(label);
+
+    var wrap = document.createElement('div');
+    wrap.style.cssText =
+      'display:flex;gap:4px;flex-wrap:wrap;background:#1e293b;padding:8px;' +
+      'border-radius:8px;min-height:48px;' +
+      (oppTurn ? 'border:1px solid #fbbf24;' : 'border:1px solid transparent;');
+
+    if (oppTiles.length === 0) {
+      var empty = document.createElement('div');
+      empty.style.cssText = 'color:#64748b;font-size:12px;padding:4px;';
+      empty.textContent = '(empty)';
+      wrap.appendChild(empty);
+    } else {
+      for (var i = 0; i < oppTiles.length; i++) {
+        // Use UI.renderTile with faceDown=true to get the proper tile-back styling
+        var tileEl = (UI && UI.renderTile)
+          ? UI.renderTile({ id: 'opp_' + i, face: '?', type: 'digit', points: 0 }, true, false)
+          : makeFallbackTileBack();
+        // Shrink slightly so face-down rack feels distinct from yours
+        tileEl.style.transform = 'scale(0.85)';
+        tileEl.style.transformOrigin = 'top left';
+        wrap.appendChild(tileEl);
+      }
+    }
+    el.appendChild(wrap);
+  }
+
+  function makeFallbackTileBack() {
+    var d = document.createElement('div');
+    d.className = 'amath-tile tile-back';
+    d.style.cssText =
+      'width:36px;height:36px;background:#475569;border-radius:6px;' +
+      'background-image:repeating-linear-gradient(45deg,#334155 0 4px,#475569 4px 8px);';
+    return d;
   }
 
   // ---------------------------------------------------------------------
