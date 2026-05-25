@@ -17,14 +17,18 @@
   };
 
   // Initialize Firebase (compat SDK loaded via script tags)
-  if (typeof firebase !== 'undefined') {
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
+  try {
+    if (typeof firebase !== 'undefined') {
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+      window.AMathFirebase = {
+        auth: firebase.auth(),
+        db: firebase.firestore(),
+        config: firebaseConfig,
+      };
     }
-    window.AMathFirebase = {
-      auth: firebase.auth(),
-      db: firebase.firestore(),
-      config: firebaseConfig,
-    };
+  } catch (e) {
+    console.warn('[Firebase] Init failed (game still works):', e.message);
   }
 })();
