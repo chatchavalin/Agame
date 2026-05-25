@@ -192,21 +192,24 @@
     });
   }
 
+  /**
+   * Serialize board for Firestore. CRITICAL: Firestore rejects nested arrays,
+   * so we cannot store cells as a 2D array. Instead we flatten to a 1D array
+   * of cell objects each carrying their {r, c} indices. rebuildLocalSession
+   * reconstructs the 2D grid client-side.
+   */
   function serializeBoard(board) {
-    // Strip non-serializable bits; cells are plain objects already
     var out = { cells: [] };
     for (var r = 0; r < board.cells.length; r++) {
-      var row = [];
       for (var c = 0; c < board.cells[r].length; c++) {
         var cell = board.cells[r][c];
-        row.push({
-          row: cell.row, col: cell.col,
+        out.cells.push({
+          r: r, c: c,
           premium: cell.premium || null,
           premiumUsed: !!cell.premiumUsed,
           tile: cell.tile || null,
         });
       }
-      out.cells.push(row);
     }
     return out;
   }
@@ -219,16 +222,22 @@
     var C = window.AMath.constants;
     var Board = window.AMath.board;
 
-    // Reconstruct board from serialized form (need a fresh board object that
-    // matches what Board.createBoard returns — cell objects with full keys)
+    // Reconstruct board from serialized form. The doc stores cells as a flat
+    // 1D array (Firestore disallows nested arrays). Reassemble into the 2D
+    // grid the Board module expects.
     var board = Board.createBoard();
-    for (var r = 0; r < C.BOARD_SIZE; r++) {
-      for (var c = 0; c < C.BOARD_SIZE; c++) {
-        var saved = gs.board.cells[r][c];
-        var live = board.cells[r][c];
-        live.tile = saved.tile || null;
-        live.premiumUsed = !!saved.premiumUsed;
-      }
+    var flatCells = (gs.board && gs.board.cells) || [];
+    for (var fi = 0; fi < flatCells.length; fi++) {
+      var saved = flatCells[fi];
+      if (!saved) continue;
+      // Support both new flat shape ({r,c}) and any legacy 2D shape ([r][c])
+      var rr = (saved.r != null) ? saved.r : null;
+      var cc = (saved.c != null) ? saved.c : null;
+      if (rr == null || cc == null) continue;
+      var live = board.cells[rr] && board.cells[rr][cc];
+      if (!live) continue;
+      live.tile = saved.tile || null;
+      live.premiumUsed = !!saved.premiumUsed;
     }
 
     // Determine which rack is mine, which is opponent
@@ -1155,10 +1164,14 @@
       // Bag state pre-play
       bag: gs.bag,
       // Pre-play board's premiumUsed flags for cells the play covered
-      // (so the new tiles are removed AND the premium gets re-armed)
+      // (so the new tiles are removed AND the premium gets re-armed).
+      // Read from the live 2D board we already reconstructed locally, since
+      // the doc's gs.board.cells is a flat 1D array (Firestore constraint).
       premiumUsedRestore: playPlacements.map(function (p) {
-        var savedCell = gs.board && gs.board.cells[p.r] && gs.board.cells[p.r][p.c];
-        return { r: p.r, c: p.c, premiumUsed: !!(savedCell && savedCell.premiumUsed) };
+        var liveCell = localSession.board
+                       && localSession.board.cells[p.r]
+                       && localSession.board.cells[p.r][p.c];
+        return { r: p.r, c: p.c, premiumUsed: !!(liveCell && liveCell.premiumUsed) };
       }),
       isFirstMove: gs.isFirstMove,
       // Who made the play (for revert: their score goes down, their rack restored)
