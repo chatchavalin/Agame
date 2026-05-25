@@ -416,6 +416,19 @@
     });
     dialog.appendChild(scoreSheetBtn);
 
+    // Back to Lobby button (only if user came from lobby)
+    if (window.AMathBridge && !window.AMathBridge.isGuest()) {
+      const lobbyBtn = document.createElement('button');
+      lobbyBtn.className = 'btn btn-secondary';
+      lobbyBtn.textContent = '🏠 Back to Lobby';
+      lobbyBtn.style.marginTop = '8px';
+      lobbyBtn.style.width = '100%';
+      lobbyBtn.addEventListener('click', function () {
+        window.location.href = 'lobby.html';
+      });
+      dialog.appendChild(lobbyBtn);
+    }
+
     overlay.appendChild(dialog);
     document.body.appendChild(overlay);
   }
