@@ -139,11 +139,20 @@
     // Determine keep targets based on scenario + bag prediction
     let keepOpsTarget = 1;
     let keepSmallTarget = hasEquals ? 2 : 1;
-    let keepEqualsTarget = hasEquals ? 1 : 0;  // keep 1 = for equations; 2nd = kept situationally
+    let keepEqualsTarget = hasEquals ? 1 : 0;  // keep 1 = for equations; 2nd = always swap
+
+    // BEGINNING PHASE: when bingo-fishing (early game), keep 2 operators
+    // because bingo equations typically need 2+ operators (e.g., 3+4-2+1=5+3)
+    const aiSwaps = (state.aiConsecutiveSwaps || 0);
+    const aiPlays = (state.aiActualPlayCount || 0);
+    const isBeginning = aiPlays === 0; // haven't played any tiles yet
+    if (isBeginning) {
+      keepOpsTarget = 2; // keep both operators for bingo
+    }
 
     // Bag prediction overlay
     if (bagInfo.opRatio < 0.15) {
-      keepOpsTarget += 1;  // keep an extra operator
+      keepOpsTarget = Math.max(keepOpsTarget, 2);  // keep an extra operator
     }
     if (bagInfo.smallRatio < 0.20) {
       keepSmallTarget += 1;  // keep an extra small number
