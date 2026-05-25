@@ -4,6 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>A-Math — Lobby</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#fbbf24">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="lobby.css">
@@ -122,6 +127,10 @@
         <span class="play-icon">👥</span>
         <span>Play Online (Coming Soon)</span>
       </button>
+      <button class="btn-play btn-play-puzzle" onclick="window.location.href='puzzle.html'" style="background:#1e293b;color:#e2e8f0;border:1px solid #fbbf24;">
+        <span class="play-icon">🧩</span>
+        <span>Puzzle Mode</span>
+      </button>
     </div>
 
     <!-- Leaderboard -->
@@ -173,5 +182,6 @@
   <!-- Storage not needed — avatars stored as data URL in Firestore -->
   <script src="js/firebase-config.js?v=20260525b"></script>
   <script src="js/lobby.js?v=20260525b"></script>
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 </body>
 </html>

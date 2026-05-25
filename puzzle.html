@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>A-Math — Puzzle Mode</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#fbbf24">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Outfit',sans-serif; background:#0f172a; color:#e2e8f0; min-height:100vh; }
+    .puzzle-header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:12px 16px; border-bottom:1px solid #1e293b;
+    }
+    .puzzle-header h1 { font-size:18px; font-weight:700; }
+    .puzzle-header .back { background:none; border:none; color:#fbbf24; font-size:24px; cursor:pointer; }
+    .puzzle-info {
+      display:flex; justify-content:space-between; padding:12px 16px;
+      background:#1e293b; font-size:13px;
+    }
+    .puzzle-info .badge { background:#fbbf24; color:#1f2937; padding:2px 10px; border-radius:99px; font-weight:700; }
+    .puzzle-board-wrap { display:flex; justify-content:center; padding:8px; }
+    .puzzle-board {
+      display:grid; grid-template-columns:repeat(15,1fr);
+      gap:1px; background:#334155; border:2px solid #475569; border-radius:4px;
+      width:min(95vw, 450px); aspect-ratio:1;
+    }
+    .p-cell {
+      background:#1e293b; display:flex; align-items:center; justify-content:center;
+      font-size:min(2.8vw,13px); font-weight:700; color:#94a3b8; position:relative;
+    }
+    .p-cell.has-tile { background:#fef3c7; color:#1f2937; border:1px solid #d97706; }
+    .p-cell.c3E { background:#dc2626; color:#fff; }
+    .p-cell.c2E { background:#f472b6; color:#1f2937; }
+    .p-cell.c3T { background:#7c3aed; color:#fff; }
+    .p-cell.c2T { background:#6366f1; color:#fff; }
+    .p-cell.star { background:#f59e0b; color:#1f2937; }
+    .puzzle-rack-section { padding:12px 16px; text-align:center; }
+    .puzzle-rack-section h3 { font-size:14px; color:#94a3b8; margin-bottom:8px; }
+    .puzzle-rack {
+      display:flex; justify-content:center; gap:4px;
+    }
+    .p-tile {
+      width:40px; height:40px; background:#fef3c7; border:2px solid #d97706;
+      border-radius:6px; display:flex; align-items:center; justify-content:center;
+      font-size:16px; font-weight:800; color:#1f2937; position:relative;
+    }
+    .p-tile .pts { position:absolute; bottom:1px; right:3px; font-size:8px; font-weight:600; color:#78716c; }
+    .puzzle-controls { padding:16px; display:flex; flex-direction:column; gap:10px; max-width:450px; margin:0 auto; }
+    .btn-puzzle {
+      padding:14px; border:none; border-radius:12px; font-size:16px; font-weight:700;
+      cursor:pointer; font-family:'Outfit',sans-serif; width:100%;
+    }
+    .btn-reveal { background:#fbbf24; color:#1f2937; }
+    .btn-next { background:#334155; color:#e2e8f0; }
+    .btn-back { background:#1e293b; color:#94a3b8; border:1px solid #334155; }
+    .answer-box {
+      background:#1e293b; border-radius:12px; padding:16px; margin:0 16px;
+      display:none; max-width:450px; margin:0 auto;
+    }
+    .answer-box.show { display:block; }
+    .answer-box h3 { color:#fbbf24; font-size:16px; margin-bottom:8px; }
+    .answer-play { font-size:14px; margin-bottom:6px; }
+    .answer-score { font-size:22px; font-weight:800; color:#34d399; }
+    .answer-eq { color:#94a3b8; font-size:13px; margin-top:4px; }
+    .puzzle-type-select { padding:16px; max-width:450px; margin:0 auto; }
+    .type-btn {
+      display:block; width:100%; padding:18px 20px; margin-bottom:10px;
+      background:#1e293b; border:1px solid #334155; border-radius:14px;
+      color:#e2e8f0; font-size:16px; font-weight:600; text-align:left;
+      cursor:pointer; font-family:'Outfit',sans-serif;
+    }
+    .type-btn:hover { border-color:#fbbf24; }
+    .type-btn .emoji { font-size:24px; margin-right:12px; }
+    .type-btn .desc { font-size:12px; color:#64748b; display:block; margin-top:4px; }
+    .timer { font-size:14px; color:#fbbf24; font-weight:700; }
+    .streak { font-size:14px; color:#34d399; }
+  </style>
+</head>
+<body>
+
+<div class="puzzle-header">
+  <button class="back" onclick="goBack()">←</button>
+  <h1>🧩 Puzzle Mode</h1>
+  <div class="timer" id="timer">0:00</div>
+</div>
+
+<!-- TYPE SELECT -->
+<div id="screen-select" class="puzzle-type-select">
+  <button class="type-btn" onclick="startPuzzle('best')">
+    <span class="emoji">🎯</span>Best Play
+    <span class="desc">หาสมการที่ดีที่สุดจาก rack + board</span>
+  </button>
+  <button class="type-btn" onclick="startPuzzle('bingo')">
+    <span class="emoji">🎰</span>Bingo Challenge
+    <span class="desc">หา Bingo (8 เบี้ย) ให้เจอ</span>
+  </button>
+  <button class="type-btn" onclick="startPuzzle('high')">
+    <span class="emoji">💎</span>High Score
+    <span class="desc">หาสมการ 40+ คะแนน</span>
+  </button>
+  <button class="type-btn" onclick="goBack()">
+    <span class="emoji">🏠</span>Back to Lobby
+  </button>
+</div>
+
+<!-- PUZZLE VIEW -->
+<div id="screen-puzzle" style="display:none">
+  <div class="puzzle-info">
+    <span id="puzzle-type-label">Best Play</span>
+    <span class="streak" id="streak">Streak: 0</span>
+    <span class="badge" id="puzzle-num">#1</span>
+  </div>
+  <div class="puzzle-board-wrap">
+    <div class="puzzle-board" id="puzzle-board"></div>
+  </div>
+  <div class="puzzle-rack-section">
+    <h3>Your Rack</h3>
+    <div class="puzzle-rack" id="puzzle-rack"></div>
+  </div>
+  <div class="answer-box" id="answer-box">
+    <h3>💡 Best Play</h3>
+    <div class="answer-play" id="answer-play"></div>
+    <div class="answer-score" id="answer-score"></div>
+    <div class="answer-eq" id="answer-eq"></div>
+  </div>
+  <div class="puzzle-controls">
+    <button class="btn-puzzle btn-reveal" id="btn-reveal" onclick="revealAnswer()">👁️ Show Answer</button>
+    <button class="btn-puzzle btn-next" onclick="nextPuzzle()">Next Puzzle →</button>
+    <button class="btn-puzzle btn-back" onclick="showSelect()">← Change Type</button>
+  </div>
+</div>
+
+<!-- Load game engine (needed for board, scoring, AI search) -->
+<script src="js/constants.js?v=20260535"></script>
+<script src="js/board.js?v=20260535"></script>
+<script src="js/bag.js?v=20260535"></script>
+<script src="js/rack.js?v=20260535"></script>
+<script src="js/evaluator.js?v=20260535"></script>
+<script src="js/placement.js?v=20260535"></script>
+<script src="js/scoring.js?v=20260535"></script>
+<script>
+(function() {
+  var Board, Bag, Rack, C, Placement, Scoring;
+  var currentPuzzle = null;
+  var puzzleType = 'best';
+  var puzzleNum = 0;
+  var streak = 0;
+  var timerInterval = null;
+  var timerSeconds = 0;
+  var answerRevealed = false;
+
+  function init() {
+    Board = window.AMath.board;
+    Bag = window.AMath.bag;
+    Rack = window.AMath.rack;
+    C = window.AMath.constants;
+    Placement = window.AMath.placement;
+    Scoring = window.AMath.scoring;
+  }
+
+  // Premium square map
+  var PREMIUMS = {};
+  var pList = [
+    // 3E (red corners + center cross)
+    [0,0,'3E'],[0,7,'3E'],[0,14,'3E'],[7,0,'3E'],[7,14,'3E'],[14,0,'3E'],[14,7,'3E'],[14,14,'3E'],
+    // 2E
+    [1,1,'2E'],[1,13,'2E'],[2,2,'2E'],[2,12,'2E'],[3,3,'2E'],[3,11,'2E'],[4,4,'2E'],[4,10,'2E'],
+    [10,4,'2E'],[10,10,'2E'],[11,3,'2E'],[11,11,'2E'],[12,2,'2E'],[12,12,'2E'],[13,1,'2E'],[13,13,'2E'],
+    // 3T
+    [1,5,'3T'],[1,9,'3T'],[5,1,'3T'],[5,5,'3T'],[5,9,'3T'],[5,13,'3T'],
+    [9,1,'3T'],[9,5,'3T'],[9,9,'3T'],[9,13,'3T'],[13,5,'3T'],[13,9,'3T'],
+    // 2T
+    [0,3,'2T'],[0,11,'2T'],[3,0,'2T'],[3,6,'2T'],[3,8,'2T'],[3,14,'2T'],
+    [6,2,'2T'],[6,6,'2T'],[6,8,'2T'],[6,12,'2T'],
+    [7,3,'2T'],[7,11,'2T'],
+    [8,2,'2T'],[8,6,'2T'],[8,8,'2T'],[8,12,'2T'],
+    [11,0,'2T'],[11,6,'2T'],[11,8,'2T'],[11,14,'2T'],
+    [14,3,'2T'],[14,11,'2T'],
+  ];
+  pList.forEach(function(p){ PREMIUMS[p[0]+','+p[1]] = p[2]; });
+
+  function renderBoard(board) {
+    var grid = document.getElementById('puzzle-board');
+    grid.innerHTML = '';
+    for (var r = 0; r < 15; r++) {
+      for (var c = 0; c < 15; c++) {
+        var cell = document.createElement('div');
+        cell.className = 'p-cell';
+        var tile = board.cells[r][c].tile;
+        if (tile) {
+          cell.classList.add('has-tile');
+          cell.textContent = tile.assigned || tile.face;
+        } else {
+          var key = r+','+c;
+          if (r===7 && c===7) { cell.classList.add('star'); cell.textContent='★'; }
+          else if (PREMIUMS[key]) {
+            cell.classList.add('c'+PREMIUMS[key]);
+            cell.textContent = PREMIUMS[key];
+          }
+        }
+        grid.appendChild(cell);
+      }
+    }
+  }
+
+  function renderRack(tiles) {
+    var rack = document.getElementById('puzzle-rack');
+    rack.innerHTML = '';
+    tiles.forEach(function(t) {
+      var div = document.createElement('div');
+      div.className = 'p-tile';
+      div.textContent = t.face === 'BLANK' ? '?' : t.face;
+      var pts = document.createElement('span');
+      pts.className = 'pts';
+      pts.textContent = t.points;
+      div.appendChild(pts);
+      rack.appendChild(div);
+    });
+  }
+
+  function generatePuzzle(type) {
+    if (!Board) init();
+    var inv = C.getActiveInventory();
+    var bag = Bag.createBag('prathom');
+    var board = Board.createBoard();
+
+    // Place some random equations on board (except for bingo type)
+    if (type !== 'bingo') {
+      // Place 1-3 equations on board
+      var eqCount = 1 + Math.floor(Math.random() * 3);
+      for (var e = 0; e < eqCount; e++) {
+        placeRandomEquation(board, bag);
+      }
+    }
+
+    // Draw rack
+    var rackTiles = [];
+    for (var i = 0; i < 8; i++) {
+      var t = Bag.drawOne(bag);
+      if (t) rackTiles.push(t);
+    }
+
+    // Ensure rack has = for solvability
+    var hasEq = rackTiles.some(function(t){ return t.type === 'equals'; });
+    if (!hasEq) {
+      // Swap a random non-blank tile for =
+      var swapIdx = rackTiles.findIndex(function(t){ return t.type !== 'blank'; });
+      if (swapIdx >= 0) {
+        var eqTile = inv.find(function(d){ return d.face === '='; });
+        rackTiles[swapIdx] = {id:'peq'+Math.random(), face:'=', type:'equals', points:eqTile.points, assigned:null};
+      }
+    }
+
+    return { board: board, rack: rackTiles, bag: bag };
+  }
+
+  function placeRandomEquation(board, bag) {
+    // Simple equations: A op B = C
+    var nums = [1,2,3,4,5,6,7,8,9];
+    var a = nums[Math.floor(Math.random()*nums.length)];
+    var b = nums[Math.floor(Math.random()*nums.length)];
+    var ops = ['+','-'];
+    var op = ops[Math.floor(Math.random()*2)];
+    var result = op === '+' ? a+b : a-b;
+    if (result < 0 || result > 16) return;
+
+    var inv = C.getActiveInventory();
+    function mk(f) {
+      var d = inv.find(function(x){return x.face===f}) || {type:'digit',points:1};
+      return {id:'p'+Math.random(), face:f, type:d.type, points:d.points, assigned:null};
+    }
+
+    // Pick random row, try to place
+    var row = Math.floor(Math.random()*15);
+    var startCol = Math.floor(Math.random()*10);
+    var tiles = [mk(String(a)), mk(op), mk(String(b)), mk('='), mk(String(result))];
+
+    // Check if fits
+    var fits = true;
+    for (var i = 0; i < tiles.length; i++) {
+      if (startCol+i >= 15) { fits = false; break; }
+      if (board.cells[row][startCol+i].tile) { fits = false; break; }
+    }
+    if (!fits) return;
+
+    // Check if first move or adjacent
+    var boardEmpty = true;
+    for (var r = 0; r < 15 && boardEmpty; r++)
+      for (var c = 0; c < 15 && boardEmpty; c++)
+        if (board.cells[r][c].tile) boardEmpty = false;
+
+    if (boardEmpty) {
+      // Must pass through center
+      var passesCenter = false;
+      for (var j = 0; j < tiles.length; j++) {
+        if (row === 7 && startCol+j === 7) passesCenter = true;
+      }
+      if (!passesCenter) { row = 7; startCol = 5; }
+    }
+
+    // Place
+    for (var k = 0; k < tiles.length; k++) {
+      if (startCol+k < 15 && !board.cells[row][startCol+k].tile) {
+        Board.placeTile(board, row, startCol+k, tiles[k]);
+      }
+    }
+  }
+
+  function findBestPlay(board, rackTiles) {
+    // Brute force search for best play (simplified — checks 1-6 tile plays)
+    var best = null;
+    var anchors = [];
+
+    // Find anchors (empty cells adjacent to filled cells)
+    for (var r = 0; r < 15; r++) {
+      for (var c = 0; c < 15; c++) {
+        if (board.cells[r][c].tile) continue;
+        var adj = [[r-1,c],[r+1,c],[r,c-1],[r,c+1]];
+        for (var a = 0; a < adj.length; a++) {
+          var ar = adj[a][0], ac = adj[a][1];
+          if (ar>=0 && ar<15 && ac>=0 && ac<15 && board.cells[ar][ac].tile) {
+            anchors.push({row:r, col:c});
+            break;
+          }
+        }
+      }
+    }
+
+    // Check if board is empty → center is only anchor
+    var boardEmpty = anchors.length === 0;
+    if (boardEmpty) anchors = [{row:7, col:7}];
+
+    // For each anchor, try horizontal and vertical plays
+    var maxLen = Math.min(rackTiles.length, 6);
+    var timeLimit = Date.now() + 5000; // 5 second budget
+
+    for (var ai = 0; ai < anchors.length && Date.now() < timeLimit; ai++) {
+      var anchor = anchors[ai];
+      
+      // Try placing 2-maxLen tiles through this anchor
+      for (var len = 2; len <= maxLen && Date.now() < timeLimit; len++) {
+        // Horizontal
+        for (var sc = Math.max(0, anchor.col-len+1); sc <= anchor.col && sc+len-1 < 15; sc++) {
+          tryPlacement(board, rackTiles, 7, sc, len, 'h', boardEmpty);
+        }
+        // Vertical
+        for (var sr = Math.max(0, anchor.row-len+1); sr <= anchor.row && sr+len-1 < 15; sr++) {
+          tryPlacement(board, rackTiles, sr, anchor.col, len, 'v', boardEmpty);
+        }
+      }
+    }
+
+    function tryPlacement(board, tiles, startR, startC, len, dir, isFirst) {
+      // Quick check: do we have enough tiles for empty cells?
+      var emptyCells = [];
+      for (var i = 0; i < len; i++) {
+        var r = dir==='h' ? startR : startR+i;
+        var c = dir==='h' ? startC+i : startC;
+        if (r>=15 || c>=15) return;
+        if (!board.cells[r][c].tile) emptyCells.push({row:r, col:c, idx:i});
+      }
+      if (emptyCells.length === 0 || emptyCells.length > tiles.length) return;
+
+      // Try permutations of tiles for empty cells (limit to avoid explosion)
+      var perms = getSimplePerms(tiles, emptyCells.length, 50);
+      for (var p = 0; p < perms.length; p++) {
+        var perm = perms[p];
+        var placements = [];
+        for (var e = 0; e < emptyCells.length; e++) {
+          Board.placeTile(board, emptyCells[e].row, emptyCells[e].col, perm[e]);
+          placements.push({row:emptyCells[e].row, col:emptyCells[e].col, tile:perm[e]});
+        }
+        var result = Placement.validatePlay(board, placements, isFirst);
+        if (result.ok) {
+          var score = Scoring.scorePlay(result.equations, board, placements.length);
+          if (!best || score.total > best.score) {
+            best = {
+              score: score.total,
+              placements: placements.map(function(p){return{row:p.row,col:p.col,face:p.tile.assigned||p.tile.face};}),
+              equations: result.equations,
+              bingo: placements.length === 8,
+            };
+          }
+        }
+        // Remove tiles
+        for (var e2 = 0; e2 < emptyCells.length; e2++) {
+          Board.removeTile(board, emptyCells[e2].row, emptyCells[e2].col);
+        }
+      }
+    }
+
+    function getSimplePerms(arr, k, limit) {
+      var results = [];
+      function helper(remaining, chosen) {
+        if (results.length >= limit) return;
+        if (chosen.length === k) { results.push(chosen.slice()); return; }
+        for (var i = 0; i < remaining.length; i++) {
+          if (i > 0 && remaining[i].face === remaining[i-1].face && remaining[i].type === remaining[i-1].type) continue;
+          chosen.push(remaining[i]);
+          helper(remaining.slice(0,i).concat(remaining.slice(i+1)), chosen);
+          chosen.pop();
+        }
+      }
+      helper(arr, []);
+      return results;
+    }
+
+    return best;
+  }
+
+  // === PUBLIC API ===
+
+  window.startPuzzle = function(type) {
+    puzzleType = type;
+    puzzleNum = 0;
+    streak = 0;
+    document.getElementById('screen-select').style.display = 'none';
+    document.getElementById('screen-puzzle').style.display = 'block';
+    var labels = {best:'🎯 Best Play', bingo:'🎰 Bingo Challenge', high:'💎 High Score'};
+    document.getElementById('puzzle-type-label').textContent = labels[type] || type;
+    nextPuzzle();
+  };
+
+  window.nextPuzzle = function() {
+    if (!Board) init();
+    puzzleNum++;
+    answerRevealed = false;
+    document.getElementById('puzzle-num').textContent = '#' + puzzleNum;
+    document.getElementById('streak').textContent = 'Streak: ' + streak;
+    document.getElementById('answer-box').classList.remove('show');
+    document.getElementById('btn-reveal').textContent = '👁️ Show Answer';
+    document.getElementById('btn-reveal').disabled = false;
+
+    // Generate puzzle
+    var puzzle = generatePuzzle(puzzleType);
+    currentPuzzle = puzzle;
+    renderBoard(puzzle.board);
+    renderRack(puzzle.rack);
+
+    // Find answer in background
+    currentPuzzle.answer = null;
+    document.getElementById('btn-reveal').textContent = '⏳ Searching...';
+    setTimeout(function() {
+      var answer = findBestPlay(puzzle.board, puzzle.rack);
+      currentPuzzle.answer = answer;
+      if (!answerRevealed) {
+        document.getElementById('btn-reveal').textContent = '👁️ Show Answer';
+      }
+    }, 100);
+
+    // Start timer
+    timerSeconds = 0;
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(function() {
+      timerSeconds++;
+      var m = Math.floor(timerSeconds/60);
+      var s = timerSeconds % 60;
+      document.getElementById('timer').textContent = m + ':' + (s<10?'0':'') + s;
+    }, 1000);
+  };
+
+  window.revealAnswer = function() {
+    answerRevealed = true;
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+
+    var box = document.getElementById('answer-box');
+    var answer = currentPuzzle ? currentPuzzle.answer : null;
+
+    if (!answer) {
+      document.getElementById('answer-play').textContent = 'No valid play found for this rack/board. Try next puzzle!';
+      document.getElementById('answer-score').textContent = '';
+      document.getElementById('answer-eq').textContent = '';
+    } else {
+      var positions = answer.placements.map(function(p){return p.face + ' at ('+p.row+','+p.col+')';}).join(', ');
+      document.getElementById('answer-play').textContent = positions;
+      document.getElementById('answer-score').textContent = answer.score + ' points' + (answer.bingo ? ' 🎉 BINGO!' : '');
+      // Highlight answer on board
+      answer.placements.forEach(function(p) {
+        var idx = p.row * 15 + p.col;
+        var cells = document.getElementById('puzzle-board').children;
+        if (cells[idx]) {
+          cells[idx].style.background = '#34d399';
+          cells[idx].style.color = '#1f2937';
+          cells[idx].textContent = p.face;
+        }
+      });
+    }
+    box.classList.add('show');
+    document.getElementById('btn-reveal').textContent = '✅ Revealed';
+    document.getElementById('btn-reveal').disabled = true;
+  };
+
+  window.showSelect = function() {
+    document.getElementById('screen-select').style.display = 'block';
+    document.getElementById('screen-puzzle').style.display = 'none';
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  };
+
+  window.goBack = function() {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('from') === 'lobby') {
+      window.location.href = 'lobby.html';
+    } else {
+      window.location.href = 'lobby.html';
+    }
+  };
+})();
+</script>
+</body>
+</html>
