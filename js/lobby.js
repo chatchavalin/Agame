@@ -142,17 +142,33 @@
     if (dataUrl && dataUrl.startsWith('http')) return dataUrl;
     if (!dataUrl || !dataUrl.startsWith('data:')) return null;
 
+    // Resize image to small avatar (max 128x128) to keep Firestore doc small
     try {
-      var ref = firebase.storage().ref('avatars/' + uid + '.jpg');
-      // Convert data URL to blob
-      var res = await fetch(dataUrl);
-      var blob = await res.blob();
-      await ref.put(blob, { contentType: 'image/jpeg' });
-      return await ref.getDownloadURL();
+      var resized = await resizeImage(dataUrl, 128);
+      return resized; // store as data URL directly in Firestore
     } catch (err) {
-      console.error('Avatar upload error:', err);
-      return dataUrl; // fallback to data URL stored in Firestore (not ideal but works)
+      console.error('Resize error:', err);
+      return dataUrl;
     }
+  }
+
+  function resizeImage(dataUrl, maxSize) {
+    return new Promise(function (resolve) {
+      var img = new Image();
+      img.onload = function () {
+        var w = img.width, h = img.height;
+        if (w > maxSize || h > maxSize) {
+          if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+          else { w = Math.round(w * maxSize / h); h = maxSize; }
+        }
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.onerror = function () { resolve(dataUrl); };
+      img.src = dataUrl;
+    });
   }
 
   async function saveProfile() {
