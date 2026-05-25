@@ -169,12 +169,13 @@
   function isOpponentReadyForBingo(oppHistory) {
     if (!oppHistory || oppHistory.length === 0) return false; // no data yet
 
-    // Check last 2 opponent swap turns
     const swapTurns = oppHistory.filter(h => h.type === 'swap');
-    const nonSwapTurns = oppHistory.filter(h => h.type !== 'swap');
 
-    // If opponent never swapped (all plays or passes) → very ready
-    if (swapTurns.length === 0 && oppHistory.length >= 1) return true;
+    // If opponent ever played a tile → definitely ready
+    if (oppHistory.some(h => h.type === 'play')) return true;
+
+    // If opponent never swapped (all passes) → very ready
+    if (swapTurns.length === 0) return true;
 
     // If opponent swapped ≥2 turns, check last 2 swap amounts
     if (swapTurns.length >= 2) {
@@ -294,33 +295,70 @@
             }
 
             // Place on board and validate
-            const tempBoard = Board.createBoard();
-            for (const p of placements) {
-              Board.placeTile(tempBoard, p.row, p.col, p.tile);
+            // Handle choice tiles — try both assignments
+            const choiceIndices = [];
+            for (let ci = 0; ci < placements.length; ci++) {
+              if (placements[ci].tile.type === 'choice') choiceIndices.push(ci);
             }
 
-            const result = Placement.validatePlay(tempBoard, placements, true);
-            if (result.ok) {
-              const score = Scoring.scorePlay(result.equations, tempBoard, placements.length);
-              // Calculate dump quality — higher = dumped more bad tiles
-              let dumpScore = 0;
-              for (const p of placements) {
-                if (p.tile.type !== 'equals') {
-                  dumpScore += (100 - tileDesirability(p.tile));
+            function tryChoiceAssignments(cIdx) {
+              if (cIdx >= choiceIndices.length) {
+                // All choices assigned — validate
+                const tempBoard = Board.createBoard();
+                for (const p of placements) {
+                  Board.placeTile(tempBoard, p.row, p.col, p.tile);
                 }
+                const result = Placement.validatePlay(tempBoard, placements, true);
+                if (result.ok) {
+                  const score = Scoring.scorePlay(result.equations, tempBoard, placements.length);
+                  let dumpScore = 0;
+                  for (const p of placements) {
+                    if (p.tile.type !== 'equals') dumpScore += (100 - tileDesirability(p.tile));
+                  }
+                  bestPlays.push({
+                    placements: placements.map(p => ({row:p.row,col:p.col,tile:Object.assign({},p.tile)})),
+                    score: score.total,
+                    equations: result.equations,
+                    dumpScore: dumpScore,
+                    len: len,
+                  });
+                }
+                for (const p of placements) Board.removeTile(tempBoard, p.row, p.col);
+                return;
               }
-              bestPlays.push({
-                placements: placements,
-                score: score.total,
-                equations: result.equations,
-                dumpScore: dumpScore,
-                len: len,
-              });
+              const pi = choiceIndices[cIdx];
+              const tile = placements[pi].tile;
+              const opts = tile.face === '+/-' ? ['+','-'] : ['×','÷'];
+              for (const opt of opts) {
+                tile.assigned = opt;
+                tryChoiceAssignments(cIdx + 1);
+              }
+              tile.assigned = null;
             }
 
-            // Clean up
-            for (const p of placements) {
-              Board.removeTile(tempBoard, p.row, p.col);
+            if (choiceIndices.length > 0) {
+              tryChoiceAssignments(0);
+            } else {
+              const tempBoard = Board.createBoard();
+              for (const p of placements) {
+                Board.placeTile(tempBoard, p.row, p.col, p.tile);
+              }
+              const result = Placement.validatePlay(tempBoard, placements, true);
+              if (result.ok) {
+                const score = Scoring.scorePlay(result.equations, tempBoard, placements.length);
+                let dumpScore = 0;
+                for (const p of placements) {
+                  if (p.tile.type !== 'equals') dumpScore += (100 - tileDesirability(p.tile));
+                }
+                bestPlays.push({
+                  placements: placements.map(p => ({row:p.row,col:p.col,tile:Object.assign({},p.tile)})),
+                  score: score.total,
+                  equations: result.equations,
+                  dumpScore: dumpScore,
+                  len: len,
+                });
+              }
+              for (const p of placements) Board.removeTile(tempBoard, p.row, p.col);
             }
           }
         }
