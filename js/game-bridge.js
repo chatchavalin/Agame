@@ -32,6 +32,14 @@
       showProfileInGame();
     }
 
+    // Show lobby button (may not exist yet if UI hasn't rendered)
+    function showLobbyBtn() {
+      var lobbyBtn = document.getElementById('btn-lobby');
+      if (lobbyBtn) { lobbyBtn.style.display = ''; }
+      else { setTimeout(showLobbyBtn, 500); }
+    }
+    showLobbyBtn();
+
     // Wait for Firebase SDK (may load async)
     if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
       _db = firebase.firestore();

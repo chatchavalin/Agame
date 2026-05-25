@@ -597,6 +597,7 @@
       <button class="btn btn-icon" id="btn-import" title="Load game from file">📂</button>
       <button class="btn btn-icon" id="btn-score-sheet" title="Score Sheet">📊</button>
       <button class="btn btn-icon" id="btn-settings" title="Settings">⚙️</button>
+      <button class="btn btn-icon" id="btn-lobby" title="Back to Lobby" style="display:none" onclick="window.location.href='lobby.html'">🏠</button>
       <input type="file" id="file-import-input" accept=".json" style="display:none">
     `;
     root.appendChild(buttonBar);
