@@ -136,6 +136,7 @@
 
 <!-- Load game engine (needed for board, scoring, AI search) -->
 <script src="js/constants.js?v=20260535"></script>
+<script src="js/utils.js?v=20260535"></script>
 <script src="js/board.js?v=20260535"></script>
 <script src="js/bag.js?v=20260535"></script>
 <script src="js/rack.js?v=20260535"></script>
@@ -415,6 +416,12 @@
   // === PUBLIC API ===
 
   window.startPuzzle = function(type) {
+    try {
+      if (!Board) init();
+    } catch(e) {
+      alert('Game engine load error: ' + e.message);
+      return;
+    }
     puzzleType = type;
     puzzleNum = 0;
     streak = 0;
@@ -426,7 +433,12 @@
   };
 
   window.nextPuzzle = function() {
-    if (!Board) init();
+    try {
+      if (!Board) init();
+    } catch(e) {
+      alert('Init error: ' + e.message);
+      return;
+    }
     puzzleNum++;
     answerRevealed = false;
     document.getElementById('puzzle-num').textContent = '#' + puzzleNum;
