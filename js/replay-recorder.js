@@ -71,17 +71,23 @@
   }
 
   /**
-   * Convert an equation (array of {row,col,tile,isNew?}) to faces only.
+   * Encode an equation as a comma-separated face string (e.g. '3,+,4,=,7').
+   * CRITICAL: previously returned an Array, which produced Array<Array<String>>
+   * when nested inside move.equations — Firestore rejects nested arrays
+   * (Array directly inside Array), so saveReplay silently failed for every
+   * game with equations.
+   *
+   * Comma is safe: no tile face contains a comma. Decoder is .split(',').
    */
   function compactEquation(eq) {
-    if (!eq || !eq.length) return [];
-    var out = [];
+    if (!eq || !eq.length) return '';
+    var parts = [];
     for (var i = 0; i < eq.length; i++) {
       var cell = eq[i];
-      if (!cell || !cell.tile) { out.push('?'); continue; }
-      out.push(cell.tile.assigned || cell.tile.face);
+      if (!cell || !cell.tile) { parts.push('?'); continue; }
+      parts.push(cell.tile.assigned || cell.tile.face);
     }
-    return out;
+    return parts.join(',');
   }
 
   function recordPlay(info) {

@@ -181,7 +181,13 @@
           text += 'played ' + (m.placements ? m.placements.length : 0) + ' tiles for ' + (m.score || 0) + ' pts';
           if (m.bingo) text += ' BINGO! 🎉';
           if (m.equations && m.equations.length) {
-            var eqStr = m.equations.map(function (e) { return e.join(''); }).join(' | ');
+            // Each equation can be either a comma-encoded string (new format,
+            // Firestore-safe) or a legacy Array (older replay docs). Handle
+            // both so old PvA replays keep rendering.
+            var eqStr = m.equations.map(function (e) {
+              var faces = (typeof e === 'string') ? e.split(',') : e;
+              return faces.join('');
+            }).join(' | ');
             text += ' (' + eqStr + ')';
           }
         } else if (m.type === 'swap') {

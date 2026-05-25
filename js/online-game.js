@@ -1111,9 +1111,14 @@
     if (myRole === 'host') newHostScore += scoreResult.total;
     else newGuestScore += scoreResult.total;
 
-    // Equation faces for replay
+    // Equations encoded as comma-separated face strings (e.g. '3,+,10,=,13').
+    // CRITICAL: must NOT be an array-of-arrays — Firestore rejects nested
+    // arrays. Comma preserves multi-character faces like '10' and '12'
+    // (no face contains a comma). Decoded on read via .split(',').
     var equationFaces = (validation.equations || []).map(function (eq) {
-      return eq.map(function (c) { return c.tile ? (c.tile.assigned || c.tile.face) : '?'; });
+      return eq.map(function (c) {
+        return c.tile ? (c.tile.assigned || c.tile.face) : '?';
+      }).join(',');
     });
 
     var isBingo = scoreResult.bingoBonus > 0;
@@ -1282,12 +1287,17 @@
 
     submitInFlight = true;
     try {
-      // Validate each equation. Replay schema stored each equation as a
-      // face array (e.g. ['3','+','4','=','7']).
+      // Validate each equation. Replay schema stores each equation as a
+      // comma-encoded face string (e.g. '3,+,4,=,7'). Split before
+      // handing to Evaluator.validateEquation which wants an array of faces.
       var equations = gs.lastMove.equations || [];
       var badReason = null;
       for (var i = 0; i < equations.length; i++) {
-        var faces = equations[i];
+        var encoded = equations[i];
+        if (!encoded) continue;
+        // Be defensive — old docs may still hold the broken nested-array
+        // shape (Array<Array>). If we see an array, use it as-is.
+        var faces = (typeof encoded === 'string') ? encoded.split(',') : encoded;
         if (!faces || !faces.length) continue;
         var res = Evaluator.validateEquation(faces);
         if (!res.valid) { badReason = res.reason || 'invalid'; break; }
