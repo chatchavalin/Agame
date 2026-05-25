@@ -317,7 +317,17 @@
                     if (p.tile.type !== 'equals') dumpScore += (100 - tileDesirability(p.tile));
                   }
                   bestPlays.push({
-                    placements: placements.map(p => ({row:p.row,col:p.col,tile:Object.assign({},p.tile)})),
+                    // IMPORTANT: surface `assigned` at the placement top-level.
+                    // main.js commits via `p.assigned` (not p.tile.assigned),
+                    // so a played +/- or ×/÷ choice tile must carry its
+                    // assigned face up here, or the board cell will render
+                    // the raw stacked "+/-" / "×/÷" face after commit.
+                    placements: placements.map(p => ({
+                      row: p.row,
+                      col: p.col,
+                      tile: Object.assign({}, p.tile),
+                      assigned: p.tile.assigned || null,
+                    })),
                     score: score.total,
                     equations: result.equations,
                     dumpScore: dumpScore,
@@ -352,7 +362,16 @@
                   if (p.tile.type !== 'equals') dumpScore += (100 - tileDesirability(p.tile));
                 }
                 bestPlays.push({
-                  placements: placements.map(p => ({row:p.row,col:p.col,tile:Object.assign({},p.tile)})),
+                  // (See sibling bestPlays.push above for why `assigned` is
+                  // surfaced at the placement top-level. Same reason here —
+                  // this branch handles plays with no choice tiles, but the
+                  // shape must match for main.js to commit consistently.)
+                  placements: placements.map(p => ({
+                    row: p.row,
+                    col: p.col,
+                    tile: Object.assign({}, p.tile),
+                    assigned: p.tile.assigned || null,
+                  })),
                   score: score.total,
                   equations: result.equations,
                   dumpScore: dumpScore,
