@@ -135,14 +135,14 @@
 </div>
 
 <!-- Load game engine (needed for board, scoring, AI search) -->
-<script src="js/constants.js?v=20260535"></script>
-<script src="js/utils.js?v=20260535"></script>
-<script src="js/board.js?v=20260535"></script>
-<script src="js/bag.js?v=20260535"></script>
-<script src="js/rack.js?v=20260535"></script>
-<script src="js/evaluator.js?v=20260535"></script>
-<script src="js/placement.js?v=20260535"></script>
-<script src="js/scoring.js?v=20260535"></script>
+<script src="js/constants.js?v=20260525c"></script>
+<script src="js/utils.js?v=20260525c"></script>
+<script src="js/board.js?v=20260525c"></script>
+<script src="js/bag.js?v=20260525c"></script>
+<script src="js/rack.js?v=20260525c"></script>
+<script src="js/evaluator.js?v=20260525c"></script>
+<script src="js/placement.js?v=20260525c"></script>
+<script src="js/scoring.js?v=20260525c"></script>
 <script>
 (function() {
   var Board, Bag, Rack, C, Placement, Scoring;
@@ -419,7 +419,7 @@
     try {
       if (!Board) init();
     } catch(e) {
-      alert('Game engine load error: ' + e.message);
+      document.getElementById('screen-select').innerHTML += '<div style="color:red;padding:16px">Error: ' + e.message + '</div>';
       return;
     }
     puzzleType = type;
@@ -436,7 +436,7 @@
     try {
       if (!Board) init();
     } catch(e) {
-      alert('Init error: ' + e.message);
+      document.getElementById('puzzle-rack').innerHTML = '<div style="color:red">Init error: ' + e.message + '</div>';
       return;
     }
     puzzleNum++;
@@ -448,10 +448,15 @@
     document.getElementById('btn-reveal').disabled = false;
 
     // Generate puzzle
-    var puzzle = generatePuzzle(puzzleType);
-    currentPuzzle = puzzle;
-    renderBoard(puzzle.board);
-    renderRack(puzzle.rack);
+    try {
+      var puzzle = generatePuzzle(puzzleType);
+      currentPuzzle = puzzle;
+      renderBoard(puzzle.board);
+      renderRack(puzzle.rack);
+    } catch(e) {
+      document.getElementById('puzzle-rack').innerHTML = '<div style="color:red">Puzzle error: ' + e.message + '</div>';
+      return;
+    }
 
     // Find answer in background
     currentPuzzle.answer = null;
