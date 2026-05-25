@@ -64,12 +64,32 @@
   <script src="js/ui.js?v=20260535"></script>
   <script src="js/interactions.js?v=20260535"></script>
   <script src="js/main.js?v=20260535"></script>
-  <!-- Firebase (optional — only for logged-in users from lobby) -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <!-- Storage not needed — avatars stored as data URL in Firestore -->
-  <script src="js/firebase-config.js"></script>
-  <script src="js/game-bridge.js"></script>
+  <!-- Firebase (optional — loads async, won't slow down game) -->
+  <script>
+  (function(){
+    var params = new URLSearchParams(window.location.search);
+    if (!params.get('userId') || params.get('userId') === 'guest') return; // skip Firebase for guest
+    var scripts = [
+      'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js',
+      'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js',
+      'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js'
+    ];
+    var loaded = 0;
+    scripts.forEach(function(src){
+      var s = document.createElement('script');
+      s.src = src;
+      s.async = false; // preserve order but non-blocking
+      s.onload = function(){
+        loaded++;
+        if (loaded === scripts.length) {
+          // All Firebase scripts loaded — init
+          var s1 = document.createElement('script'); s1.src = 'js/firebase-config.js'; document.body.appendChild(s1);
+          var s2 = document.createElement('script'); s2.src = 'js/game-bridge.js'; document.body.appendChild(s2);
+        }
+      };
+      document.body.appendChild(s);
+    });
+  })();
+  </script>
 </body>
 </html>
