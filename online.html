@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>A-Math — Online Room</title>
+  <link rel="stylesheet" href="styles.css?v=20260525e">
+  <style>
+    body { background: #0f172a; color: #e2e8f0; font-family: 'Outfit', sans-serif; }
+    .room-wrap { max-width: 900px; margin: 0 auto; padding: 14px; }
+    .room-header {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 14px; margin-bottom: 12px;
+    }
+    .room-code-display {
+      background: #1e293b; padding: 8px 14px; border-radius: 8px;
+      border: 2px dashed #fbbf24;
+      font-family: monospace; font-size: 20px; font-weight: 700;
+      letter-spacing: 4px; color: #fbbf24; cursor: pointer;
+    }
+    .room-code-display:hover { background: #334155; }
+    .room-back { color: #94a3b8; text-decoration: none; font-size: 14px; }
+    .room-back:hover { color: #fbbf24; }
+    .room-status {
+      background: #1e293b; padding: 14px; border-radius: 8px;
+      margin: 10px 0; text-align: center;
+    }
+    .room-status.waiting { border: 1px solid #fbbf24; }
+    .room-status.playing { border: 1px solid #86efac; }
+    .room-status.finished { border: 1px solid #93c5fd; }
+    .players-row { display: flex; gap: 10px; margin: 12px 0; }
+    .player-card {
+      flex: 1; background: #1e293b; padding: 10px; border-radius: 8px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .player-card.active { border: 2px solid #fbbf24; }
+    .player-card img { width: 36px; height: 36px; border-radius: 50%; }
+    .player-card .pname { font-weight: 600; }
+    .player-card .pscore { font-size: 24px; color: #fbbf24; font-weight: 700; }
+    .mvp-warning {
+      background: #422006; color: #fbbf24; padding: 10px; border-radius: 6px;
+      font-size: 13px; margin: 12px 0; border: 1px solid #92400e;
+    }
+    .copy-feedback {
+      position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+      background: #16a34a; color: white; padding: 8px 14px; border-radius: 6px;
+      z-index: 99999; opacity: 0; transition: opacity .3s;
+    }
+    .copy-feedback.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div class="room-wrap">
+    <div class="room-header">
+      <a href="lobby.html" class="room-back">← Leave room</a>
+      <div class="room-code-display" id="room-code" onclick="copyRoomCode()">…</div>
+    </div>
+
+    <div class="mvp-warning">
+      ⚠️ <b>Beta — MVP build:</b> 2P online uses Firestore for sync.
+      Room creation, joining, and live status update work.
+      Full move synchronization in the board is the next iteration.
+      For now, this screen confirms the connection and shows live presence.
+    </div>
+
+    <div class="players-row" id="players-row">
+      <div class="player-card" id="host-card">
+        <div style="width:36px;height:36px;border-radius:50%;background:#334155;"></div>
+        <div>
+          <div class="pname">…</div>
+          <div style="font-size:11px;color:#94a3b8;">Host</div>
+        </div>
+        <div class="pscore" style="margin-left:auto;">0</div>
+      </div>
+      <div class="player-card" id="guest-card">
+        <div style="width:36px;height:36px;border-radius:50%;background:#334155;"></div>
+        <div>
+          <div class="pname">Waiting…</div>
+          <div style="font-size:11px;color:#94a3b8;">Guest</div>
+        </div>
+        <div class="pscore" style="margin-left:auto;">0</div>
+      </div>
+    </div>
+
+    <div class="room-status waiting" id="room-status">Loading…</div>
+
+    <div id="room-content"></div>
+  </div>
+
+  <div id="copy-feedback" class="copy-feedback">Copied to clipboard!</div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="js/firebase-config.js?v=20260525e"></script>
+  <script src="js/online-room.js?v=20260525e"></script>
+  <script>
+    var roomCode = new URLSearchParams(window.location.search).get('room');
+    var role = new URLSearchParams(window.location.search).get('role');
+    var unsubscribe = null;
+
+    function copyRoomCode() {
+      if (!roomCode) return;
+      navigator.clipboard.writeText(roomCode).then(function () {
+        var fb = document.getElementById('copy-feedback');
+        fb.classList.add('show');
+        setTimeout(function () { fb.classList.remove('show'); }, 1500);
+      });
+    }
+
+    function renderRoom(data) {
+      // Code
+      document.getElementById('room-code').textContent = roomCode || '???';
+
+      // Host
+      var hostCard = document.getElementById('host-card');
+      hostCard.innerHTML =
+        (data.hostPhoto
+          ? '<img src="' + data.hostPhoto + '" alt="">'
+          : '<div style="width:36px;height:36px;border-radius:50%;background:#334155;"></div>') +
+        '<div><div class="pname">' + escapeHtml(data.hostName || 'Host') + '</div>' +
+        '<div style="font-size:11px;color:#94a3b8;">Host' +
+        (role === 'host' ? ' · you' : '') + '</div></div>' +
+        '<div class="pscore" style="margin-left:auto;">' + (data.hostScore || 0) + '</div>';
+
+      var guestCard = document.getElementById('guest-card');
+      if (data.guestUid) {
+        guestCard.innerHTML =
+          (data.guestPhoto
+            ? '<img src="' + data.guestPhoto + '" alt="">'
+            : '<div style="width:36px;height:36px;border-radius:50%;background:#334155;"></div>') +
+          '<div><div class="pname">' + escapeHtml(data.guestName || 'Guest') + '</div>' +
+          '<div style="font-size:11px;color:#94a3b8;">Guest' +
+          (role === 'guest' ? ' · you' : '') + '</div></div>' +
+          '<div class="pscore" style="margin-left:auto;">' + (data.guestScore || 0) + '</div>';
+      } else {
+        guestCard.innerHTML =
+          '<div style="width:36px;height:36px;border-radius:50%;background:#334155;"></div>' +
+          '<div><div class="pname" style="color:#64748b;">Waiting…</div>' +
+          '<div style="font-size:11px;color:#94a3b8;">Guest</div></div>';
+      }
+
+      // Active highlight
+      if (data.status === 'playing' && data.turn) {
+        hostCard.classList.toggle('active', data.turn === 'host');
+        guestCard.classList.toggle('active', data.turn === 'guest');
+      }
+
+      // Status text
+      var statusEl = document.getElementById('room-status');
+      statusEl.classList.remove('waiting', 'playing', 'finished');
+      if (data.status === 'waiting') {
+        statusEl.classList.add('waiting');
+        statusEl.innerHTML = role === 'host'
+          ? '⏳ Waiting for a guest to join with code <b>' + roomCode + '</b>.<br>' +
+            '<span style="font-size:12px;color:#94a3b8;">Tap the code at the top to copy.</span>'
+          : '⏳ Joined! Waiting for game to start…';
+      } else if (data.status === 'playing') {
+        statusEl.classList.add('playing');
+        statusEl.innerHTML = data.turn === role
+          ? '✅ Your turn — make a move'
+          : '⏱️ Opponent thinking…';
+      } else if (data.status === 'finished') {
+        statusEl.classList.add('finished');
+        var winnerName = data.winner === 'host' ? data.hostName : data.winner === 'guest' ? data.guestName : 'Tie';
+        statusEl.innerHTML = '🏁 Game over — ' + escapeHtml(winnerName);
+      }
+    }
+
+    function escapeHtml(s) {
+      if (s == null) return '';
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function boot() {
+      if (!roomCode || roomCode.length !== 6) {
+        document.getElementById('room-status').innerHTML =
+          '❌ Invalid room code. <a href="lobby.html" style="color:#fbbf24;">Back to lobby</a>';
+        return;
+      }
+      if (typeof firebase === 'undefined' || !firebase.apps || !firebase.apps.length) {
+        return setTimeout(boot, 200);
+      }
+      // Wait for auth
+      firebase.auth().onAuthStateChanged(function (user) {
+        if (!user) {
+          document.getElementById('room-status').innerHTML =
+            'Please <a href="lobby.html" style="color:#fbbf24;">sign in via the lobby</a> first.';
+          return;
+        }
+        if (!window.AMath || !window.AMath.onlineRoom) {
+          document.getElementById('room-status').textContent = 'Online module not loaded';
+          return;
+        }
+        unsubscribe = window.AMath.onlineRoom.subscribe(roomCode, renderRoom, function (err) {
+          document.getElementById('room-status').textContent = 'Connection error: ' + err.message;
+        });
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', boot);
+    } else {
+      boot();
+    }
+
+    window.addEventListener('beforeunload', function () {
+      if (unsubscribe) unsubscribe();
+    });
+  </script>
+</body>
+</html>

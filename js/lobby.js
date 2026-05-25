@@ -446,6 +446,63 @@
     // Coming soon
   }
 
+  function openOnlineMenu() {
+    var modal = document.getElementById('modal-online');
+    if (modal) modal.style.display = 'flex';
+    var errEl = document.getElementById('online-error');
+    if (errEl) errEl.textContent = '';
+    var codeIn = document.getElementById('input-room-code');
+    if (codeIn) { codeIn.value = ''; setTimeout(function () { codeIn.focus(); }, 50); }
+  }
+
+  function closeOnlineMenu(event) {
+    if (event && event.target && event.target.id && event.target.id !== 'modal-online') return;
+    var modal = document.getElementById('modal-online');
+    if (modal) modal.style.display = 'none';
+  }
+
+  async function hostRoom() {
+    var errEl = document.getElementById('online-error');
+    if (errEl) errEl.textContent = '';
+    try {
+      if (!window.AMath || !window.AMath.onlineRoom) throw new Error('Online module not loaded');
+      // Need a signed-in user
+      if (!currentUser) throw new Error('Please sign in first');
+      var code = await window.AMath.onlineRoom.createRoom({
+        hostName: userProfile && userProfile.displayName,
+        hostPhoto: userProfile && userProfile.photoURL,
+        tileSet: 'prathom',
+      });
+      window.location.href = 'online.html?room=' + encodeURIComponent(code) + '&role=host';
+    } catch (err) {
+      console.error(err);
+      if (errEl) errEl.textContent = err.message || String(err);
+    }
+  }
+
+  async function joinByCode() {
+    var errEl = document.getElementById('online-error');
+    if (errEl) errEl.textContent = '';
+    var input = document.getElementById('input-room-code');
+    var code = (input && input.value || '').toUpperCase().trim();
+    if (code.length !== 6) {
+      if (errEl) errEl.textContent = 'Code must be 6 characters';
+      return;
+    }
+    try {
+      if (!window.AMath || !window.AMath.onlineRoom) throw new Error('Online module not loaded');
+      if (!currentUser) throw new Error('Please sign in first');
+      await window.AMath.onlineRoom.joinRoom(code, {
+        guestName: userProfile && userProfile.displayName,
+        guestPhoto: userProfile && userProfile.photoURL,
+      });
+      window.location.href = 'online.html?room=' + encodeURIComponent(code) + '&role=guest';
+    } catch (err) {
+      console.error(err);
+      if (errEl) errEl.textContent = err.message || String(err);
+    }
+  }
+
   // ============================================================
   // LEADERBOARD
   // ============================================================
@@ -533,5 +590,9 @@
     openBadges: openBadges,
     closeBadges: closeBadges,
     loadMyGames: loadMyGames,
+    openOnlineMenu: openOnlineMenu,
+    closeOnlineMenu: closeOnlineMenu,
+    hostRoom: hostRoom,
+    joinByCode: joinByCode,
   };
 })();

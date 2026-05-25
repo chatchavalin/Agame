@@ -136,9 +136,9 @@
         <span class="play-icon">🤖</span>
         <span>Play vs AI</span>
       </button>
-      <button class="btn-play btn-play-2p" onclick="AMathLobby.playOnline()" disabled>
+      <button class="btn-play btn-play-2p" onclick="AMathLobby.openOnlineMenu()">
         <span class="play-icon">👥</span>
-        <span>Play Online (Coming Soon)</span>
+        <span>Play Online (2P)</span>
       </button>
       <button class="btn-play btn-play-puzzle" onclick="window.location.href='puzzle.html'" style="background:#1e293b;color:#e2e8f0;border:1px solid #fbbf24;">
         <span class="play-icon">🧩</span>
@@ -206,6 +206,40 @@
   </div>
 
   <!-- ============================================================ -->
+  <!-- ONLINE MENU MODAL -->
+  <!-- ============================================================ -->
+  <div id="modal-online" class="modal-overlay" style="display:none" onclick="AMathLobby.closeOnlineMenu(event)">
+    <div class="modal-card" onclick="event.stopPropagation()" style="max-width:380px;">
+      <h2>👥 Play Online (2P)</h2>
+      <p style="color:#94a3b8;font-size:13px;margin-bottom:14px;">
+        Create a room and share the code with a friend, or join an existing room.
+      </p>
+
+      <button class="btn-primary" onclick="AMathLobby.hostRoom()" style="width:100%;margin-bottom:10px;">
+        🆕 Create new room
+      </button>
+
+      <div style="text-align:center;color:#64748b;font-size:12px;margin:8px 0;">— OR —</div>
+
+      <div class="form-group">
+        <label>Room code (6 letters)</label>
+        <input type="text" id="input-room-code" maxlength="6"
+               placeholder="ABC123"
+               style="text-transform:uppercase;letter-spacing:2px;text-align:center;font-size:18px;">
+      </div>
+      <button class="btn-primary" onclick="AMathLobby.joinByCode()" style="width:100%;">
+        🚪 Join room
+      </button>
+
+      <div id="online-error" class="error-msg" style="margin-top:10px;"></div>
+
+      <div class="modal-buttons" style="margin-top:14px;">
+        <button class="btn-secondary" onclick="AMathLobby.closeOnlineMenu()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
   <!-- BADGES MODAL -->
   <!-- ============================================================ -->
   <div id="modal-badges" class="modal-overlay" style="display:none" onclick="AMathLobby.closeBadges(event)">
@@ -223,10 +257,11 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
   <!-- Storage not needed — avatars stored as data URL in Firestore -->
-  <script src="js/firebase-config.js?v=20260525d"></script>
-  <script src="js/achievements.js?v=20260525d"></script>
-  <script src="js/game-bridge.js?v=20260525d"></script>
-  <script src="js/lobby.js?v=20260525d"></script>
+  <script src="js/firebase-config.js?v=20260525e"></script>
+  <script src="js/achievements.js?v=20260525e"></script>
+  <script src="js/game-bridge.js?v=20260525e"></script>
+  <script src="js/online-room.js?v=20260525e"></script>
+  <script src="js/lobby.js?v=20260525e"></script>
   <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 </body>
 </html>
