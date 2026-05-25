@@ -307,6 +307,35 @@
     section.style.display = '';
     try {
       var rooms = await window.AMath.onlineRoom.listMyRooms(currentUser.uid);
+
+      // Auto-prune: any room I host where status='waiting' and no activity
+      // for >1 hour gets deleted. Skips rooms where I'm just the guest
+      // (can't delete those, host owns them).
+      var STALE_MS = 60 * 60 * 1000; // 1 hour
+      var now = Date.now();
+      var prunedCount = 0;
+      var keepRooms = [];
+      for (var pi = 0; pi < rooms.length; pi++) {
+        var pr = rooms[pi];
+        var isMineToHost = (pr.myRole === 'host');
+        var isStale = (pr.status === 'waiting')
+                      && pr.lastActivity
+                      && (now - pr.lastActivity > STALE_MS);
+        if (isMineToHost && isStale) {
+          // Fire-and-forget; don't block the lobby on cleanup
+          window.AMath.onlineRoom.deleteRoom(pr.id).catch(function (e) {
+            console.warn('[Lobby] stale-room prune failed:', e);
+          });
+          prunedCount++;
+        } else {
+          keepRooms.push(pr);
+        }
+      }
+      if (prunedCount > 0) {
+        console.log('[Lobby] Pruned ' + prunedCount + ' stale waiting room(s)');
+      }
+      rooms = keepRooms;
+
       if (!rooms || rooms.length === 0) {
         section.style.display = 'none';
         return;

@@ -825,20 +825,32 @@
     if (!btns) return;
     var myTurn = localSession.isPlayerTurn;
     var hasTentative = tentativePlacements.length > 0;
+    var gs = localSession._rawGameState;
+    // Challenge is available when it's my turn AND the opponent just played
+    // (prevPlayState is set, and it was THEM who played).
+    var canChallenge = !!(myTurn && gs && gs.prevPlayState
+                          && gs.prevPlayState.who && gs.prevPlayState.who !== myRole
+                          && !hasTentative);
     btns.innerHTML =
       '<button class="replay-btn" id="online-btn-reset" ' + ((myTurn && hasTentative) ? '' : 'disabled') + '>Reset</button>' +
       '<button class="replay-btn" id="online-btn-pass" ' + (myTurn ? '' : 'disabled') + '>Pass</button>' +
       '<button class="replay-btn" id="online-btn-swap" ' + (myTurn ? '' : 'disabled') + '>Swap…</button>' +
+      (canChallenge
+        ? '<button class="replay-btn" id="online-btn-challenge" ' +
+          'style="background:#7f1d1d;color:#fecaca;">Challenge</button>'
+        : '') +
       '<button class="replay-btn replay-btn-primary" id="online-btn-submit" ' + ((myTurn && hasTentative) ? '' : 'disabled') + '>Submit move</button>';
 
     var resetBtn = document.getElementById('online-btn-reset');
     var passBtn = document.getElementById('online-btn-pass');
     var swapBtn = document.getElementById('online-btn-swap');
     var submitBtn = document.getElementById('online-btn-submit');
+    var challengeBtn = document.getElementById('online-btn-challenge');
     if (resetBtn) resetBtn.onclick = onResetClick;
     if (passBtn) passBtn.onclick = onPassClick;
     if (swapBtn) swapBtn.onclick = onSwapClick;
     if (submitBtn) submitBtn.onclick = onSubmitClick;
+    if (challengeBtn) challengeBtn.onclick = onChallengeClick;
   }
 
   function onResetClick() {
@@ -1010,6 +1022,7 @@
       moves: newMoves,
       moveCount: (gs.moveCount || 0) + 1,
       gameOver: gameOver,
+      prevPlayState: null,  // swap clears the last challengeable play
     });
     newGs[myRackKey] = newRack;
     var update = { gameState: newGs, turn: newTurn };
@@ -1124,6 +1137,38 @@
       if (myRole === 'host') newHostBingos++;
       else newGuestBingos++;
     }
+
+    // Pre-play snapshot — captured so the opposing player can challenge this
+    // play and revert it on the next turn. Replaced on every play, so only
+    // the MOST RECENT play is challengeable (matching PvA behavior).
+    // Stored compactly: just what's needed to undo the play.
+    var prevPlayState = {
+      // Pre-play scores so we know how much to subtract
+      hostScore: gs.hostScore || 0,
+      guestScore: gs.guestScore || 0,
+      hostBingos: gs.hostBingos || 0,
+      guestBingos: gs.guestBingos || 0,
+      // Pre-play rack of the player who made the play (so we can restore
+      // the tiles they used + drop the refill tiles back to the bag).
+      // The other rack is unchanged on a play, no need to snapshot it.
+      playerRack: gs[myRackKey],
+      // Bag state pre-play
+      bag: gs.bag,
+      // Pre-play board's premiumUsed flags for cells the play covered
+      // (so the new tiles are removed AND the premium gets re-armed)
+      premiumUsedRestore: playPlacements.map(function (p) {
+        var savedCell = gs.board && gs.board.cells[p.r] && gs.board.cells[p.r][p.c];
+        return { r: p.r, c: p.c, premiumUsed: !!(savedCell && savedCell.premiumUsed) };
+      }),
+      isFirstMove: gs.isFirstMove,
+      // Who made the play (for revert: their score goes down, their rack restored)
+      who: myRole,
+      // The tiles placed on the board (full tile objects so we can identify them)
+      placedTiles: placementsToValidate.map(function (p) {
+        return { row: p.row, col: p.col, tile: JSON.parse(JSON.stringify(p.tile)) };
+      }),
+    };
+
     var newGs = Object.assign({}, gs, {
       board: newBoard,
       bag: newBag,
@@ -1145,6 +1190,7 @@
       },
       moves: newMoves,
       moveCount: (gs.moveCount || 0) + 1,
+      prevPlayState: prevPlayState,
     });
     newGs[myRackKey] = newRack;
 
@@ -1190,6 +1236,156 @@
     } finally {
       submitInFlight = false;
     }
+  }
+
+  /**
+   * Challenge the opponent's last play. Walks the equations stashed in
+   * lastMove and runs each through Evaluator.validateEquation.
+   *   - Any invalid equation → opponent's play is reverted (tiles back to
+   *     their rack, score subtracted, board cleaned, premium re-armed). They
+   *     LOSE the play; turn stays on me.
+   *   - All equations valid → I lose my turn as the penalty (challenge missed).
+   *
+   * Matches the PvA challenge semantics.
+   */
+  async function onChallengeClick() {
+    if (submitInFlight) return;
+    if (!localSession || !localSession.isPlayerTurn) return;
+    var gs = localSession._rawGameState;
+    if (!gs || !gs.prevPlayState || !gs.lastMove
+        || gs.lastMove.type !== 'play'
+        || gs.prevPlayState.who === myRole) return;
+
+    if (!confirm('Challenge opponent\'s last play?\n\n' +
+                 '• If invalid → their play is reverted and you keep your turn.\n' +
+                 '• If valid → you lose your turn as the penalty.\n\n' +
+                 'Proceed?')) return;
+
+    var Evaluator = window.AMath.evaluator;
+    if (!Evaluator || !Evaluator.validateEquation) {
+      alert('Evaluator not loaded.');
+      return;
+    }
+
+    submitInFlight = true;
+    try {
+      // Validate each equation. Replay schema stored each equation as a
+      // face array (e.g. ['3','+','4','=','7']).
+      var equations = gs.lastMove.equations || [];
+      var badReason = null;
+      for (var i = 0; i < equations.length; i++) {
+        var faces = equations[i];
+        if (!faces || !faces.length) continue;
+        var res = Evaluator.validateEquation(faces);
+        if (!res.valid) { badReason = res.reason || 'invalid'; break; }
+      }
+
+      if (badReason) {
+        await revertOpponentPlay(gs, badReason);
+      } else {
+        await loseChallengePenalty(gs);
+      }
+    } catch (err) {
+      console.error('[OnlineGame] challenge error', err);
+      alert('Challenge failed: ' + err.message);
+    } finally {
+      submitInFlight = false;
+    }
+  }
+
+  /**
+   * Build a reverted gameState: opponent's last play is undone.
+   * - Their score goes back to pre-play
+   * - Their rack restored to pre-play (the tiles they USED come back; refill
+   *   tiles go back to the bag — we just snapshot-restore both)
+   * - Board's placed tiles removed, premiumUsed restored to pre-play
+   * - Bingo counters rolled back if applicable
+   * - lastMove updated to reflect the challenge result
+   * - prevPlayState cleared (no challenge-after-challenge)
+   * - Turn stays on me (challenger keeps the turn)
+   */
+  async function revertOpponentPlay(gs, reason) {
+    var prev = gs.prevPlayState;
+    var oppRole = prev.who;
+    var oppRackKey = (oppRole === 'host') ? 'hostRack' : 'guestRack';
+
+    // Deep-clone the board so we can mutate cells.
+    var newBoard = JSON.parse(JSON.stringify(gs.board));
+
+    for (var i = 0; i < prev.premiumUsedRestore.length; i++) {
+      var rec = prev.premiumUsedRestore[i];
+      newBoard.cells[rec.r][rec.c].tile = null;
+      newBoard.cells[rec.r][rec.c].premiumUsed = rec.premiumUsed;
+    }
+
+    var newGs = Object.assign({}, gs, {
+      board: newBoard,
+      bag: JSON.parse(JSON.stringify(prev.bag)),
+      hostScore: prev.hostScore,
+      guestScore: prev.guestScore,
+      hostBingos: prev.hostBingos,
+      guestBingos: prev.guestBingos,
+      isFirstMove: prev.isFirstMove,
+      lastMove: {
+        who: myRole,
+        type: 'challenge_won',
+        challengedReason: reason,
+        timestamp: Date.now(),
+      },
+      moves: (gs.moves || []).concat([{
+        t: gs.startedAt ? (Date.now() - gs.startedAt) : 0,
+        who: myRole,
+        type: 'challenge_won',
+        reason: reason,
+      }]),
+      moveCount: (gs.moveCount || 0) + 1,
+      prevPlayState: null,
+    });
+    newGs[oppRackKey] = JSON.parse(JSON.stringify(prev.playerRack));
+
+    await window.AMath.onlineRoom.updateRoom(roomCode, {
+      gameState: newGs,
+      hostScore: newGs.hostScore,
+      guestScore: newGs.guestScore,
+      turn: gs.turn,
+    });
+  }
+
+  /**
+   * Challenge missed: opponent's play was valid. I lose my turn.
+   * Turn flips back to opponent. Counts as a non-scoring turn.
+   */
+  async function loseChallengePenalty(gs) {
+    var newTurn = (gs.turn === 'host') ? 'guest' : 'host';
+    var newConsec = (gs.consecutiveNonScoring || 0) + 1;
+    var gameOver = newConsec >= 6;
+    var newGs = Object.assign({}, gs, {
+      turn: newTurn,
+      consecutiveNonScoring: newConsec,
+      lastMove: {
+        who: myRole,
+        type: 'challenge_failed',
+        timestamp: Date.now(),
+      },
+      moves: (gs.moves || []).concat([{
+        t: gs.startedAt ? (Date.now() - gs.startedAt) : 0,
+        who: myRole,
+        type: 'challenge_failed',
+      }]),
+      moveCount: (gs.moveCount || 0) + 1,
+      gameOver: gameOver,
+      prevPlayState: null,
+    });
+    var update = { gameState: newGs, turn: newTurn };
+    if (gameOver) {
+      newGs.winner = newGs.hostScore > newGs.guestScore ? 'host'
+                   : newGs.guestScore > newGs.hostScore ? 'guest' : 'tie';
+      newGs.endReason = '6_consecutive_passes';
+      update.status = 'finished';
+      update.winner = newGs.winner;
+    }
+    await window.AMath.onlineRoom.updateRoom(roomCode, update);
+    if (gameOver) await saveReplayDoc(newGs, roomData);
   }
 
   /**
@@ -1256,6 +1452,12 @@
     if (lm.type === 'pass') el.textContent = who + ' passed.';
     else if (lm.type === 'swap') el.textContent = who + ' swapped ' + (lm.count || 0) + ' tiles.';
     else if (lm.type === 'play') el.textContent = who + ' played for ' + (lm.score || 0) + ' pts.';
+    else if (lm.type === 'challenge_won') {
+      el.innerHTML = '⚖️ <b>' + who + ' challenged successfully</b> — opponent\u2019s play was reverted' +
+                     (lm.challengedReason ? ' (' + escapeHtml(lm.challengedReason) + ')' : '') + '.';
+    } else if (lm.type === 'challenge_failed') {
+      el.innerHTML = '⚖️ <b>' + who + ' challenged and lost</b> — opponent\u2019s play stood; turn forfeited.';
+    }
   }
 
   function renderGameEnd(data) {
@@ -1299,6 +1501,7 @@
         moves: newMoves,
         moveCount: (gs.moveCount || 0) + 1,
         gameOver: gameOver,
+        prevPlayState: null,  // pass clears the last challengeable play
       }),
       turn: newTurn,
     };
