@@ -92,12 +92,22 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <script src="js/firebase-config.js?v=20260525e"></script>
-  <script src="js/online-room.js?v=20260525e"></script>
+  <script src="js/firebase-config.js?v=20260525f"></script>
+  <!-- Game-core modules required by the online controller -->
+  <script src="js/constants.js?v=20260525f"></script>
+  <script src="js/utils.js?v=20260525f"></script>
+  <script src="js/evaluator.js?v=20260525f"></script>
+  <script src="js/bag.js?v=20260525f"></script>
+  <script src="js/rack.js?v=20260525f"></script>
+  <script src="js/board.js?v=20260525f"></script>
+  <script src="js/scoring.js?v=20260525f"></script>
+  <script src="js/placement.js?v=20260525f"></script>
+  <script src="js/ui.js?v=20260525f"></script>
+  <script src="js/online-room.js?v=20260525f"></script>
+  <script src="js/online-game.js?v=20260525f"></script>
   <script>
     var roomCode = new URLSearchParams(window.location.search).get('room');
     var role = new URLSearchParams(window.location.search).get('role');
-    var unsubscribe = null;
 
     function copyRoomCode() {
       if (!roomCode) return;
@@ -108,11 +118,9 @@
       });
     }
 
-    function renderRoom(data) {
-      // Code
+    function renderHeader(data) {
       document.getElementById('room-code').textContent = roomCode || '???';
 
-      // Host
       var hostCard = document.getElementById('host-card');
       hostCard.innerHTML =
         (data.hostPhoto
@@ -140,13 +148,11 @@
           '<div style="font-size:11px;color:#94a3b8;">Guest</div></div>';
       }
 
-      // Active highlight
       if (data.status === 'playing' && data.turn) {
         hostCard.classList.toggle('active', data.turn === 'host');
         guestCard.classList.toggle('active', data.turn === 'guest');
       }
 
-      // Status text
       var statusEl = document.getElementById('room-status');
       statusEl.classList.remove('waiting', 'playing', 'finished');
       if (data.status === 'waiting') {
@@ -162,52 +168,20 @@
           : '⏱️ Opponent thinking…';
       } else if (data.status === 'finished') {
         statusEl.classList.add('finished');
-        var winnerName = data.winner === 'host' ? data.hostName : data.winner === 'guest' ? data.guestName : 'Tie';
+        var winnerName = data.winner === 'host' ? data.hostName
+                       : data.winner === 'guest' ? data.guestName : 'Tie';
         statusEl.innerHTML = '🏁 Game over — ' + escapeHtml(winnerName);
       }
     }
+
+    // online-game.js calls this via window.AMathOnlineHeader (defined below)
+    window.AMathOnlineHeader = { render: renderHeader };
 
     function escapeHtml(s) {
       if (s == null) return '';
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
-
-    function boot() {
-      if (!roomCode || roomCode.length !== 6) {
-        document.getElementById('room-status').innerHTML =
-          '❌ Invalid room code. <a href="lobby.html" style="color:#fbbf24;">Back to lobby</a>';
-        return;
-      }
-      if (typeof firebase === 'undefined' || !firebase.apps || !firebase.apps.length) {
-        return setTimeout(boot, 200);
-      }
-      // Wait for auth
-      firebase.auth().onAuthStateChanged(function (user) {
-        if (!user) {
-          document.getElementById('room-status').innerHTML =
-            'Please <a href="lobby.html" style="color:#fbbf24;">sign in via the lobby</a> first.';
-          return;
-        }
-        if (!window.AMath || !window.AMath.onlineRoom) {
-          document.getElementById('room-status').textContent = 'Online module not loaded';
-          return;
-        }
-        unsubscribe = window.AMath.onlineRoom.subscribe(roomCode, renderRoom, function (err) {
-          document.getElementById('room-status').textContent = 'Connection error: ' + err.message;
-        });
-      });
-    }
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', boot);
-    } else {
-      boot();
-    }
-
-    window.addEventListener('beforeunload', function () {
-      if (unsubscribe) unsubscribe();
-    });
   </script>
 </body>
 </html>
