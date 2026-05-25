@@ -509,6 +509,7 @@
     // searches (fast, grammar, and brute-force bingo stage). This saves
     // 3-12 seconds of wasted computation.
     let bingoFeasible = false;
+    let bingoIsHard = false;
     if (state.aiRack.tiles.length === 8) {
       const tiles = state.aiRack.tiles;
       let numCount = 0, opCount = 0, eqCount = 0, blankCount = 0;
@@ -525,21 +526,25 @@
       bingoFeasible = blankCount >= (needNums + needOps + needEq);
 
       // Extra infeasibility checks:
-      // - 3+ equals tiles → practically impossible to bingo (need 3 valid chained equations)
       // - 3+ two-digit tiles → too few slots left for operators/equals
-      // - 4+ operators → not enough numbers
+      // - 4+ operators with < 3 numbers → not enough numbers
+      // Note: 3+ equals is HARD but not impossible (chained: A=B=C=D)
+      //   → still feasible but gets reduced time budget
       if (bingoFeasible) {
         const twoDigitCount = tiles.filter(t => t.type === 'twodigit').length;
-        if (eqCount >= 3) {
-          bingoFeasible = false;
-          console.log('[AI] Bingo INFEASIBLE: ' + eqCount + ' equals tiles — too many');
-        } else if (twoDigitCount >= 3) {
+        if (twoDigitCount >= 3) {
           bingoFeasible = false;
           console.log('[AI] Bingo INFEASIBLE: ' + twoDigitCount + ' two-digit tiles — too many');
         } else if (opCount >= 4 && numCount < 3) {
           bingoFeasible = false;
           console.log('[AI] Bingo INFEASIBLE: ' + opCount + ' ops but only ' + numCount + ' nums');
         }
+      }
+
+      // Flag hard racks (3+ equals) for reduced budget
+      bingoIsHard = bingoFeasible && eqCount >= 3;
+      if (bingoIsHard) {
+        console.log('[AI] Bingo HARD: ' + eqCount + ' equals — chained search, reduced budget');
       }
 
       if (!bingoFeasible) {
@@ -555,7 +560,7 @@
     let fastBingoPlay = null;
     if (bingoFeasible && window.AMath.aiBingoFast && state.aiRack.tiles.length === 8 && !state.isFirstMove) {
       const fastStart = Date.now();
-      const fastBingoBudget = getTimeBudgetMs() >= 200000 ? 15000 : 5000;
+      const fastBingoBudget = bingoIsHard ? 3000 : (getTimeBudgetMs() >= 200000 ? 15000 : 5000);
       fastBingoPlay = window.AMath.aiBingoFast.findFastBingo(state, fastBingoBudget);
       if (fastBingoPlay) {
         console.log('[AI] Fast Bingo found in ' + (Date.now() - fastStart) + 'ms, score=' + fastBingoPlay.score);
@@ -627,7 +632,7 @@
       _stateSettings.aiThinkSeconds = Math.floor(findBestBudgetMs / 1000);
     }
 
-    const bingoPlay = await findBestPlay(state.board, state.aiRack, state.isFirstMove, startTime, threats, bingoFeasible);
+    const bingoPlay = await findBestPlay(state.board, state.aiRack, state.isFirstMove, startTime, threats, bingoFeasible, bingoIsHard);
 
     // Restore original time budget
     if (_stateSettings && origThinkSeconds !== null) {
@@ -1564,7 +1569,7 @@
     return new Promise(function (resolve) { setTimeout(resolve, 0); });
   }
 
-  async function findBestPlay(board, aiRack, isFirstMove, startTime, threats, bingoFeasible) {
+  async function findBestPlay(board, aiRack, isFirstMove, startTime, threats, bingoFeasible, bingoIsHard) {
     let bestPlay = null;
     let bestNonRimPlay = null;  // Best play that doesn't violate rim rule
     let bestSafePlay = null;    // Best play by adjusted score (penalizing rim hooks)
@@ -1738,7 +1743,10 @@
     //   Size 1: 10s
     //   Total: ~160s, leaving slack for YoYo + scoring
     const totalBudgetMs = getTimeBudgetMs();
-    const bingoStageMs = Math.floor(totalBudgetMs * 0.33 * Math.min(candidateMultiplier, 1.5));
+    // Hard racks (3+ equals): reduce bingo budget to 15% (chained search only needs structured attempt)
+    // Normal: 33% of budget for bingo stage
+    const bingoBudgetPct = bingoIsHard ? 0.15 : 0.33;
+    const bingoStageMs = Math.floor(totalBudgetMs * bingoBudgetPct * Math.min(candidateMultiplier, 1.5));
     const otherStageMs = Math.floor(totalBudgetMs * 0.08 * Math.min(candidateMultiplier, 1.5));
     const singleTileMs = Math.floor(totalBudgetMs * 0.05);
 
