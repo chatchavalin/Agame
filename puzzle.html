@@ -100,7 +100,11 @@
   </button>
   <button class="type-btn" onclick="startPuzzle('high')">
     <span class="emoji">💎</span>High Score
-    <span class="desc">หาสมการ 40+ คะแนน</span>
+    <span class="desc">หาสมการที่ได้คะแนนสูงสุด</span>
+  </button>
+  <button class="type-btn" onclick="startPuzzle('yoyo')">
+    <span class="emoji">🪀</span>YoYo Challenge
+    <span class="desc">ต่อสมการให้เต็มแถว 15 ช่อง</span>
   </button>
   <button class="type-btn" onclick="goBack()">
     <span class="emoji">🏠</span>Back to Lobby
@@ -120,6 +124,7 @@
   <div class="puzzle-rack-section">
     <h3>Your Rack</h3>
     <div class="puzzle-rack" id="puzzle-rack"></div>
+    <div id="puzzle-hint" style="color:#64748b;font-size:12px;margin-top:8px;"></div>
   </div>
   <div class="answer-box" id="answer-box">
     <h3>💡 Best Play</h3>
@@ -223,92 +228,96 @@
     });
   }
 
+  // Pre-built puzzle banks — each has a guaranteed solution
+  var PUZZLE_BANK = {
+    bingo: [
+      // Board equations (row, col, tiles), then rack with bingo solution
+      { board: [[7,5,'4'],[7,6,'='],[7,7,'2'],[7,8,'+'],[7,9,'2']], rack: ['3','+','5','=','1','+','7','='], hint: 'Chained equation through center' },
+      { board: [[7,4,'9'],[7,5,'-'],[7,6,'3'],[7,7,'='],[7,8,'6']], rack: ['1','+','2','=','3','=','4','-'], hint: 'Extend the equation' },
+      { board: [[7,6,'1'],[7,7,'='],[7,8,'1']], rack: ['3','+','4','=','7','=','8','-'], hint: 'Build around 1=1' },
+      { board: [[7,5,'5'],[7,6,'='],[7,7,'3'],[7,8,'+'],[7,9,'2']], rack: ['4','-','1','=','6','-','3','='], hint: 'Use both sides' },
+      { board: [[7,3,'8'],[7,4,'-'],[7,5,'3'],[7,6,'='],[7,7,'5']], rack: ['1','+','6','=','7','=','9','-'], hint: 'Cross or extend' },
+      { board: [[6,7,'3'],[7,7,'='],[8,7,'3']], rack: ['2','+','5','=','7','=','9','-'], hint: 'Vertical anchor' },
+      { board: [[7,5,'6'],[7,6,'='],[7,7,'6'],[7,8,'='],[7,9,'6']], rack: ['0','+','3','+','1','=','4','='], hint: 'Extend chained 6=6=6' },
+      { board: [[7,6,'2'],[7,7,'='],[7,8,'2'],[5,7,'4'],[6,7,'=']], rack: ['1','+','3','-','2','=','5','+'], hint: 'Use cross point' },
+    ],
+    yoyo: [
+      // Nearly full line (11-13 tiles), rack has 2-4 tiles to complete to 15
+      { line: 'row', idx: 7, tiles: [[2,'3'],[3,'+'],[4,'4'],[5,'-'],[6,'2'],[7,'+'],[8,'1'],[9,'='],[10,'6'],[11,'='],[12,'5'],[13,'+'],[14,'1']], rack: ['0','+'], hint: '0+... at start' },
+      { line: 'row', idx: 0, tiles: [[0,'8'],[1,'-'],[2,'3'],[3,'='],[4,'5'],[5,'='],[6,'4'],[7,'+'],[8,'1'],[9,'='],[10,'7'],[11,'-'],[12,'2']], rack: ['=','5'], hint: 'End with =5' },
+      { line: 'col', idx: 7, tiles: [[2,'3'],[3,'+'],[4,'4'],[5,'-'],[6,'2'],[7,'='],[8,'5'],[9,'='],[10,'4'],[11,'+'],[12,'1'],[13,'='],[14,'5']], rack: ['0','+'], hint: 'Vertical completion' },
+      { line: 'row', idx: 14, tiles: [[1,'9'],[2,'-'],[3,'4'],[4,'='],[5,'5'],[6,'='],[7,'3'],[8,'+'],[9,'2'],[10,'='],[11,'1'],[12,'+'],[13,'4']], rack: ['=','5'], hint: 'Fill both ends' },
+      { line: 'row', idx: 7, tiles: [[0,'1'],[1,'+'],[3,'='],[4,'5'],[5,'='],[6,'4'],[7,'+'],[8,'1'],[9,'='],[10,'3'],[11,'+'],[12,'2'],[13,'='],[14,'5']], rack: ['4'], hint: 'Single tile to complete' },
+      { line: 'row', idx: 7, tiles: [[2,'7'],[3,'-'],[4,'2'],[5,'='],[6,'5'],[7,'='],[8,'3'],[9,'+'],[10,'2'],[11,'='],[12,'4'],[13,'+'],[14,'1']], rack: ['0','+'], hint: '0+ prefix' },
+    ],
+    best: [
+      // Complex boards with high-score opportunities
+      { board: [
+          [7,5,'4'],[7,6,'='],[7,7,'2'],[7,8,'+'],[7,9,'2'],
+          [5,7,'3'],[6,7,'+'],[8,7,'='],[9,7,'4'],
+          [7,11,'5'],[7,12,'-'],[7,13,'2'],[7,14,'='],
+        ], rack: ['3','8','=','+','6','1','-','5'], hint: 'Look for premium squares' },
+      { board: [
+          [7,4,'9'],[7,5,'-'],[7,6,'3'],[7,7,'='],[7,8,'6'],
+          [5,6,'1'],[6,6,'+'],[8,6,'='],[9,6,'4'],
+          [9,7,'+'],[9,8,'2'],[9,9,'='],[9,10,'6'],
+        ], rack: ['7','+','5','=','3','-','1','4'], hint: 'Cross-play for max points' },
+      { board: [
+          [7,5,'8'],[7,6,'='],[7,7,'8'],[7,8,'='],[7,9,'8'],
+          [5,9,'2'],[6,9,'+'],[8,9,'='],[9,9,'10'],
+        ], rack: ['3','+','5','=','4','+','4','='], hint: '3E corner opportunity' },
+      { board: [
+          [7,3,'1'],[7,4,'+'],[7,5,'2'],[7,6,'='],[7,7,'3'],
+          [3,7,'5'],[4,7,'-'],[5,7,'2'],[6,7,'='],
+          [9,7,'+'],[10,7,'1'],[11,7,'='],[12,7,'4'],
+        ], rack: ['6','=','9','-','3','=','7','+'], hint: 'Multiple anchors available' },
+      { board: [
+          [7,6,'1'],[7,7,'='],[7,8,'1'],
+          [6,6,'2'],[6,7,'+'],[6,8,'3'],[6,9,'='],[6,10,'5'],
+          [5,10,'='],[4,10,'3'],[3,10,'+'],[2,10,'2'],
+        ], rack: ['4','+','8','=','6','+','5','-'], hint: 'Build down from existing' },
+      { board: [
+          [7,5,'6'],[7,6,'='],[7,7,'3'],[7,8,'+'],[7,9,'3'],
+          [5,5,'8'],[6,5,'-'],[8,5,'='],[9,5,'4'],
+        ], rack: ['2','×','0','=','0','+','7','='], hint: '×0 trick for high score' },
+    ],
+  };
+
   function generatePuzzle(type) {
     if (!Board) init();
-    var inv = C.getActiveInventory();
-    var bag = Bag.createBag('prathom');
-    var board = Board.createBoard();
-
-    // Place some random equations on board (except for bingo type)
-    if (type !== 'bingo') {
-      // Place 1-3 equations on board
-      var eqCount = 1 + Math.floor(Math.random() * 3);
-      for (var e = 0; e < eqCount; e++) {
-        placeRandomEquation(board, bag);
-      }
-    }
-
-    // Draw rack
-    var rackTiles = [];
-    for (var i = 0; i < 8; i++) {
-      var t = Bag.drawTile(bag);
-      if (t) rackTiles.push(t);
-    }
-
-    // Ensure rack has = for solvability
-    var hasEq = rackTiles.some(function(t){ return t.type === 'equals'; });
-    if (!hasEq) {
-      // Swap a random non-blank tile for =
-      var swapIdx = rackTiles.findIndex(function(t){ return t.type !== 'blank'; });
-      if (swapIdx >= 0) {
-        var eqTile = inv.find(function(d){ return d.face === '='; });
-        rackTiles[swapIdx] = {id:'peq'+Math.random(), face:'=', type:'equals', points:eqTile.points, assigned:null};
-      }
-    }
-
-    return { board: board, rack: rackTiles, bag: bag };
-  }
-
-  function placeRandomEquation(board, bag) {
-    // Simple equations: A op B = C
-    var nums = [1,2,3,4,5,6,7,8,9];
-    var a = nums[Math.floor(Math.random()*nums.length)];
-    var b = nums[Math.floor(Math.random()*nums.length)];
-    var ops = ['+','-'];
-    var op = ops[Math.floor(Math.random()*2)];
-    var result = op === '+' ? a+b : a-b;
-    if (result < 0 || result > 16) return;
-
     var inv = C.getActiveInventory();
     function mk(f) {
       var d = inv.find(function(x){return x.face===f}) || {type:'digit',points:1};
       return {id:'p'+Math.random(), face:f, type:d.type, points:d.points, assigned:null};
     }
 
-    // Pick random row, try to place
-    var row = Math.floor(Math.random()*15);
-    var startCol = Math.floor(Math.random()*10);
-    var tiles = [mk(String(a)), mk(op), mk(String(b)), mk('='), mk(String(result))];
+    var bank = PUZZLE_BANK[type] || PUZZLE_BANK.best;
+    var template = bank[Math.floor(Math.random() * bank.length)];
+    var board = Board.createBoard();
 
-    // Check if fits
-    var fits = true;
-    for (var i = 0; i < tiles.length; i++) {
-      if (startCol+i >= 15) { fits = false; break; }
-      if (board.cells[row][startCol+i].tile) { fits = false; break; }
-    }
-    if (!fits) return;
-
-    // Check if first move or adjacent
-    var boardEmpty = true;
-    for (var r = 0; r < 15 && boardEmpty; r++)
-      for (var c = 0; c < 15 && boardEmpty; c++)
-        if (board.cells[r][c].tile) boardEmpty = false;
-
-    if (boardEmpty) {
-      // Must pass through center
-      var passesCenter = false;
-      for (var j = 0; j < tiles.length; j++) {
-        if (row === 7 && startCol+j === 7) passesCenter = true;
+    if (type === 'yoyo') {
+      // Place tiles on the specified line
+      for (var i = 0; i < template.tiles.length; i++) {
+        var pos = template.tiles[i][0];
+        var face = template.tiles[i][1];
+        if (template.line === 'row') {
+          Board.placeTile(board, template.idx, pos, mk(face));
+        } else {
+          Board.placeTile(board, pos, template.idx, mk(face));
+        }
       }
-      if (!passesCenter) { row = 7; startCol = 5; }
-    }
-
-    // Place
-    for (var k = 0; k < tiles.length; k++) {
-      if (startCol+k < 15 && !board.cells[row][startCol+k].tile) {
-        Board.placeTile(board, row, startCol+k, tiles[k]);
+    } else {
+      // Place board tiles
+      for (var j = 0; j < template.board.length; j++) {
+        var r = template.board[j][0], c = template.board[j][1], f = template.board[j][2];
+        Board.placeTile(board, r, c, mk(f));
       }
     }
+
+    // Build rack
+    var rackTiles = template.rack.map(function(f) { return mk(f); });
+
+    return { board: board, rack: rackTiles, bag: {tiles:[]}, hint: template.hint };
   }
 
   function findBestPlay(board, rackTiles) {
@@ -427,7 +436,7 @@
     streak = 0;
     document.getElementById('screen-select').style.display = 'none';
     document.getElementById('screen-puzzle').style.display = 'block';
-    var labels = {best:'🎯 Best Play', bingo:'🎰 Bingo Challenge', high:'💎 High Score'};
+    var labels = {best:'🎯 Best Play', bingo:'🎰 Bingo Challenge', high:'💎 High Score', yoyo:'🪀 YoYo Challenge'};
     document.getElementById('puzzle-type-label').textContent = labels[type] || type;
     nextPuzzle();
   };
@@ -453,6 +462,7 @@
       currentPuzzle = puzzle;
       renderBoard(puzzle.board);
       renderRack(puzzle.rack);
+      document.getElementById('puzzle-hint').textContent = puzzle.hint ? '💡 Hint: ' + puzzle.hint : '';
     } catch(e) {
       document.getElementById('puzzle-rack').innerHTML = '<div style="color:red">Puzzle error: ' + e.message + '</div>';
       return;
