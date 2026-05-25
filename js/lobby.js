@@ -92,8 +92,7 @@
       }
     }).catch(function (err) {
       console.error('[Lobby] Load profile error:', err);
-      // Show error visibly so user can report
-      alert('Firestore read error: ' + err.code + ' — ' + err.message);
+      showError('login-error', 'Profile load failed: ' + (err.message || err));
       showProfileSetup();
     });
   }
@@ -332,7 +331,12 @@
     document.querySelectorAll('.lb-tab').forEach(function (tab) {
       tab.classList.remove('active');
     });
-    event.target.classList.add('active');
+    // Highlight active tab — find by text content since event may not exist
+    var tabs = document.querySelectorAll('.lb-tab');
+    tabs.forEach(function (tab) {
+      if (type === 'highScore' && tab.textContent.indexOf('High Score') >= 0) tab.classList.add('active');
+      if (type === 'wins' && tab.textContent.indexOf('Most Wins') >= 0) tab.classList.add('active');
+    });
 
     var listEl = document.getElementById('leaderboard-list');
     listEl.innerHTML = '<div class="lb-loading">Loading...</div>';
