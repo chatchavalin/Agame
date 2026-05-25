@@ -260,12 +260,26 @@
         ], rack: ['2','+','6','=','3','+','5','='], hint: 'Look for 8-tile space on open rows' },
     ],
     yoyo: [
-      { line: 'row', idx: 7, tiles: [[2,'3'],[3,'+'],[4,'4'],[5,'-'],[6,'2'],[7,'+'],[8,'1'],[9,'='],[10,'6'],[11,'='],[12,'5'],[13,'+'],[14,'1']], rack: ['0','+'], hint: 'Start with 0+' },
-      { line: 'row', idx: 7, tiles: [[0,'1'],[1,'+'],[2,'3'],[3,'='],[4,'4'],[5,'='],[6,'2'],[7,'+'],[9,'='],[10,'5'],[11,'='],[12,'4'],[13,'+'],[14,'1']], rack: ['2'], hint: 'Single tile!' },
-      { line: 'row', idx: 0, tiles: [[0,'8'],[1,'-'],[2,'3'],[3,'='],[4,'5'],[5,'='],[6,'4'],[7,'+'],[8,'1'],[9,'='],[10,'7'],[11,'-'],[12,'2']], rack: ['=','5'], hint: 'Complete both ends' },
-      { line: 'col', idx: 7, tiles: [[2,'3'],[3,'+'],[4,'4'],[5,'-'],[6,'2'],[7,'='],[8,'5'],[9,'='],[10,'4'],[11,'+'],[12,'1'],[13,'='],[14,'5']], rack: ['0','+'], hint: 'Vertical 0+' },
-      { line: 'row', idx: 14, tiles: [[1,'9'],[2,'-'],[3,'4'],[4,'='],[5,'5'],[6,'='],[7,'3'],[8,'+'],[9,'2'],[10,'='],[11,'1'],[12,'+'],[13,'4']], rack: ['=','5'], hint: 'Fill both edges' },
-      { line: 'row', idx: 7, tiles: [[2,'7'],[3,'-'],[4,'2'],[5,'='],[6,'5'],[7,'='],[8,'3'],[9,'+'],[10,'2'],[11,'='],[12,'4'],[13,'+'],[14,'1']], rack: ['0','+'], hint: 'Prefix 0+' },
+      // Each yoyo puzzle: 7 tiles already on the line, leaving exactly 8
+      // empty slots. The player fills the 8-tile rack into those slots so
+      // the entire 15-cell line forms a valid equation.
+      // Format: line='row'|'col', idx, tiles=[[pos,face],...], rack=[8 faces]
+      { line:'row', idx:7,
+        tiles: [[1,'4'],[3,'='],[5,'2'],[7,'+'],[9,'1'],[11,'3'],[13,'-']],
+        rack: ['1','5','=','3','3','+','-','3'],
+        hint: 'Fill row 7 — 8 tiles complete the line' },
+      { line:'row', idx:7,
+        tiles: [[0,'5'],[2,'='],[4,'2'],[6,'+'],[8,'+'],[10,'='],[12,'-']],
+        rack: ['+','3','3','1','5','2','4','3'],
+        hint: 'Both ends are open — bingo across the full row' },
+      { line:'col', idx:7,
+        tiles: [[1,'6'],[3,'-'],[5,'4'],[7,'='],[9,'+'],[11,'='],[13,'5']],
+        rack: ['+','3','2','=','2','1','=','3'],
+        hint: 'Vertical yoyo — fill column 7' },
+      { line:'row', idx:7,
+        tiles: [[1,'9'],[3,'='],[5,'5'],[7,'-'],[9,'+'],[11,'='],[13,'2']],
+        rack: ['+','2','4','3','1','=','3','7'],
+        hint: 'Complete the 15-cell yoyo' },
     ],
     cross: [
       { board: [
@@ -339,7 +353,9 @@
     var board = Board.createBoard();
 
     if (type === 'yoyo') {
-      // Place tiles on the specified line
+      // YoYo banks place 7 fixed tiles on a row/col; the 8-tile rack fills
+      // the remaining 8 slots to complete the 15-cell line. (Older banks
+      // may pre-place more tiles — the solver still handles those.)
       for (var i = 0; i < template.tiles.length; i++) {
         var pos = template.tiles[i][0];
         var face = template.tiles[i][1];
@@ -386,7 +402,7 @@
     if (boardEmpty) anchors = [{row:7, col:7}];
 
     var maxLen = Math.min(rackTiles.length, 8);
-    var timeLimit = Date.now() + 8000;
+    var timeLimit = Date.now() + 12000;
 
     for (var ai = 0; ai < anchors.length && Date.now() < timeLimit; ai++) {
       var anchor = anchors[ai];
@@ -410,7 +426,7 @@
       }
       if (emptyCells.length === 0 || emptyCells.length > tiles.length) return;
 
-      var perms = getSimplePerms(tiles, emptyCells.length, 100);
+      var perms = getSimplePerms(tiles, emptyCells.length, emptyCells.length >= 7 ? 1000 : 100);
       for (var p = 0; p < perms.length && Date.now() < timeLimit; p++) {
         var perm = perms[p];
         var placements = [];
@@ -424,10 +440,15 @@
           var key = placements.map(function(p){return p.row+','+p.col+':'+p.tile.face;}).sort().join('|');
           if (!seen[key]) {
             seen[key] = true;
+            // Detect yoyo: this play completes a full 15-cell line.
+            // We pass the post-placement board (placements are still on it
+            // before the rollback loop below) so isYoyoCompletion can scan.
+            var yoyo = isYoyoCompletion(board, placements);
             results.push({
               score: score.total,
               placements: placements.map(function(p){return{row:p.row,col:p.col,face:p.tile.assigned||p.tile.face};}),
               bingo: placements.length >= 8,
+              yoyo: yoyo,
               tilesUsed: placements.length,
             });
           }
@@ -436,6 +457,35 @@
           Board.removeTile(board, emptyCells[e2].row, emptyCells[e2].col);
         }
       }
+    }
+
+    /**
+     * A yoyo is when a play completes a contiguous 15-cell run (an entire
+     * row or column filled with tiles). Detected by checking the line that
+     * each placement sits on: if EVERY one of the 15 cells in that line
+     * has a tile post-play, it's a yoyo.
+     */
+    function isYoyoCompletion(board, placements) {
+      var rowsToCheck = {}, colsToCheck = {};
+      for (var i = 0; i < placements.length; i++) {
+        rowsToCheck[placements[i].row] = true;
+        colsToCheck[placements[i].col] = true;
+      }
+      for (var r in rowsToCheck) {
+        var allFilled = true;
+        for (var c = 0; c < 15; c++) {
+          if (!board.cells[r][c].tile) { allFilled = false; break; }
+        }
+        if (allFilled) return true;
+      }
+      for (var col in colsToCheck) {
+        var allFilledC = true;
+        for (var r2 = 0; r2 < 15; r2++) {
+          if (!board.cells[r2][col].tile) { allFilledC = false; break; }
+        }
+        if (allFilledC) return true;
+      }
+      return false;
     }
 
     function getSimplePerms(arr, k, limit) {
@@ -455,7 +505,30 @@
     }
 
     results.sort(function(a,b){ return b.score - a.score; });
-    return results.slice(0, maxResults || 3);
+
+    // PUZZLE RULES (per user spec):
+    //   Slot #1, #2: MUST be bingo (>=8 tiles) OR yoyo (line completion).
+    //   Slot #3: MAY be a short equation, but only if score >= 40 pts.
+    //   Anything not meeting these is filtered out — better to show 1-2
+    //   real answers than pad with sub-40 shorts.
+    var bigPlays = results.filter(function (r) { return r.bingo || r.yoyo; });
+    var shortHighValue = results.filter(function (r) {
+      return !r.bingo && !r.yoyo && r.score >= 40;
+    });
+    var filtered = bigPlays.slice(0, 2);
+    if (filtered.length < 2 && shortHighValue.length) {
+      // If we don't have 2 big plays, slot #2 can fall back to a 40+ short
+      filtered = filtered.concat(shortHighValue.slice(0, 2 - filtered.length));
+    }
+    if (filtered.length < 3 && shortHighValue.length) {
+      // Slot #3: first 40+ short not already used
+      for (var si = 0; si < shortHighValue.length && filtered.length < 3; si++) {
+        if (filtered.indexOf(shortHighValue[si]) === -1) {
+          filtered.push(shortHighValue[si]);
+        }
+      }
+    }
+    return filtered.slice(0, maxResults || 3);
   }
 
   // === PUBLIC API ===
@@ -539,7 +612,8 @@
 
     if (!answers || answers.length === 0) {
       document.getElementById('answer-buttons').innerHTML = '';
-      document.getElementById('answer-detail').innerHTML = '<div style="color:#f87171">No valid play found. Try next puzzle!</div>';
+      document.getElementById('answer-detail').innerHTML =
+        '<div style="color:#f87171">No valid bingo / yoyo / 40+ play found. Try next puzzle!</div>';
     } else {
       var colors = ['#34d399','#fbbf24','#94a3b8'];
       var medals = ['🥇','🥈','🥉'];
@@ -547,12 +621,12 @@
       for (var i = 0; i < answers.length; i++) {
         var a = answers[i];
         var label = medals[i] + ' ' + a.score + 'pts';
-        if (a.bingo) label += ' 🎉';
+        if (a.bingo) label += ' 🎉 BINGO';
+        else if (a.yoyo) label += ' 🪀 YOYO';
         btnsHtml += '<button onclick="showPlay('+i+')" style="flex:1;padding:10px 6px;border:2px solid '+colors[i]+';background:#0f172a;color:'+colors[i]+';border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif" id="ans-btn-'+i+'">' + label + '</button>';
       }
       document.getElementById('answer-buttons').innerHTML = btnsHtml;
       document.getElementById('answer-detail').innerHTML = '';
-      // Auto-show #1
       showPlay(0);
     }
     box.classList.add('show');
@@ -590,7 +664,8 @@
 
     // Show detail
     var positions = a.placements.map(function(p){return p.face;}).join(' ');
-    var tilesText = a.tilesUsed + ' tiles' + (a.bingo ? ' — BINGO! 🎉' : '');
+    var tag = a.bingo ? ' — BINGO! 🎉' : (a.yoyo ? ' — YOYO! 🪀' : '');
+    var tilesText = a.tilesUsed + ' tiles' + tag;
     document.getElementById('answer-detail').innerHTML =
       '<div style="text-align:center;margin-top:8px">' +
       '<div style="font-size:24px;font-weight:800;color:'+colors[idx]+'">' + a.score + ' points</div>' +
