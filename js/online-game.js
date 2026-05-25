@@ -51,6 +51,8 @@
   var selectedTileId = null;     // currently-selected rack tile (for placement)
   var tentativePlacements = [];  // tiles placed but not yet submitted
   var submitInFlight = false;    // prevent double-submit
+  var myMaxDeficit = 0;          // peak score gap when I was behind
+  var statsFinalized = false;    // prevent double-save of game-end stats
 
   // -----------------------------------------------------------------------
   // BOOT
@@ -131,6 +133,13 @@
       rebuildLocalSession(data.gameState);
       renderGameUI();
       renderGameEnd(data);
+      // Fire-and-forget achievements + stats — guarded by statsFinalized so
+      // it only runs once per session even though onSnapshot may deliver the
+      // 'finished' doc multiple times.
+      if (!statsFinalized) {
+        statsFinalized = true;
+        finalizeOnlineStats(data.gameState, data);
+      }
     }
   }
 
@@ -238,6 +247,12 @@
     var myScore = (myRole === 'host') ? gs.hostScore : gs.guestScore;
     var oppScore = (myRole === 'host') ? gs.guestScore : gs.hostScore;
     var myTurn = (gs.turn === myRole);
+
+    // Track largest deficit I ever faced — used by Comeback King achievement.
+    // Run this on every snapshot so it captures the peak even if the lead
+    // changes hands multiple times during the game.
+    var deficit = oppScore - myScore;
+    if (deficit > myMaxDeficit) myMaxDeficit = deficit;
 
     // If a new move came in (moveCount went up), drop any tentative placements
     // — server-truth has changed.
@@ -1365,6 +1380,87 @@
       console.log('[OnlineGame] Replay saved as ' + id);
     } catch (err) {
       console.error('[OnlineGame] saveReplay failed', err);
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // ACHIEVEMENTS + STATS
+  // -----------------------------------------------------------------------
+
+  /**
+   * Detect a ×9 play. Same rule as PvA (isX9Play in main.js):
+   * a single play that places 2+ NEW tiles on 3E (triple-equation) squares
+   * creates a 9× multiplier.
+   *
+   * @param {Array} placements - compact [{r,c,...}] from a play move
+   * @returns {boolean}
+   */
+  function isX9Move(placements) {
+    if (!placements || placements.length < 2) return false;
+    var C = window.AMath.constants;
+    var squares = C && C.PREMIUM_SQUARES;
+    if (!squares) return false;
+    var count = 0;
+    for (var i = 0; i < placements.length; i++) {
+      var p = placements[i];
+      var row = squares[p.r];
+      if (row && row[p.c] === '3E') {
+        count++;
+        if (count >= 2) return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * After game end, compute per-player stats from gameState.moves[] and
+   * write them via the existing AMathBridge.saveGameResult — same code path
+   * as PvA, so achievements unlock and lifetime stats update identically.
+   *
+   * Only fires when the local user is authenticated (signed-in players).
+   * Online games for guests are not tracked, consistent with PvA behavior.
+   */
+  async function finalizeOnlineStats(gs, data) {
+    if (!window.AMathBridge || !window.AMathBridge.saveGameResult) return;
+    if (window.AMathBridge.isGuest && window.AMathBridge.isGuest()) return;
+
+    var isHost = (myRole === 'host');
+    var myScore = isHost ? gs.hostScore : gs.guestScore;
+    var oppScore = isHost ? gs.guestScore : gs.hostScore;
+    var myBingos = isHost ? (gs.hostBingos || 0) : (gs.guestBingos || 0);
+    var won = (gs.winner === myRole);
+
+    // Walk moves[] and count my actions / x9 plays
+    var myPlays = 0, mySwaps = 0, myX9 = 0;
+    var moves = gs.moves || [];
+    for (var i = 0; i < moves.length; i++) {
+      var m = moves[i];
+      if (m.who !== myRole) continue;
+      if (m.type === 'play') {
+        myPlays++;
+        if (isX9Move(m.placements)) myX9++;
+      } else if (m.type === 'swap') {
+        mySwaps++;
+      }
+    }
+
+    var payload = {
+      playerScore: myScore,
+      aiScore: oppScore,
+      won: won,
+      bingos: myBingos,
+      x9plays: myX9,
+      maxDeficit: myMaxDeficit,
+      swapCount: mySwaps,
+      playsMade: myPlays,
+      gameDurationMs: gs.startedAt ? (Date.now() - gs.startedAt) : 0,
+    };
+
+    try {
+      await window.AMathBridge.saveGameResult(payload);
+      console.log('[OnlineGame] Stats saved:', payload);
+    } catch (err) {
+      console.error('[OnlineGame] saveGameResult failed', err);
     }
   }
 
