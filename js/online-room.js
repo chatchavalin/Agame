@@ -152,11 +152,65 @@
     await db.collection('rooms').doc(code).update(payload);
   }
 
+  /**
+   * List active rooms (status != 'finished') that the user is either host
+   * or guest of. Returns deduplicated array sorted by lastActivity desc.
+   *
+   * Two separate queries (host-side, guest-side) to avoid needing a composite
+   * Firestore index. Single-field queries are auto-indexed.
+   */
+  async function listMyRooms(uid) {
+    if (!uid) return [];
+    var db = firebase.firestore();
+    try {
+      var [hostSnap, guestSnap] = await Promise.all([
+        db.collection('rooms').where('hostUid', '==', uid).get(),
+        db.collection('rooms').where('guestUid', '==', uid).get(),
+      ]);
+      var rooms = {};
+      hostSnap.forEach(function (d) {
+        var data = d.data();
+        if (data.status !== 'finished') {
+          rooms[d.id] = Object.assign({ id: d.id, myRole: 'host' }, data);
+        }
+      });
+      guestSnap.forEach(function (d) {
+        var data = d.data();
+        if (data.status !== 'finished' && !rooms[d.id]) {
+          rooms[d.id] = Object.assign({ id: d.id, myRole: 'guest' }, data);
+        }
+      });
+      var list = Object.values(rooms);
+      list.sort(function (a, b) { return (b.lastActivity || 0) - (a.lastActivity || 0); });
+      return list;
+    } catch (err) {
+      console.error('[OnlineRoom] listMyRooms error:', err);
+      return [];
+    }
+  }
+
+  /**
+   * Delete a room. Only allowed if the caller is the host (enforced by rules).
+   * If you're the guest, calling this will fail silently — use leaveRoom instead.
+   */
+  async function deleteRoom(code) {
+    var db = firebase.firestore();
+    try {
+      await db.collection('rooms').doc(code).delete();
+      return true;
+    } catch (err) {
+      console.error('[OnlineRoom] deleteRoom error:', err);
+      return false;
+    }
+  }
+
   window.AMath = window.AMath || {};
   window.AMath.onlineRoom = {
     createRoom: createRoom,
     joinRoom: joinRoom,
     subscribe: subscribe,
     updateRoom: updateRoom,
+    listMyRooms: listMyRooms,
+    deleteRoom: deleteRoom,
   };
 })();

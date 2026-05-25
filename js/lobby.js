@@ -282,6 +282,114 @@
     updateStats();
     showLeaderboard('highScore');
     loadMyGames();
+    loadActiveRooms();
+  }
+
+  /**
+   * Query Firestore for any active rooms where the current user is host or
+   * guest, then render them in #active-rooms-list. Rooms appear if status is
+   * NOT 'finished'. Each row links to online.html?room=CODE&role=...
+   *
+   * Empty list → the entire section hides.
+   */
+  async function loadActiveRooms() {
+    var section = document.getElementById('active-rooms-section');
+    var listEl = document.getElementById('active-rooms-list');
+    if (!section || !listEl) return;
+    if (!currentUser || !window.AMath || !window.AMath.onlineRoom
+        || !window.AMath.onlineRoom.listMyRooms) {
+      section.style.display = 'none';
+      return;
+    }
+    listEl.innerHTML =
+      '<div style="color:#64748b;font-size:12px;text-align:center;padding:10px;">' +
+      'Loading…</div>';
+    section.style.display = '';
+    try {
+      var rooms = await window.AMath.onlineRoom.listMyRooms(currentUser.uid);
+      if (!rooms || rooms.length === 0) {
+        section.style.display = 'none';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < rooms.length; i++) {
+        var r = rooms[i];
+        var oppName = (r.myRole === 'host')
+          ? (r.guestName || 'Waiting for guest…')
+          : (r.hostName || 'Host');
+        var statusText, statusColor;
+        if (r.status === 'waiting') {
+          statusText = (r.myRole === 'host')
+            ? 'Waiting for guest — share code ' + r.id
+            : 'Joined, waiting to start';
+          statusColor = '#fbbf24';
+        } else if (r.status === 'playing') {
+          var gs = r.gameState || {};
+          var myTurn = (gs.turn === r.myRole);
+          statusText = myTurn ? '✅ Your turn'
+                              : '⏱️ ' + (oppName) + '\u2019s turn';
+          statusColor = myTurn ? '#86efac' : '#94a3b8';
+        } else {
+          statusText = r.status || '';
+          statusColor = '#94a3b8';
+        }
+        var lastActivity = r.lastActivity
+          ? new Date(r.lastActivity).toLocaleString()
+          : '';
+        html +=
+          '<div style="background:#1e293b;padding:10px 12px;border-radius:8px;' +
+                'border:1px solid #334155;display:flex;justify-content:space-between;' +
+                'align-items:center;gap:8px;">' +
+            '<div style="flex:1;min-width:0;cursor:pointer;" ' +
+            'onclick="window.location.href=\'online.html?room=' + encodeURIComponent(r.id) +
+            '&role=' + r.myRole + '\'">' +
+              '<div style="font-weight:600;font-family:monospace;letter-spacing:2px;' +
+                          'color:#fbbf24;font-size:14px;">' + escapeHtml(r.id) + '</div>' +
+              '<div style="color:' + statusColor + ';font-size:12px;margin-top:2px;">' +
+                escapeHtml(statusText) +
+              '</div>' +
+              '<div style="color:#64748b;font-size:11px;margin-top:1px;">' +
+                escapeHtml(r.myRole === 'host' ? 'Host' : 'Guest') +
+                ' · ' + escapeHtml(lastActivity) +
+              '</div>' +
+            '</div>' +
+            (r.myRole === 'host'
+              ? '<button onclick="AMathLobby.endRoom(\'' + r.id + '\')" ' +
+                'style="background:#7f1d1d;color:#fecaca;border:none;padding:6px 10px;' +
+                       'border-radius:6px;font-size:11px;cursor:pointer;">End</button>'
+              : '') +
+          '</div>';
+      }
+      listEl.innerHTML = html;
+    } catch (err) {
+      console.error('[Lobby] loadActiveRooms', err);
+      listEl.innerHTML =
+        '<div style="color:#fca5a5;font-size:12px;text-align:center;padding:10px;">' +
+        'Failed to load active rooms.</div>';
+    }
+  }
+
+  /**
+   * Host ends/deletes their own room.
+   */
+  async function endRoom(code) {
+    if (!confirm('End room ' + code + '? This deletes it for both players.')) return;
+    if (!window.AMath || !window.AMath.onlineRoom) return;
+    var ok = await window.AMath.onlineRoom.deleteRoom(code);
+    if (!ok) {
+      alert('Failed to delete room (only the host can delete).');
+      return;
+    }
+    loadActiveRooms();
+  }
+
+  function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 
   /**
@@ -594,5 +702,7 @@
     closeOnlineMenu: closeOnlineMenu,
     hostRoom: hostRoom,
     joinByCode: joinByCode,
+    loadActiveRooms: loadActiveRooms,
+    endRoom: endRoom,
   };
 })();
