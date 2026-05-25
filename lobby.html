@@ -156,6 +156,23 @@
         <div class="lb-loading">Loading...</div>
       </div>
     </div>
+
+    <!-- My Games -->
+    <div class="my-games-section" style="margin-top:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <h3 style="margin:0;font-size:15px;color:#e2e8f0;">📖 Recent Games</h3>
+        <button onclick="AMathLobby.loadMyGames()"
+                style="background:none;border:1px solid #475569;color:#94a3b8;
+                       padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;">
+          Refresh
+        </button>
+      </div>
+      <div id="my-games-list" style="display:flex;flex-direction:column;gap:6px;">
+        <div style="color:#64748b;font-size:12px;text-align:center;padding:14px;">
+          (loading…)
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ============================================================ -->
@@ -206,9 +223,10 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
   <!-- Storage not needed — avatars stored as data URL in Firestore -->
-  <script src="js/firebase-config.js?v=20260525c"></script>
-  <script src="js/achievements.js?v=20260525c"></script>
-  <script src="js/lobby.js?v=20260525c"></script>
+  <script src="js/firebase-config.js?v=20260525d"></script>
+  <script src="js/achievements.js?v=20260525d"></script>
+  <script src="js/game-bridge.js?v=20260525d"></script>
+  <script src="js/lobby.js?v=20260525d"></script>
   <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 </body>
 </html>

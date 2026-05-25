@@ -281,6 +281,69 @@
     updateLobbyHeader();
     updateStats();
     showLeaderboard('highScore');
+    loadMyGames();
+  }
+
+  /**
+   * Fetch recent games via game-bridge.js and render the list.
+   * Each row is clickable → opens replay.html?gameId=...
+   */
+  async function loadMyGames() {
+    var listEl = document.getElementById('my-games-list');
+    if (!listEl) return;
+    if (!window.AMathBridge || !window.AMathBridge.listMyGames
+        || window.AMathBridge.isGuest()) {
+      listEl.innerHTML =
+        '<div style="color:#64748b;font-size:12px;text-align:center;padding:14px;">' +
+        'Sign in to see your replay history.</div>';
+      return;
+    }
+    listEl.innerHTML =
+      '<div style="color:#64748b;font-size:12px;text-align:center;padding:14px;">Loading…</div>';
+    try {
+      var games = await window.AMathBridge.listMyGames(20);
+      if (!games || games.length === 0) {
+        listEl.innerHTML =
+          '<div style="color:#64748b;font-size:12px;text-align:center;padding:14px;">' +
+          'No games yet — finish a game to see it here.</div>';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < games.length; i++) {
+        var g = games[i];
+        var date = g.endedAt ? new Date(g.endedAt).toLocaleString()
+                            : (g.createdAt ? new Date(g.createdAt).toLocaleString() : '');
+        var resultClass = g.won ? 'color:#86efac;' : 'color:#fca5a5;';
+        var resultText = g.won ? 'Win' : 'Loss';
+        var moves = (g.moves || []).length;
+        var durMin = g.durationMs ? Math.round(g.durationMs / 60000) : '?';
+        var bingoStr = g.bingos ? ' · 🎯 ' + g.bingos : '';
+        html +=
+          '<div onclick="window.location.href=\'replay.html?gameId=' + encodeURIComponent(g.id) + '\'" ' +
+          'style="background:#1e293b;padding:10px 12px;border-radius:8px;cursor:pointer;' +
+                 'display:flex;justify-content:space-between;align-items:center;' +
+                 'border:1px solid #334155;" ' +
+          'onmouseover="this.style.background=\'#334155\'" ' +
+          'onmouseout="this.style.background=\'#1e293b\'">' +
+            '<div>' +
+              '<div style="font-weight:600;font-size:13px;' + resultClass + '">' +
+                resultText + ' · ' + (g.playerScore || 0) + '–' + (g.aiScore || 0) +
+                bingoStr +
+              '</div>' +
+              '<div style="color:#94a3b8;font-size:11px;margin-top:2px;">' +
+                date + ' · ' + moves + ' moves · ' + durMin + ' min' +
+              '</div>' +
+            '</div>' +
+            '<div style="color:#fbbf24;font-size:18px;">▶</div>' +
+          '</div>';
+      }
+      listEl.innerHTML = html;
+    } catch (err) {
+      console.error('[Lobby] loadMyGames error:', err);
+      listEl.innerHTML =
+        '<div style="color:#fca5a5;font-size:12px;text-align:center;padding:14px;">' +
+        'Failed to load games.</div>';
+    }
   }
 
   function updateLobbyHeader() {
@@ -469,5 +532,6 @@
     showLeaderboard: showLeaderboard,
     openBadges: openBadges,
     closeBadges: closeBadges,
+    loadMyGames: loadMyGames,
   };
 })();

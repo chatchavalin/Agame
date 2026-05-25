@@ -1,10 +1,5 @@
 // A-Math Firestore Security Rules
 // Deploy: Firebase Console → Firestore → Rules → Paste → Publish
-//
-// These rules allow:
-// - Any authenticated user to read any profile (for leaderboard)
-// - Users to only write their own profile
-// - Stats can only be updated (not overwritten) by the user
 
 rules_version = '2';
 service cloud.firestore {
@@ -14,13 +9,46 @@ service cloud.firestore {
     match /users/{userId} {
       // Anyone logged in can read (for leaderboard)
       allow read: if request.auth != null;
-
-      // Users can only create/update their own profile
       allow create: if request.auth != null && request.auth.uid == userId;
       allow update: if request.auth != null && request.auth.uid == userId;
-
-      // No one can delete profiles
       allow delete: if false;
+    }
+
+    // Game replays — one doc per finished game
+    // Owner can read all their own games. For now, anyone authenticated can
+    // read any game (enables sharing a replay URL). Tighten later if needed.
+    match /games/{gameId} {
+      allow read: if request.auth != null;
+      // Anyone authenticated can create a replay doc, but the userId field
+      // must match their own uid (no fake replays in someone else's name).
+      allow create: if request.auth != null
+                    && request.resource.data.userId == request.auth.uid;
+      // Replays are immutable history — no update or delete.
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // 2P online rooms (real-time game sync)
+    // Schema: rooms/{roomCode} = { hostUid, guestUid?, hostName, guestName?,
+    //   status: 'waiting'|'playing'|'finished', moves: [...], turn, scores, ... }
+    match /rooms/{roomCode} {
+      // Anyone authenticated can read (so a guest can scan a room code).
+      allow read: if request.auth != null;
+      // Host creates the room; their uid must be in hostUid.
+      allow create: if request.auth != null
+                    && request.resource.data.hostUid == request.auth.uid;
+      // Update allowed if requester is host OR guest in the room, OR claiming
+      // an empty guest slot. Within a private 6-char room code clients trust
+      // each other.
+      allow update: if request.auth != null && (
+        resource.data.hostUid == request.auth.uid ||
+        resource.data.guestUid == request.auth.uid ||
+        (resource.data.guestUid == null
+         && request.resource.data.guestUid == request.auth.uid)
+      );
+      // Host can delete (cleanup); others can't.
+      allow delete: if request.auth != null
+                    && resource.data.hostUid == request.auth.uid;
     }
 
     // Default: deny everything else

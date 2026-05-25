@@ -328,6 +328,18 @@
 
     Interactions.init(session);
 
+    // Start replay recording (PvA only)
+    if (window.AMath.replayRecorder) {
+      var SettingsForReplay = window.AMath.settings;
+      var tileSetForReplay = (SettingsForReplay && SettingsForReplay.get('tileSet')) || 'prathom';
+      var botLevelForReplay = (SettingsForReplay && SettingsForReplay.get('botLevel')) || 'hard';
+      window.AMath.replayRecorder.start({
+        tileSet: tileSetForReplay,
+        botLevel: botLevelForReplay,
+        isPvP: false,
+      });
+    }
+
     // Wire up New Game button
     // Wire up New Game button
     const btnNewGame = document.getElementById('btn-new-game');
@@ -1726,6 +1738,9 @@
       session.board,
       session.tentativePlacements.length
     );
+    // Stash equations on scoreResult so commitPlayerPlay (and replay recorder)
+    // can use them without changing the function signature.
+    scoreResult.equations = result.equations;
 
     commitPlayerPlay(scoreResult);
   }
@@ -1781,6 +1796,17 @@
       wasBingo: wasBingo,
     };
     session.opponentSwapHistory.push({ type: 'play' });
+
+    // Replay recorder — record before tentative placements are cleared
+    if (window.AMath.replayRecorder && !isPvP) {
+      window.AMath.replayRecorder.recordPlay({
+        who: 'player',
+        score: scoreResult.total,
+        bingo: wasBingo,
+        placements: session.tentativePlacements,
+        equations: scoreResult.equations || [],
+      });
+    }
 
     Rack.refillFromBag(session.playerRack, session.bag);
     Interactions.clearTentativePlacements();
@@ -2190,6 +2216,11 @@
 
     session.consecutiveNonScoringTurns++;
 
+    // Replay recorder — player pass
+    if (window.AMath.replayRecorder && !session.isPvP) {
+      window.AMath.replayRecorder.recordPass({ who: 'player' });
+    }
+
     // Warn player when close to 6-pass game end
     var sixPassDisabled = false;
     try { sixPassDisabled = window.AMath.settings.get('disableSixPassEnd') === true; } catch (e) {}
@@ -2281,6 +2312,11 @@
     // Achievement tracking — count player swaps (PvA, P1 in PvP)
     if (!session.isPvP || (session.currentPlayer || 1) === 1) {
       session.playerSwapCount = (session.playerSwapCount || 0) + 1;
+    }
+
+    // Replay recorder — player swap
+    if (window.AMath.replayRecorder && !session.isPvP) {
+      window.AMath.replayRecorder.recordSwap({ who: 'player', count: tilesToReturn.length });
     }
 
     // Track opponent's last action for late-game AI strategy
@@ -2554,6 +2590,17 @@
       // (3 × 3 = 9). This is dramatic and rare — fire the special gloat toast.
       const wasX9 = isX9Play(decision.placements);
 
+      // Replay recorder — capture AI play with equations for replay
+      if (window.AMath.replayRecorder) {
+        window.AMath.replayRecorder.recordPlay({
+          who: 'ai',
+          score: decision.score,
+          bingo: isBingo,
+          placements: decision.placements,
+          equations: decision.equations || [],
+        });
+      }
+
       const event = isBingo ? 'ai_bingo' : (wasX9 ? 'ai_x9' : 'ai_play');
       fireTrashTalk(event, { lastScore: decision.score });
 
@@ -2594,6 +2641,10 @@
       session.lastAiPlay = null;
       session.aiConsecutiveSwaps = (session.aiConsecutiveSwaps || 0) + 1;
 
+      if (window.AMath.replayRecorder) {
+        window.AMath.replayRecorder.recordSwap({ who: 'ai', count: swapped.length });
+      }
+
       if (window.AMath.scoreSheet) {
         window.AMath.scoreSheet.recordTurn('ai', 'swap', 0, false, session.aiScore, { swapCount: swapped.length });
       }
@@ -2612,6 +2663,10 @@
     } else if (decision.type === 'pass') {
       session.consecutiveNonScoringTurns++;
       session.lastAiPlay = null;
+
+      if (window.AMath.replayRecorder) {
+        window.AMath.replayRecorder.recordPass({ who: 'ai' });
+      }
 
       if (window.AMath.scoreSheet) {
         window.AMath.scoreSheet.recordTurn('ai', 'pass', 0, false, session.aiScore);
@@ -2936,7 +2991,7 @@
           if (entries[ei].who === 'player' && entries[ei].bingo) playerBingos++;
         }
       }
-      window.AMathBridge.saveGameResult({
+      var resultPayload = {
         playerScore: session.playerScore,
         aiScore: session.aiScore,
         won: session.playerScore > session.aiScore,
@@ -2946,7 +3001,19 @@
         swapCount: session.playerSwapCount || 0,
         playsMade: session.playerPlaysMade || 0,
         gameDurationMs: session.gameStartTime ? (Date.now() - session.gameStartTime) : 0,
-      });
+      };
+      window.AMathBridge.saveGameResult(resultPayload);
+
+      // Save replay (separate Firestore doc in `games` collection)
+      if (window.AMath.replayRecorder && window.AMath.replayRecorder.active()) {
+        var replayDoc = window.AMath.replayRecorder.finish(resultPayload);
+        if (replayDoc && window.AMathBridge.saveReplay) {
+          window.AMathBridge.saveReplay(replayDoc);
+        }
+      }
+    } else if (window.AMath.replayRecorder) {
+      // Guest / PvP — discard the recording cleanly
+      window.AMath.replayRecorder.cancel();
     }
 
     // Game end sound + celebration if player won

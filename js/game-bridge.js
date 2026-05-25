@@ -14,11 +14,36 @@
   let _db = null;
 
   function init() {
-    // Read user info from URL params (set by lobby.html)
+    // Read user info from URL params (set by lobby.html when launching a game)
     var params = new URLSearchParams(window.location.search);
     _userId = params.get('userId');
     _userName = params.get('userName');
     _userPhoto = params.get('userPhoto');
+
+    // Lobby context: no URL params, but the user IS authenticated. Pick up the
+    // identity from Firebase Auth so listMyGames / getReplay work.
+    if ((!_userId || _userId === 'guest') && typeof firebase !== 'undefined' && firebase.auth) {
+      try {
+        var current = firebase.auth().currentUser;
+        if (current) {
+          _userId = current.uid;
+          _userName = current.displayName || '';
+          _userPhoto = current.photoURL || '';
+        } else {
+          // Wait for auth state to settle, then re-init silently
+          firebase.auth().onAuthStateChanged(function (u) {
+            if (u && (!_userId || _userId === 'guest')) {
+              _userId = u.uid;
+              _userName = u.displayName || '';
+              _userPhoto = u.photoURL || '';
+              if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+                _db = firebase.firestore();
+              }
+            }
+          });
+        }
+      } catch (e) { /* not a fatal — guest mode continues */ }
+    }
 
     if (!_userId || _userId === 'guest') {
       console.log('[Bridge] Guest mode — no Firebase tracking');
@@ -27,16 +52,15 @@
 
     console.log('[Bridge] User: ' + _userName + ' (' + _userId + ')');
 
-    // Show profile image in game UI
+    // Show profile image in game UI (no-op on lobby — element doesn't exist)
     if (_userPhoto) {
       showProfileInGame();
     }
 
-    // Show lobby button (may not exist yet if UI hasn't rendered)
+    // Show lobby button (may not exist yet if UI hasn't rendered, or in lobby itself)
     function showLobbyBtn() {
       var lobbyBtn = document.getElementById('btn-lobby');
       if (lobbyBtn) { lobbyBtn.style.display = ''; }
-      else { setTimeout(showLobbyBtn, 500); }
     }
     showLobbyBtn();
 
@@ -149,6 +173,66 @@
     // This is called from the game-over handler
   }
 
+  /**
+   * Persist a full replay doc to Firestore `games` collection.
+   * The doc holds the move-list + final summary so replay.html can re-play it.
+   * Fire-and-forget — failure doesn't break the game.
+   */
+  async function saveReplay(replayDoc) {
+    if (!_userId || _userId === 'guest' || !_db || !replayDoc) return null;
+    try {
+      var doc = Object.assign({}, replayDoc, {
+        userId: _userId,
+        displayName: _userName || '',
+        photoURL: _userPhoto || '',
+        createdAt: Date.now(),
+      });
+      var ref = await _db.collection('games').add(doc);
+      console.log('[Bridge] Replay saved:', ref.id);
+      return ref.id;
+    } catch (err) {
+      console.error('[Bridge] Replay save error:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch the user's recent games. Returns array of { id, ...doc }.
+   */
+  async function listMyGames(limit) {
+    if (!_userId || _userId === 'guest' || !_db) return [];
+    try {
+      var snap = await _db.collection('games')
+        .where('userId', '==', _userId)
+        .orderBy('createdAt', 'desc')
+        .limit(limit || 20)
+        .get();
+      var games = [];
+      snap.forEach(function (d) {
+        games.push(Object.assign({ id: d.id }, d.data()));
+      });
+      return games;
+    } catch (err) {
+      console.error('[Bridge] listMyGames error:', err);
+      return [];
+    }
+  }
+
+  /**
+   * Fetch one replay by id.
+   */
+  async function getReplay(gameId) {
+    if (!_db || !gameId) return null;
+    try {
+      var d = await _db.collection('games').doc(gameId).get();
+      if (!d.exists) return null;
+      return Object.assign({ id: d.id }, d.data());
+    } catch (err) {
+      console.error('[Bridge] getReplay error:', err);
+      return null;
+    }
+  }
+
   // Init on load
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
@@ -158,6 +242,9 @@
 
   window.AMathBridge = {
     saveGameResult: saveGameResult,
+    saveReplay: saveReplay,
+    listMyGames: listMyGames,
+    getReplay: getReplay,
     getUserId: function () { return _userId; },
     getUserName: function () { return _userName; },
     getUserPhoto: function () { return _userPhoto; },
