@@ -7,7 +7,7 @@
 // This script bumps version stamp every time we deploy. If the SW is stale,
 // it tells the SW to unregister, clears all caches, and reloads.
 (function(){
-  var DEPLOYED_VERSION = 'v7-2026-05-26-2';
+  var DEPLOYED_VERSION = 'v8-2026-05-26';
   var lastVersion = localStorage.getItem('pz_version');
   if (lastVersion !== DEPLOYED_VERSION) {
     localStorage.setItem('pz_version', DEPLOYED_VERSION);
@@ -123,12 +123,29 @@
   .aivai-bar,
   #tile-tracker-panel{ display:none !important; }
 
-  /* Highlight best-play placements after submit */
+  /* Ensure rack tiles always visible in any theme */
+.player-area .amath-tile,
+.player-area .amath-tile-rack {
+  background: linear-gradient(145deg, #fef9c3, #fde68a) !important;
+  border-color: #f59e0b !important;
+  color: #1f2937 !important;
+}
+.player-area .amath-tile .tile-face,
+.player-area .amath-tile .tile-points { color: #1f2937 !important; }
+body.theme-dark .player-area .amath-tile,
+body.theme-dark .player-area .amath-tile-rack {
+  background: linear-gradient(145deg, #f8fafc, #e2e8f0) !important;
+  border-color: #94a3b8 !important;
+}
+
+/* Highlight best-play placements after submit */
   .amath-cell.pz-highlight-gold .amath-tile{outline:3px solid #fbbf24;}
   .amath-cell.pz-highlight-silver .amath-tile{outline:3px dashed #94a3b8;}
   .amath-cell.pz-highlight-bronze .amath-tile{outline:3px dashed #a78bfa;}
 
-  /* Hide opponent score/timer for puzzle (replaced by our scoreboard) */
+  /* Hide opponent area entirely in puzzle (no opponent rack/score/timer) */
+.opponent-area { display:none !important; }
+/* Hide opponent score/timer for puzzle (replaced by our scoreboard) */
   .opponent-area .timer-box, .timer-bar { display:none !important; }
   /* Use a custom scoreboard above the board */
   .pz-scoreboard{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:6px 12px;background:var(--bg-page,#0f172a);border-bottom:1px solid var(--border-medium,#1e293b);}
@@ -141,12 +158,12 @@
   .opponent-area .score-box, .player-area .score-box, .player-area .timer-box { display:none !important; }
 </style>
 </head>
-<body class="theme-dark">
+<body>
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v7</span></h1>
-  <div style="width:36px"></div>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v8</span></h1>
+  <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
 <!-- SELECT SCREEN -->
@@ -828,9 +845,7 @@ window.startPuzzle = function(type){
   var container = document.getElementById('game-container');
   var parts = UI.buildGameLayout(container);
 
-  // Hide opponent rack — puzzles don't show opponent tiles
-  if(parts.opponentRack) parts.opponentRack.style.display = 'none';
-  if(parts.opponentArea) parts.opponentArea.style.display = 'none';
+  // Hide opponent area via CSS (no opponent in puzzle)
 
   // Initialize session — same structure as PvA
   session = {
@@ -922,6 +937,32 @@ window.nextPuzzle = function(){
 window.goBack = function(){
   if(timerInterval) clearInterval(timerInterval);
   window.location.href = 'lobby.html';
+};
+
+// Theme toggle — cycle through dark / modern / physical
+window.cycleTheme = function(){
+  var themes = ['dark', 'modern', 'physical', 'capture'];
+  var labels = {dark:'🌙 Dark', modern:'☀️ Modern', physical:'🎲 Physical', capture:'🟢 Capture'};
+  var body = document.body;
+  // Find current
+  var idx = 0;
+  for(var i=0;i<themes.length;i++){
+    if(body.classList.contains('theme-'+themes[i])){ idx=i; break; }
+  }
+  var next = themes[(idx+1) % themes.length];
+  // Remove all theme classes
+  themes.forEach(function(t){ body.classList.remove('theme-'+t); });
+  body.classList.add('theme-'+next);
+  // Persist via settings if available
+  if(window.AMath && window.AMath.settings && window.AMath.settings.set){
+    window.AMath.settings.set('theme', next);
+  }
+  // Brief toast
+  var toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#1f2937;color:#fbbf24;padding:8px 16px;border-radius:99px;font-size:13px;font-weight:700;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.4);';
+  toast.textContent = labels[next];
+  document.body.appendChild(toast);
+  setTimeout(function(){ toast.style.transition='opacity .3s'; toast.style.opacity='0'; setTimeout(function(){toast.remove();}, 300); }, 1200);
 };
 
 })();
