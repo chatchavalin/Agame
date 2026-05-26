@@ -7,7 +7,7 @@
 // This script bumps version stamp every time we deploy. If the SW is stale,
 // it tells the SW to unregister, clears all caches, and reloads.
 (function(){
-  var DEPLOYED_VERSION = 'v15-2026-05-26';
+  var DEPLOYED_VERSION = 'v16-2026-05-26';
   var lastVersion = localStorage.getItem('pz_version');
   if (lastVersion !== DEPLOYED_VERSION) {
     localStorage.setItem('pz_version', DEPLOYED_VERSION);
@@ -172,7 +172,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v15</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v16</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -279,6 +279,25 @@ function init(){
 
   var PUZZLE_BANK = {
     bingo: [
+      { scoreYou:114, scoreOpp:148, bagCount:22,
+        board:[
+        [4,9,'2'],
+        [5,9,'+'],
+        [6,9,'3'],
+        [7,6,'11'],[7,7,'='],[7,8,'7'],[7,9,'×/÷','×'],[7,10,'4'],[7,11,'-'],[7,12,'1'],[7,13,'BLANK','16'],
+        [8,9,'4'],
+        [9,9,'='],
+        [10,6,'8'],[10,7,'0'],[10,8,'-'],[10,9,'14'],[10,10,'='],[10,11,'6'],[10,12,'6'],
+        [11,12,'+'],
+        [12,12,'7'],
+        [13,12,'='],
+        [14,8,'5'],[14,9,'='],[14,10,'16'],[14,11,'+/-','-'],[14,12,'13'],[14,13,'+'],[14,14,'2']
+        ],
+        rack: ['0','2','3','8','20','+','+/-','×/÷'],
+        bagComp: {'+/-':3,'-':2,'0':3,'1':5,'10':2,'12':2,'15':1,'17':1,'18':1,'19':1,'2':3,'3':3,'4':3,'5':3,'6':2,'7':2,'8':2,'9':4,'=':6,'BLANK':3,'×':4,'×/÷':2,'÷':4},
+        history: 'Book 4 ข้อ 9 — Mid-game position',
+        hint: 'Down 34. Dense board with multiple equation chains. Look for short plays that hook into existing big tiles (11, 14, 16). The 8+3=11 hook is one option.'
+      },
       { scoreYou:78, scoreOpp:215, bagCount:28,
         board:[
         [3,10,'3'],
