@@ -2,6 +2,33 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script>
+// CACHE NUKE: if old service worker is serving stale puzzle.html, force update.
+// This script bumps version stamp every time we deploy. If the SW is stale,
+// it tells the SW to unregister, clears all caches, and reloads.
+(function(){
+  var DEPLOYED_VERSION = 'v7-2026-05-26-2';
+  var lastVersion = localStorage.getItem('pz_version');
+  if (lastVersion !== DEPLOYED_VERSION) {
+    localStorage.setItem('pz_version', DEPLOYED_VERSION);
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(regs){
+        return Promise.all(regs.map(function(r){ return r.unregister(); }));
+      }).then(function(){
+        return caches.keys().then(function(keys){
+          return Promise.all(keys.map(function(k){ return caches.delete(k); }));
+        });
+      }).then(function(){
+        if (!sessionStorage.getItem('pz_reloaded')) {
+          sessionStorage.setItem('pz_reloaded','1');
+          window.location.reload(true);
+        }
+      });
+    }
+  }
+})();
+</script>
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 <title>A-Math — Puzzle Mode</title>
 <link rel="manifest" href="manifest.json">
