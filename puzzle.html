@@ -1295,3 +1295,1499 @@ window.goBack=function(){
 </script>
 </body>
 </html>
+  var PUZZLE_BANK = {
+    bingo: [
+      { scoreYou:148, scoreOpp:112, bagCount:32,
+        board:[
+        [5,2,'4'],[5,3,'+'],[5,4,'3'],[5,5,'+'],[5,6,'2'],[5,7,'+'],[5,8,'1'],[5,9,'='],[5,10,'10'],
+        [6,8,'+'],
+        [7,0,'3'],[7,1,'+'],[7,2,'4'],[7,3,'+'],[7,4,'1'],[7,5,'+'],[7,6,'2'],[7,7,'='],[7,8,'10'],
+        [8,8,'-'],
+        [9,8,'3'],
+        [10,8,'='],
+        [11,8,'8'],
+        [13,1,'4'],[13,2,'+'],[13,3,'2'],[13,4,'+'],[13,5,'1'],[13,6,'='],[13,7,'7']
+        ],
+        rack: ['12','=','3','+','6','=','9','-'],
+        bagComp: {'+/-':5,'-':2,'0':5,'1':3,'11':1,'12':1,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'2':3,'20':1,'3':1,'4':2,'5':4,'6':3,'7':3,'8':3,'9':3,'=':5,'BLANK':4,'×':4,'×/÷':4,'÷':4},
+        hint: 'Three equations in a cross pattern. Find the bingo hooking through (5,8) or (7,8).'
+      },
+      { scoreYou:85, scoreOpp:210, bagCount:18,
+        board:[
+        [5,2,'3'],[5,3,'+'],[5,4,'2'],[5,5,'+'],[5,6,'4'],[5,7,'+'],[5,8,'3'],[5,9,'='],[5,10,'12'],
+        [6,8,'+'],
+        [7,0,'4'],[7,1,'+'],[7,2,'3'],[7,3,'-'],[7,4,'1'],[7,5,'+'],[7,6,'6'],[7,7,'='],[7,8,'12'],
+        [8,8,'-'],
+        [9,8,'8'],
+        [10,8,'='],
+        [11,8,'7'],
+        [13,1,'3'],[13,2,'+'],[13,3,'4'],[13,4,'+'],[13,5,'2'],[13,6,'='],[13,7,'9']
+        ],
+        rack: ['÷','÷','×','×','0','0','BLANK','+/-'],
+        bagComp: {'+/-':4,'-':2,'0':3,'1':5,'10':2,'11':1,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'2':4,'20':1,'3':1,'4':2,'5':4,'6':3,'7':3,'8':3,'9':3,'=':7,'BLANK':3,'×':2,'×/÷':4,'÷':2},
+        hint: 'Your rack is ÷÷××00BLANK+/- — no valid equation is possible. Swap all tiles.'
+      },
+      { scoreYou:167, scoreOpp:130, bagCount:25,
+        board:[
+        [1,5,'4'],[1,6,'+'],[1,7,'3'],[1,8,'+'],[1,9,'2'],[1,10,'+'],[1,11,'1'],[1,12,'='],[1,13,'10'],
+        [2,7,'-'],
+        [3,7,'6'],
+        [4,7,'+'],
+        [5,7,'1'],
+        [6,7,'+'],
+        [7,5,'3'],[7,6,'+'],[7,7,'4'],[7,8,'+'],[7,9,'2'],[7,10,'='],[7,11,'9'],
+        [8,7,'='],
+        [9,5,'3'],[9,6,'+'],[9,7,'2'],[9,8,'+'],[9,9,'4'],[9,10,'='],[9,11,'9']
+        ],
+        rack: ['4','=','1','+','6','=','11','='],
+        bagComp: {'+/-':5,'-':3,'0':5,'1':3,'10':1,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'2':3,'20':1,'3':2,'4':1,'5':4,'6':2,'7':4,'8':4,'9':2,'=':4,'BLANK':4,'×':4,'×/÷':4,'÷':4},
+        hint: 'Two H equations and one V arm. Which row or column bingo scores most?'
+      },
+      { scoreYou:224, scoreOpp:198, bagCount:8,
+        board:[
+        [1,5,'4'],[1,6,'+'],[1,7,'2'],[1,8,'+'],[1,9,'3'],[1,10,'+'],[1,11,'1'],[1,12,'='],[1,13,'10'],
+        [2,7,'-'],
+        [3,7,'6'],
+        [4,7,'+'],
+        [5,7,'1'],
+        [6,7,'+'],
+        [7,5,'3'],[7,6,'+'],[7,7,'4'],[7,8,'+'],[7,9,'2'],[7,10,'='],[7,11,'9'],
+        [8,7,'='],
+        [9,5,'4'],[9,6,'+'],[9,7,'1'],[9,8,'+'],[9,9,'3'],[9,10,'='],[9,11,'8']
+        ],
+        rack: ['2','=','4','+','3','=','1','+'],
+        bagComp: {'+/-':5,'-':3,'0':5,'1':2,'10':1,'11':1,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'2':3,'20':1,'3':1,'4':1,'5':4,'6':3,'7':4,'8':3,'9':3,'=':5,'BLANK':4,'×':4,'×/÷':4,'÷':4},
+        hint: 'Dense cross: rows 1,7,9 with vertical arm. Every premium square counts in late game.'
+      }
+    ],
+    yoyo: [
+      { scoreYou:93, scoreOpp:87, bagCount:29,
+        board:[
+        [0,0,'4'],[0,1,'+'],[0,2,'2'],[0,3,'+'],[0,4,'3'],[0,5,'-'],[0,6,'1'],[0,7,'+'],
+        [7,3,'4'],[7,4,'4'],[7,5,'+'],[7,6,'3'],[7,7,'+'],[7,8,'2'],[7,9,'='],[7,10,'9'],
+        [8,3,'-'],
+        [9,3,'3'],[9,4,'3'],[9,5,'+'],[9,6,'2'],[9,7,'+'],[9,8,'4'],[9,9,'='],[9,10,'9'],
+        [10,3,'+'],
+        [11,3,'2'],
+        [12,3,'='],
+        [13,3,'3']
+        ],
+        rack: ['4','-','2','+','1','=','11','9'],
+        bagComp: {'+/-':5,'-':1,'0':5,'1':4,'10':2,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'2':1,'20':1,'5':4,'6':4,'7':4,'8':4,'9':1,'=':7,'BLANK':4,'×':4,'×/÷':4,'÷':4},
+        hint: 'Row 0 shows "4+2+3-1+" at cols 0-7. Fill cols 8-14 to YoYo spanning 3E at cols 0 and 7!'
+      },
+      { scoreYou:143, scoreOpp:160, bagCount:21,
+        board:[
+        [0,14,'3'],
+        [1,14,'+'],
+        [2,14,'2'],
+        [3,14,'-'],
+        [4,14,'1'],
+        [5,7,'3'],[5,8,'+'],[5,9,'4'],[5,10,'+'],[5,11,'2'],[5,12,'='],[5,13,'9'],[5,14,'+'],
+        [6,14,'4'],
+        [7,7,'4'],[7,8,'+'],[7,9,'3'],[7,10,'+'],[7,11,'2'],[7,12,'='],[7,13,'9'],[7,14,'-'],
+        [9,7,'2'],[9,8,'+'],[9,9,'4'],[9,10,'+'],[9,11,'3'],[9,12,'='],[9,13,'9'],
+        [11,7,'6'],[11,8,'-'],[11,9,'2'],[11,10,'+'],[11,11,'5'],[11,12,'='],[11,13,'9']
+        ],
+        rack: ['2','+','3','-','2','=','7','4'],
+        bagComp: {'+/-':5,'0':5,'1':5,'10':2,'11':1,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'20':1,'5':3,'6':3,'7':3,'8':4,'=':6,'BLANK':4,'×':4,'×/÷':4,'÷':4},
+        hint: 'Col 14 shows "3+2-1+4-" at rows 0-7. Fill rows 8-14 to YoYo spanning 3E at rows 0 and 14!'
+      },
+      { scoreYou:118, scoreOpp:105, bagCount:35,
+        board:[
+        [5,2,'4'],[5,3,'+'],[5,4,'3'],[5,5,'+'],[5,6,'2'],[5,7,'='],[5,8,'9'],[5,9,'9'],
+        [6,9,'-'],
+        [7,0,'3'],[7,1,'+'],[7,2,'2'],[7,3,'+'],[7,4,'1'],[7,5,'+'],[7,6,'4'],[7,7,'-'],[7,9,'4'],
+        [8,9,'-'],
+        [9,2,'3'],[9,3,'+'],[9,4,'2'],[9,5,'+'],[9,6,'4'],[9,7,'='],[9,8,'9'],[9,9,'2'],
+        [10,9,'='],
+        [11,9,'3']
+        ],
+        rack: ['2','+','3','-','1','=','10','6'],
+        bagComp: {'+/-':5,'0':5,'1':4,'10':1,'11':1,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'2':1,'20':1,'4':1,'5':4,'6':3,'7':4,'8':4,'9':1,'=':7,'BLANK':4,'×':4,'×/÷':4,'÷':4},
+        hint: 'Row 7 shows "3+2+1+4-" at cols 0-7. Fill cols 8-14 for the center YoYo!'
+      },
+      { scoreYou:187, scoreOpp:205, bagCount:12,
+        board:[
+        [0,7,'4'],
+        [1,7,'+'],
+        [2,7,'2'],
+        [3,7,'+'],[3,8,'4'],[3,9,'+'],[3,10,'3'],[3,11,'+'],[3,12,'2'],[3,13,'='],[3,14,'9'],
+        [4,7,'1'],
+        [5,7,'-'],[5,8,'3'],[5,9,'+'],[5,10,'2'],[5,11,'+'],[5,12,'4'],[5,13,'='],[5,14,'9'],
+        [6,7,'3'],
+        [7,7,'+'],
+        [11,8,'2'],[11,9,'+'],[11,10,'4'],[11,11,'+'],[11,12,'3'],[11,13,'='],[11,14,'9']
+        ],
+        rack: ['4','+','2','-','1','=','9','3'],
+        bagComp: {'+/-':5,'-':2,'0':5,'1':4,'10':2,'11':1,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'2':1,'20':1,'5':4,'6':4,'7':4,'8':4,'=':7,'BLANK':4,'×':4,'×/÷':4,'÷':4},
+        hint: 'Col 7 shows "4+2+1-3+" at rows 0-7. Fill rows 8-14 to YoYo hitting 3E at rows 0, 7, and 14!'
+      }
+    ],
+    mixed: [
+      { scoreYou:62, scoreOpp:71, bagCount:48,
+        board:[
+        [5,2,'4'],[5,3,'+'],[5,4,'2'],[5,5,'+'],[5,6,'3'],[5,7,'+'],[5,8,'1'],[5,9,'='],[5,10,'10'],
+        [6,8,'+'],
+        [7,0,'3'],[7,1,'+'],[7,2,'4'],[7,3,'+'],[7,4,'1'],[7,5,'+'],[7,6,'2'],[7,7,'='],[7,8,'10'],
+        [8,8,'-'],
+        [9,8,'3'],
+        [10,8,'='],
+        [11,8,'8'],
+        [13,1,'3'],[13,2,'+'],[13,3,'2'],[13,4,'+'],[13,5,'1'],[13,6,'='],[13,7,'6']
+        ],
+        rack: ['2','=','3','+','4','=','6','×'],
+        bagComp: {'+/-':5,'-':3,'0':5,'1':3,'11':1,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'2':2,'20':1,'4':2,'5':4,'6':2,'7':4,'8':3,'9':4,'=':5,'BLANK':4,'×':3,'×/÷':4,'÷':4},
+        hint: 'Early game cross pattern. Multiple bingo hooks available on the V col8 arm.'
+      },
+      { scoreYou:110, scoreOpp:95, bagCount:42,
+        board:[
+        [1,5,'4'],[1,6,'+'],[1,7,'3'],[1,8,'+'],[1,9,'2'],[1,10,'+'],[1,11,'1'],[1,12,'='],[1,13,'10'],
+        [2,7,'-'],
+        [3,7,'6'],
+        [4,7,'+'],
+        [5,7,'1'],[5,12,'9'],
+        [6,7,'+'],[6,12,'-'],
+        [7,5,'3'],[7,6,'+'],[7,7,'4'],[7,8,'+'],[7,9,'2'],[7,10,'='],[7,11,'9'],[7,12,'4'],
+        [8,7,'='],[8,12,'-'],
+        [9,5,'3'],[9,6,'+'],[9,7,'2'],[9,8,'+'],[9,9,'4'],[9,10,'='],[9,11,'9'],[9,12,'2'],
+        [10,12,'='],
+        [11,12,'3']
+        ],
+        rack: ['÷','÷','×','×','0','0','BLANK','+/-'],
+        bagComp: {'+/-':4,'-':1,'0':3,'1':4,'10':1,'11':1,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'2':2,'20':1,'3':1,'4':1,'5':4,'6':3,'7':4,'8':4,'9':1,'=':6,'BLANK':3,'×':2,'×/÷':4,'÷':2},
+        hint: 'Dense cross board but rack has no playable equation. Swap is the correct competitive move!'
+      },
+      { scoreYou:145, scoreOpp:139, bagCount:27,
+        board:[
+        [5,2,'3'],[5,3,'+'],[5,4,'2'],[5,5,'+'],[5,6,'4'],[5,7,'+'],[5,8,'3'],[5,9,'='],[5,10,'12'],
+        [6,8,'+'],
+        [7,0,'4'],[7,1,'+'],[7,2,'3'],[7,3,'-'],[7,4,'1'],[7,5,'+'],[7,6,'6'],[7,7,'='],[7,8,'12'],
+        [8,8,'-'],
+        [9,8,'8'],
+        [10,8,'='],
+        [11,8,'7'],
+        [13,1,'3'],[13,2,'+'],[13,3,'2'],[13,4,'+'],[13,5,'4'],[13,6,'='],[13,7,'9'],
+        [14,1,'4'],[14,2,'+'],[14,3,'3'],[14,4,'+'],[14,5,'2'],[14,6,'='],[14,7,'9']
+        ],
+        rack: ['9','=','2','+','5','=','7','='],
+        bagComp: {'+/-':5,'-':2,'0':5,'1':5,'10':2,'11':1,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'2':2,'20':1,'4':1,'5':3,'6':3,'7':2,'8':3,'9':1,'=':3,'BLANK':4,'×':4,'×/÷':4,'÷':4},
+        hint: 'Row 14 x9 threat! 4+3+2=9 at cols 1-7 leaves 3E at col14 exposed. Block or bingo?'
+      },
+      { scoreYou:178, scoreOpp:163, bagCount:19,
+        board:[
+        [0,0,'4'],[0,1,'+'],[0,2,'2'],[0,3,'+'],[0,4,'3'],[0,5,'-'],[0,6,'1'],[0,7,'+'],[0,8,'4'],
+        [7,3,'4'],[7,4,'4'],[7,5,'+'],[7,6,'3'],[7,7,'+'],[7,8,'2'],[7,9,'='],[7,10,'9'],[7,11,'9'],
+        [8,3,'-'],[8,11,'-'],
+        [9,3,'3'],[9,4,'3'],[9,5,'+'],[9,6,'2'],[9,7,'+'],[9,8,'4'],[9,9,'='],[9,10,'9'],[9,11,'4'],
+        [10,3,'+'],[10,11,'-'],
+        [11,3,'2'],[11,11,'2'],
+        [12,3,'='],[12,11,'='],
+        [13,3,'3'],[13,11,'3']
+        ],
+        rack: ['-','2','+','1','=','11','9','='],
+        bagComp: {'+/-':5,'0':5,'1':4,'10':2,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'20':1,'5':4,'6':4,'7':4,'8':4,'=':5,'BLANK':4,'×':4,'×/÷':4,'÷':4},
+        hint: 'Row 0 shows 9 tiles. Fill cols 9-14 to complete the YoYo. Both 3E squares already covered!'
+      },
+      { scoreYou:203, scoreOpp:205, bagCount:6,
+        board:[
+        [3,1,'4'],[3,2,'+'],[3,3,'2'],[3,4,'+'],[3,5,'1'],[3,6,'='],[3,7,'7'],
+        [5,2,'4'],[5,3,'+'],[5,4,'3'],[5,5,'+'],[5,6,'2'],[5,7,'+'],[5,8,'1'],[5,9,'='],[5,10,'10'],
+        [6,8,'+'],
+        [7,0,'3'],[7,1,'+'],[7,2,'4'],[7,3,'+'],[7,4,'1'],[7,5,'+'],[7,6,'2'],[7,7,'='],[7,8,'10'],
+        [8,8,'-'],
+        [9,8,'3'],
+        [10,8,'='],
+        [11,8,'8'],
+        [13,1,'4'],[13,2,'+'],[13,3,'2'],[13,4,'+'],[13,5,'1'],[13,6,'='],[13,7,'7']
+        ],
+        rack: ['1','=','3','+','2','=','7','-'],
+        bagComp: {'+/-':5,'-':2,'0':5,'1':1,'11':1,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'2':1,'20':1,'3':1,'4':1,'5':4,'6':4,'7':1,'8':3,'9':4,'=':4,'BLANK':4,'×':4,'×/÷':4,'÷':4},
+        hint: 'Down by 2pts, late game. Dense board — find every extra point on the three-arm network.'
+      }
+    ],
+  };    body{font-family:'Outfit',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;overflow-x:hidden;}
+
+    /* ── HEADER ── */
+    .pz-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#1e293b;border-bottom:1px solid #334155;}
+    .pz-header h1{font-size:17px;font-weight:800;color:#fbbf24;}
+    .pz-header .back-btn{background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;padding:4px;}
+
+    /* ── SELECT SCREEN ── */
+    #screen-select{padding:24px 16px;max-width:420px;margin:0 auto;}
+    #screen-select h2{font-size:22px;font-weight:800;text-align:center;margin-bottom:6px;}
+    #screen-select p{text-align:center;color:#94a3b8;font-size:13px;margin-bottom:24px;}
+    .mode-card{background:#1e293b;border:2px solid #334155;border-radius:14px;padding:18px;margin-bottom:12px;cursor:pointer;transition:border-color .2s,transform .1s;display:flex;align-items:center;gap:14px;}
+    .mode-card:hover{border-color:#fbbf24;transform:translateY(-1px);}
+    .mode-card .mode-icon{font-size:32px;flex-shrink:0;}
+    .mode-card .mode-info h3{font-size:16px;font-weight:700;margin-bottom:2px;}
+    .mode-card .mode-info p{font-size:12px;color:#94a3b8;line-height:1.4;}
+
+    /* ── PUZZLE SCREEN ── */
+    #screen-puzzle{display:none;}
+    .pz-meta{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#1e293b;font-size:12px;gap:8px;}
+    .pz-meta .badge{background:#fbbf24;color:#1f2937;padding:2px 8px;border-radius:99px;font-weight:700;font-size:11px;}
+    .pz-meta .timer{color:#94a3b8;font-variant-numeric:tabular-nums;}
+
+    /* ── SCORE HEADER ── */
+    .score-header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:8px 12px;background:#0f172a;border-bottom:1px solid #1e293b;}
+    .score-box{text-align:center;}
+    .score-box .label{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;}
+    .score-box .val{font-size:22px;font-weight:800;color:#fbbf24;}
+    .score-box.opponent .val{color:#f87171;}
+    .score-vs{font-size:11px;color:#475569;font-weight:700;}
+
+    /* ── LAYOUT ── */
+    .pz-body{display:flex;flex-direction:column;align-items:center;padding:8px;}
+
+    /* ── BOARD ── */
+    .board-wrap{width:min(98vw, 460px);aspect-ratio:1;margin:0 auto;}
+    .pz-board{display:grid;grid-template-columns:repeat(15,1fr);gap:1px;background:#1e293b;border:2px solid #334155;border-radius:4px;width:100%;aspect-ratio:1;}
+    .pz-cell{background:#1a2540;display:flex;align-items:center;justify-content:center;font-size:min(2.4vw,10px);font-weight:700;position:relative;cursor:default;border-radius:1px;transition:background .15s;}
+    .pz-cell.premium-3E{background:#7f1d1d;}
+    .pz-cell.premium-2E{background:#713f12;}
+    .pz-cell.premium-3T{background:#1e3a5f;}
+    .pz-cell.premium-2T{background:#14532d;}
+    .pz-cell.center-star{background:#1e3a5f;}
+    .pz-cell.has-tile{background:#334155!important;cursor:default;}
+    .pz-cell.drop-target{background:#1d4ed8!important;outline:2px solid #60a5fa;}
+    .pz-cell.drop-hover{background:#2563eb!important;}
+    .pz-cell.placed-new{background:#065f46!important;outline:2px solid #34d399;}
+    .pz-cell.highlight-gold{background:#92400e!important;outline:2px dashed #fbbf24;}
+    .pz-cell.highlight-silver{background:#1e3a5f!important;outline:2px dashed #94a3b8;}
+    .pz-cell.highlight-bronze{background:#374151!important;outline:2px dashed #6b7280;}
+
+    .cell-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;line-height:1;}
+    .cell-face{font-size:min(2.8vw,11px);font-weight:800;color:#f1f5f9;}
+    .cell-pts{font-size:min(1.4vw,5.5px);color:#94a3b8;margin-top:1px;}
+    .cell-label{font-size:min(1.6vw,6px);color:#475569;font-weight:600;}
+
+    /* ── RACK AREA ── */
+    .rack-section{width:min(98vw,460px);margin:8px auto 0;}
+    .rack-label{font-size:11px;color:#64748b;margin-bottom:4px;padding-left:2px;font-weight:600;}
+    .pz-rack{display:flex;gap:4px;justify-content:center;flex-wrap:nowrap;min-height:44px;padding:4px 0;}
+    .rack-tile{width:40px;height:40px;background:linear-gradient(145deg,#f8fafc,#e2e8f0);color:#1f2937;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:grab;border:2px solid #94a3b8;font-weight:800;font-size:13px;position:relative;user-select:none;transition:transform .15s,opacity .15s;box-shadow:0 2px 4px rgba(0,0,0,.4);flex-shrink:0;}
+    .rack-tile:active{cursor:grabbing;transform:scale(1.1);}
+    .rack-tile.dragging{opacity:.4;transform:scale(.95);}
+    .rack-tile.used{opacity:.2;pointer-events:none;}
+    .rack-tile .tile-pts{font-size:7px;color:#64748b;position:absolute;bottom:2px;right:3px;font-weight:600;}
+    .rack-tile.blank-tile{background:linear-gradient(145deg,#fef3c7,#fde68a);border-color:#f59e0b;}
+
+    /* ── ACTION BUTTONS ── */
+    .pz-actions{display:flex;gap:8px;justify-content:center;margin:8px 0;width:min(98vw,460px);}
+    .pz-btn{flex:1;padding:10px 6px;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;transition:transform .1s,opacity .15s;}
+    .pz-btn:hover{transform:translateY(-1px);}
+    .btn-submit{background:#16a34a;color:#fff;}
+    .btn-submit:disabled{background:#374151;color:#64748b;cursor:not-allowed;transform:none;}
+    .btn-clear{background:#dc2626;color:#fff;}
+    .btn-hint{background:#1d4ed8;color:#fff;}
+    .btn-next{background:#7c3aed;color:#fff;}
+    .btn-swap{background:#d97706;color:#fff;}
+
+    /* ── SIDE PANEL (tracker + bag) ── */
+    .info-strip{display:flex;gap:8px;width:min(98vw,460px);margin:4px auto;}
+    .info-card{background:#1e293b;border-radius:10px;padding:8px 10px;flex:1;border:1px solid #334155;}
+    .info-card h4{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:700;}
+    /* Tracker grid */
+    .tracker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(28px,1fr));gap:2px;}
+    .ti{display:flex;flex-direction:column;align-items:center;background:#0f172a;border-radius:4px;padding:2px 1px;min-width:0;}
+    .ti .tf{font-size:8px;font-weight:800;color:#e2e8f0;line-height:1;}
+    .ti .tc{font-size:8px;color:#94a3b8;line-height:1;}
+    .ti.zero .tf{color:#374151;}
+    .ti.zero .tc{color:#374151;}
+    /* Bag grid */
+    .bag-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(28px,1fr));gap:2px;}
+    .bi{display:flex;flex-direction:column;align-items:center;background:#0f172a;border-radius:4px;padding:2px 1px;}
+    .bi .bf{font-size:8px;font-weight:800;color:#fbbf24;line-height:1;}
+    .bi .bc{font-size:8px;color:#94a3b8;line-height:1;}
+    .bi.zero .bf{color:#374151;}
+    .bi.zero .bc{color:#374151;}
+    .bag-total{font-size:11px;color:#94a3b8;margin-top:4px;text-align:center;}
+
+    /* ── ANSWER BOX ── */
+    .answer-box{width:min(98vw,460px);margin:6px auto;background:#1e293b;border-radius:12px;border:1px solid #334155;overflow:hidden;}
+    .answer-box.hidden{display:none;}
+    .answer-header{padding:10px 12px;border-bottom:1px solid #334155;}
+    .answer-header h3{font-size:14px;font-weight:700;margin-bottom:4px;}
+    .player-result{font-size:12px;padding:3px 8px;border-radius:6px;display:inline-block;margin-top:4px;}
+    .player-result.perfect{background:#065f46;color:#34d399;}
+    .player-result.good{background:#0c4a6e;color:#7dd3fc;}
+    .player-result.miss{background:#450a0a;color:#f87171;}
+    .play-tabs{display:flex;gap:6px;padding:8px 10px;border-bottom:1px solid #1e293b;}
+    .play-tab{flex:1;padding:7px 4px;border:2px solid #334155;background:#0f172a;color:#94a3b8;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;text-align:center;transition:border-color .15s,color .15s;}
+    .play-tab.active-gold{border-color:#fbbf24;color:#fbbf24;}
+    .play-tab.active-silver{border-color:#94a3b8;color:#94a3b8;}
+    .play-tab.active-bronze{border-color:#6b7280;color:#9ca3af;}
+    .play-detail{padding:10px 12px;}
+    .play-score{font-size:26px;font-weight:800;margin-bottom:4px;}
+    .play-score.gold{color:#fbbf24;}
+    .play-score.silver{color:#94a3b8;}
+    .play-score.bronze{color:#6b7280;}
+    .play-equation{font-size:12px;color:#cbd5e1;margin-bottom:6px;font-family:monospace;letter-spacing:.02em;}
+    .play-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;}
+    .play-tag{font-size:10px;padding:2px 7px;border-radius:99px;font-weight:700;}
+    .tag-bingo{background:#065f46;color:#34d399;}
+    .tag-yoyo{background:#3b0764;color:#c4b5fd;}
+    .tag-short{background:#0c4a6e;color:#7dd3fc;}
+    .tag-x9warn{background:#450a0a;color:#f87171;}
+    .tag-x9safe{background:#064e3b;color:#6ee7b7;}
+    .tag-swap{background:#431407;color:#fb923c;}
+    .play-note{font-size:11px;color:#94a3b8;line-height:1.5;padding:6px 8px;background:#0f172a;border-radius:6px;border-left:3px solid #334155;}
+    .play-note.note-warn{border-color:#f87171;}
+    .play-note.note-good{border-color:#34d399;}
+    .play-note.note-info{border-color:#60a5fa;}
+
+    /* ── BLANK MODAL ── */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;display:flex;align-items:center;justify-content:center;}
+    .modal-overlay.hidden{display:none;}
+    .modal-box{background:#1e293b;border-radius:14px;padding:20px;width:min(90vw,340px);border:1px solid #334155;}
+    .modal-box h3{font-size:16px;font-weight:800;margin-bottom:12px;text-align:center;}
+    .blank-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}
+    .blank-opt{background:#0f172a;border:2px solid #334155;border-radius:6px;padding:8px 4px;text-align:center;font-size:14px;font-weight:700;cursor:pointer;transition:border-color .15s;}
+    .blank-opt:hover{border-color:#fbbf24;color:#fbbf24;}
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="pz-header">
+  <button class="back-btn" onclick="goBack()">←</button>
+  <h1>🧩 Puzzle Mode</h1>
+  <div style="width:36px"></div>
+</div>
+
+<!-- SELECT SCREEN -->
+<div id="screen-select">
+  <h2>Choose Mode</h2>
+  <p>Real competition board situations — master-level puzzles</p>
+  <div class="mode-card" onclick="startPuzzle('mixed')">
+    <div class="mode-icon">🔥</div>
+    <div class="mode-info">
+      <h3>Mixed</h3>
+      <p>Bingo, YoYo, and high-value plays — just like a real match. Think before you place!</p>
+    </div>
+  </div>
+  <div class="mode-card" onclick="startPuzzle('bingo')">
+    <div class="mode-icon">🎰</div>
+    <div class="mode-info">
+      <h3>Bingo Only</h3>
+      <p>Use all 8 tiles in one play for the +40pt bonus. Find the equation that fits the board.</p>
+    </div>
+  </div>
+  <div class="mode-card" onclick="startPuzzle('yoyo')">
+    <div class="mode-icon">🪀</div>
+    <div class="mode-info">
+      <h3>YoYo Only</h3>
+      <p>Complete an entire row or column (15 cells) with ≤7 new tiles for massive equation multipliers.</p>
+    </div>
+  </div>
+</div>
+
+<!-- PUZZLE SCREEN -->
+<div id="screen-puzzle">
+  <!-- top meta bar -->
+  <div class="pz-meta">
+    <span id="puzzle-type-label" class="badge">Mixed</span>
+    <span id="puzzle-num" style="font-weight:700;color:#e2e8f0;">#1</span>
+    <span id="streak" style="color:#fbbf24;font-weight:700;">Streak: 0</span>
+    <span id="timer" class="timer">0:00</span>
+  </div>
+
+  <!-- scores (context for decision-making) -->
+  <div class="score-header">
+    <div class="score-box">
+      <div class="label">You</div>
+      <div class="val" id="score-you">0</div>
+    </div>
+    <div class="score-vs">VS</div>
+    <div class="score-box opponent">
+      <div class="label">Opponent</div>
+      <div class="val" id="score-opp">0</div>
+    </div>
+  </div>
+
+  <div class="pz-body">
+    <!-- Board -->
+    <div class="board-wrap">
+      <div class="pz-board" id="pz-board"></div>
+    </div>
+
+    <!-- Rack -->
+    <div class="rack-section">
+      <div class="rack-label">YOUR RACK — drag tiles onto board</div>
+      <div class="pz-rack" id="pz-rack"></div>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="pz-actions">
+      <button class="pz-btn btn-submit" id="btn-submit" onclick="submitPlay()" disabled>✅ Submit</button>
+      <button class="pz-btn btn-clear" onclick="clearPlay()">🗑️ Clear</button>
+      <button class="pz-btn btn-hint" onclick="showHint()">💡 Hint</button>
+      <button class="pz-btn btn-next" onclick="nextPuzzle()">⏭️ Skip</button>
+    </div>
+
+    <!-- Tile tracker + Bag info -->
+    <div class="info-strip">
+      <div class="info-card" style="flex:1.4;">
+        <h4>Tile Tracker <span style="color:#475569;font-weight:400;">(unseen)</span></h4>
+        <div class="tracker-grid" id="tile-tracker-grid"></div>
+      </div>
+      <div class="info-card" style="flex:1;">
+        <h4>Bag</h4>
+        <div class="bag-grid" id="bag-grid"></div>
+        <div class="bag-total" id="bag-total">84 tiles</div>
+      </div>
+    </div>
+
+    <!-- Answer box -->
+    <div class="answer-box hidden" id="answer-box">
+      <div class="answer-header">
+        <h3>📊 Best Plays Analysis</h3>
+        <div id="player-result-label"></div>
+      </div>
+      <div class="play-tabs" id="play-tabs"></div>
+      <div class="play-detail" id="play-detail"></div>
+    </div>
+
+  </div><!-- /pz-body -->
+</div><!-- /screen-puzzle -->
+
+<!-- BLANK TILE MODAL -->
+<div class="modal-overlay hidden" id="blank-modal">
+  <div class="modal-box">
+    <h3>Assign BLANK tile</h3>
+    <div class="blank-grid" id="blank-grid"></div>
+  </div>
+</div>
+
+<!-- ── JS DEPS ── -->
+<script src="js/constants.js?v=20260526a"></script>
+<script src="js/board.js?v=20260526a"></script>
+<script src="js/evaluator.js?v=20260526a"></script>
+<script src="js/scoring.js?v=20260526a"></script>
+<script src="js/placement.js?v=20260526a"></script>
+<script src="js/bag.js?v=20260526a"></script>
+<script src="js/rack.js?v=20260526a"></script>
+
+<script>
+(function(){
+'use strict';
+
+// ─────────────────────────────────────────────
+//  MODULE REFS
+// ─────────────────────────────────────────────
+var C, Board, Placement, Scoring, BagMod, RackMod;
+var board, currentPuzzle, puzzleType, puzzleNum=0, streak=0;
+var timerInterval, timerSeconds=0;
+var dragTile=null, dragRackIdx=null;       // currently dragged rack tile
+var placedTiles=[];                         // [{row,col,rackIdx,tile}] — tiles placed this turn
+var answerRevealed=false;
+var pendingBlankCell=null;                  // {row,col} waiting for blank assignment
+
+function init(){
+  C = window.AMath.constants;
+  Board = window.AMath.board;
+  Placement = window.AMath.placement;
+  Scoring = window.AMath.scoring;
+  BagMod = window.AMath.bag;
+}
+
+// ─────────────────────────────────────────────
+//  PUZZLE BANK  (rich mid-game boards)
+// ─────────────────────────────────────────────
+// Format: board tiles as [row, col, face]
+// rack: 8 tile faces for player
+// scoreYou / scoreOpp: current game score context
+// bagCount: tiles remaining in bag
+// bagComposition: { face: count } for tiles in bag
+// note: strategic context note
+  var PUZZLE_BANK = {
+    bingo: [
+      { scoreYou:148, scoreOpp:112, bagCount:32,
+        board:[
+      [3,3,'6'],[3,11,'2'],
+      [4,3,'-'],[4,11,'+'],
+      [5,3,'4'],[5,4,'+'],[5,5,'2'],[5,6,'+'],[5,7,'1'],[5,8,'+'],[5,9,'2'],[5,10,'='],[5,11,'9'],
+      [6,3,'+'],[6,11,'-'],
+      [7,3,'1'],[7,4,'3'],[7,5,'+'],[7,6,'4'],[7,7,'+'],[7,8,'2'],[7,9,'='],[7,10,'9'],[7,11,'3'],
+      [8,3,'-'],[8,11,'-'],
+      [9,3,'2'],[9,4,'+'],[9,5,'1'],[9,6,'+'],[9,7,'4'],[9,8,'-'],[9,9,'4'],[9,10,'='],[9,11,'3'],
+      [10,3,'='],[10,11,'='],
+      [11,3,'1'],[11,11,'5']
+        ],
+        rack: ['12','=','3','+','6','=','9','-'],
+        bagComp: {'+/-':5,'0':5,'1':2,'10':2,'11':1,'12':1,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'2':1,'20':1,'3':1,'4':1,'5':3,'6':2,'7':4,'8':4,'9':1,'=':4,'BLANK':4,'×':4,'×/÷':4,'÷':4},
+        hint: 'The board shows 2 V equations (col3, col11) and 2 H equations (rows 5,9) — like a real game. Find the row that makes a bingo crossing both vertical arms!'
+      },
+      { scoreYou:85, scoreOpp:210, bagCount:18,
+        board:[
+      [3,2,'5'],[3,10,'3'],
+      [4,2,'-'],[4,10,'+'],
+      [5,2,'3'],[5,3,'+'],[5,4,'2'],[5,5,'+'],[5,6,'4'],[5,7,'+'],[5,8,'2'],[5,9,'='],[5,10,'11'],
+      [6,2,'+'],[6,10,'-'],
+      [7,2,'4'],[7,3,'+'],[7,4,'1'],[7,5,'+'],[7,6,'2'],[7,7,'='],[7,8,'7'],[7,10,'7'],
+      [8,2,'+'],[8,10,'+'],
+      [9,2,'1'],[9,3,'+'],[9,4,'3'],[9,5,'+'],[9,6,'4'],[9,7,'-'],[9,8,'7'],[9,9,'='],[9,10,'1'],
+      [10,2,'='],[10,10,'='],
+      [11,2,'7'],[11,10,'8']
+        ],
+        rack: ['÷','÷','×','×','0','0','BLANK','+/-'],
+        bagComp: {'+/-':4,'-':1,'0':3,'1':3,'10':2,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'2':3,'20':1,'3':2,'4':2,'5':3,'6':4,'8':3,'9':4,'=':6,'BLANK':3,'×':2,'×/÷':4,'÷':2},
+        hint: 'Your rack is ÷÷××00BLANK+/- — no valid equation is possible from these tiles. Swapping is the correct competitive move here.'
+      },
+      { scoreYou:167, scoreOpp:130, bagCount:25,
+        board:[
+      [3,3,'6'],[3,11,'3'],
+      [4,3,'-'],[4,11,'+'],
+      [5,3,'4'],[5,4,'+'],[5,5,'2'],[5,6,'+'],[5,7,'1'],[5,8,'+'],[5,9,'2'],[5,10,'='],[5,11,'9'],
+      [6,3,'+'],[6,11,'-'],
+      [7,3,'1'],[7,11,'4'],
+      [8,3,'-'],[8,11,'-'],
+      [9,3,'2'],[9,4,'+'],[9,5,'1'],[9,6,'+'],[9,7,'3'],[9,8,'-'],[9,9,'2'],[9,10,'='],[9,11,'4'],
+      [10,3,'='],[10,11,'='],
+      [11,3,'1'],[11,11,'4'],
+      [14,1,'4'],[14,2,'+'],[14,3,'3'],[14,4,'+'],[14,5,'2'],[14,6,'='],[14,7,'9']
+        ],
+        rack: ['4','=','1','+','6','=','11','='],
+        bagComp: {'+/-':5,'0':5,'1':1,'10':2,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'2':1,'20':1,'3':2,'5':4,'6':2,'7':4,'8':4,'9':2,'=':3,'BLANK':4,'×':4,'×/÷':4,'÷':4},
+        hint: 'Row 14 already has 4+3+2=9 at cols 1-7, leaving 3E at col14 exposed. Do you bingo on the main network or block the ×9 threat?'
+      },
+      { scoreYou:224, scoreOpp:198, bagCount:8,
+        board:[
+      [0,5,'4'],[0,6,'+'],[0,7,'2'],[0,8,'+'],[0,9,'3'],[0,10,'='],[0,11,'9'],
+      [3,3,'9'],[3,4,'-'],[3,5,'2'],[3,6,'-'],[3,7,'3'],[3,8,'+'],[3,9,'4'],[3,10,'='],[3,11,'8'],
+      [4,5,'+'],[4,9,'+'],
+      [5,5,'3'],[5,9,'3'],
+      [6,5,'+'],[6,9,'+'],
+      [7,3,'4'],[7,4,'+'],[7,5,'2'],[7,6,'+'],[7,7,'1'],[7,8,'+'],[7,9,'2'],[7,10,'='],[7,11,'9'],
+      [8,5,'-'],[8,9,'-'],
+      [9,5,'6'],[9,9,'7'],
+      [10,5,'='],[10,9,'='],
+      [11,3,'3'],[11,4,'+'],[11,5,'1'],[11,6,'+'],[11,7,'4'],[11,8,'-'],[11,9,'2'],[11,10,'='],[11,11,'6']
+        ],
+        rack: ['2','=','4','+','3','=','1','+'],
+        bagComp: {'+/-':5,'0':5,'1':3,'10':2,'11':1,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'20':1,'5':4,'6':2,'7':3,'8':3,'9':1,'=':3,'BLANK':4,'×':4,'×/÷':4,'÷':4},
+        hint: 'Late game: row 0 has a partial equation and two V arms are deep into the board. This is what a real competition board looks like after 6+ turns.'
+      }
+    ],
+    yoyo: [
+      { scoreYou:93, scoreOpp:87, bagCount:29,
+        board:[
+      [0,0,'4'],[0,1,'+'],[0,2,'2'],[0,3,'+'],[0,4,'3'],[0,5,'-'],[0,6,'1'],[0,7,'+'],
+      [7,3,'4'],[7,4,'4'],[7,5,'+'],[7,6,'3'],[7,7,'+'],[7,8,'2'],[7,9,'='],[7,10,'9'],
+      [8,3,'-'],
+      [9,3,'3'],[9,4,'3'],[9,5,'+'],[9,6,'2'],[9,7,'+'],[9,8,'4'],[9,9,'='],[9,10,'9'],
+      [10,3,'+'],
+      [11,3,'2'],
+      [12,3,'='],
+      [13,3,'3']
+        ],
+        rack: ['4','-','2','+','1','=','11','9'],
+        bagComp: {'+/-':5,'-':1,'0':5,'1':4,'10':2,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'2':1,'20':1,'5':4,'6':4,'7':4,'8':4,'9':1,'=':7,'BLANK':4,'×':4,'×/÷':4,'÷':4},
+        hint: 'Row 0 shows "4+2+3-1+" at cols 0-7. Fill cols 8-14 to complete the YoYo. Hits 3E at col0 AND col7!'
+      },
+      { scoreYou:143, scoreOpp:160, bagCount:21,
+        board:[
+      [0,14,'3'],
+      [1,14,'+'],
+      [2,14,'2'],
+      [3,14,'-'],
+      [4,14,'1'],
+      [5,7,'3'],[5,8,'+'],[5,9,'4'],[5,10,'+'],[5,11,'2'],[5,12,'='],[5,13,'9'],[5,14,'+'],
+      [6,14,'4'],
+      [7,7,'4'],[7,8,'+'],[7,9,'3'],[7,10,'+'],[7,11,'2'],[7,12,'='],[7,13,'9'],[7,14,'-'],
+      [9,7,'2'],[9,8,'+'],[9,9,'4'],[9,10,'+'],[9,11,'3'],[9,12,'='],[9,13,'9'],
+      [11,7,'6'],[11,8,'-'],[11,9,'2'],[11,10,'+'],[11,11,'5'],[11,12,'='],[11,13,'9']
+        ],
+        rack: ['2','+','3','-','2','=','7','4'],
+        bagComp: {'+/-':5,'0':5,'1':5,'10':2,'11':1,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'20':1,'5':3,'6':3,'7':3,'8':4,'=':6,'BLANK':4,'×':4,'×/÷':4,'÷':4},
+        hint: 'Col 14 shows "3+2-1+4-" at rows 0-7. Fill rows 8-14 to complete YoYo spanning 3E at rows 0 AND 14!'
+      },
+      { scoreYou:118, scoreOpp:105, bagCount:35,
+        board:[
+      [5,2,'4'],[5,3,'+'],[5,4,'3'],[5,5,'+'],[5,6,'2'],[5,7,'='],[5,8,'9'],[5,9,'9'],
+      [6,9,'-'],
+      [7,0,'3'],[7,1,'+'],[7,2,'2'],[7,3,'+'],[7,4,'1'],[7,5,'+'],[7,6,'4'],[7,7,'-'],[7,9,'4'],
+      [8,9,'-'],
+      [9,2,'3'],[9,3,'+'],[9,4,'2'],[9,5,'+'],[9,6,'4'],[9,7,'='],[9,8,'9'],[9,9,'2'],
+      [10,9,'='],
+      [11,9,'3']
+        ],
+        rack: ['2','+','3','-','1','=','10','6'],
+        bagComp: {'+/-':5,'0':5,'1':4,'10':1,'11':1,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'2':1,'20':1,'4':1,'5':4,'6':3,'7':4,'8':4,'9':1,'=':7,'BLANK':4,'×':4,'×/÷':4,'÷':4},
+        hint: 'Row 7 shows "3+2+1+4-" at cols 0-7. Fill cols 8-14 to YoYo. 3E at col0 and col7 already in the equation!'
+      },
+      { scoreYou:187, scoreOpp:205, bagCount:12,
+        board:[
+      [0,7,'4'],
+      [1,7,'+'],
+      [2,7,'2'],
+      [3,7,'+'],[3,8,'4'],[3,9,'+'],[3,10,'3'],[3,11,'+'],[3,12,'2'],[3,13,'='],[3,14,'9'],
+      [4,7,'1'],
+      [5,7,'-'],[5,8,'3'],[5,9,'+'],[5,10,'2'],[5,11,'+'],[5,12,'4'],[5,13,'='],[5,14,'9'],
+      [6,7,'3'],
+      [7,7,'+'],
+      [11,8,'2'],[11,9,'+'],[11,10,'4'],[11,11,'+'],[11,12,'3'],[11,13,'='],[11,14,'9']
+        ],
+        rack: ['4','+','2','-','1','=','9','3'],
+        bagComp: {'+/-':5,'-':2,'0':5,'1':4,'10':2,'11':1,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'2':1,'20':1,'5':4,'6':4,'7':4,'8':4,'=':7,'BLANK':4,'×':4,'×/÷':4,'÷':4},
+        hint: 'Col 7 shows "4+2+1-3+" at rows 0-7. Fill rows 8-14 to YoYo spanning 3E at rows 0, 7, AND 14!'
+      }
+    ],
+    mixed: [
+      { scoreYou:62, scoreOpp:71, bagCount:48,
+        board:[
+      [3,3,'6'],[3,11,'2'],
+      [4,3,'-'],[4,11,'+'],
+      [5,3,'4'],[5,4,'+'],[5,5,'2'],[5,6,'+'],[5,7,'1'],[5,8,'+'],[5,9,'2'],[5,10,'='],[5,11,'9'],
+      [6,3,'+'],[6,11,'-'],
+      [7,3,'1'],[7,11,'1'],
+      [8,3,'-'],[8,11,'-'],
+      [9,3,'3'],[9,4,'+'],[9,5,'1'],[9,6,'+'],[9,7,'2'],[9,8,'+'],[9,9,'2'],[9,10,'='],[9,11,'8'],
+      [10,3,'='],[10,11,'='],
+      [11,3,'0'],[11,11,'2']
+        ],
+        rack: ['2','=','3','+','4','=','6','×'],
+        bagComp: {'+/-':5,'0':4,'1':2,'10':2,'11':1,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'20':1,'3':3,'4':3,'5':4,'6':2,'7':4,'8':3,'9':3,'=':5,'BLANK':4,'×':3,'×/÷':4,'÷':4},
+        hint: 'Early game, scores close. Two V arms cross two H equations — bingo through a row hitting both arms, or YoYo on col3/col11?'
+      },
+      { scoreYou:110, scoreOpp:95, bagCount:42,
+        board:[
+      [3,2,'5'],[3,10,'3'],
+      [4,2,'-'],[4,10,'+'],
+      [5,2,'3'],[5,3,'+'],[5,4,'2'],[5,5,'+'],[5,6,'4'],[5,7,'+'],[5,8,'2'],[5,9,'='],[5,10,'11'],
+      [6,2,'+'],[6,10,'-'],
+      [7,2,'4'],[7,3,'+'],[7,4,'1'],[7,5,'+'],[7,6,'2'],[7,7,'='],[7,8,'7'],[7,10,'7'],
+      [8,2,'+'],[8,10,'+'],
+      [9,2,'1'],[9,3,'+'],[9,4,'3'],[9,5,'+'],[9,6,'4'],[9,7,'-'],[9,8,'7'],[9,9,'='],[9,10,'1'],
+      [10,2,'='],[10,10,'='],
+      [11,2,'7'],[11,10,'8']
+        ],
+        rack: ['÷','÷','×','×','0','0','BLANK','+/-'],
+        bagComp: {'+/-':4,'-':1,'0':3,'1':3,'10':2,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'2':3,'20':1,'3':2,'4':2,'5':3,'6':4,'8':3,'9':4,'=':6,'BLANK':3,'×':2,'×/÷':4,'÷':2},
+        hint: 'Rich board, but your rack is ÷÷××00BLANK+/- — no equation possible. Swapping ALL tiles is the competitive play.'
+      },
+      { scoreYou:145, scoreOpp:139, bagCount:27,
+        board:[
+      [3,3,'6'],[3,11,'2'],
+      [4,3,'-'],[4,11,'+'],
+      [5,3,'4'],[5,4,'+'],[5,5,'2'],[5,6,'+'],[5,7,'1'],[5,8,'+'],[5,9,'2'],[5,10,'='],[5,11,'9'],
+      [6,3,'+'],[6,11,'-'],
+      [7,3,'1'],[7,11,'3'],
+      [8,3,'-'],[8,11,'-'],
+      [9,3,'2'],[9,4,'+'],[9,5,'1'],[9,6,'+'],[9,7,'4'],[9,8,'-'],[9,9,'4'],[9,10,'='],[9,11,'3'],
+      [10,3,'='],[10,11,'='],
+      [11,3,'1'],[11,11,'5'],
+      [14,1,'4'],[14,2,'+'],[14,3,'3'],[14,4,'+'],[14,5,'2'],[14,6,'='],[14,7,'9']
+        ],
+        rack: ['9','=','2','+','5','=','7','='],
+        bagComp: {'+/-':5,'0':5,'1':2,'10':2,'11':1,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'20':1,'3':2,'4':1,'5':2,'6':3,'7':3,'8':4,'9':1,'=':3,'BLANK':4,'×':4,'×/÷':4,'÷':4},
+        hint: 'Row 14 x9 threat! 4+3+2=9 at cols 1-7 leaves 3E at col14 open. Block or bingo on the main cross-network?'
+      },
+      { scoreYou:178, scoreOpp:163, bagCount:19,
+        board:[
+      [0,0,'4'],[0,1,'+'],[0,2,'2'],[0,3,'+'],[0,4,'3'],[0,5,'-'],[0,6,'1'],[0,7,'+'],[0,8,'4'],
+      [7,3,'4'],[7,4,'4'],[7,5,'+'],[7,6,'3'],[7,7,'+'],[7,8,'2'],[7,9,'='],[7,10,'9'],[7,11,'9'],
+      [8,3,'-'],[8,11,'-'],
+      [9,3,'3'],[9,4,'3'],[9,5,'+'],[9,6,'2'],[9,7,'+'],[9,8,'4'],[9,9,'='],[9,10,'9'],[9,11,'4'],
+      [10,3,'+'],[10,11,'-'],
+      [11,3,'2'],[11,11,'2'],
+      [12,3,'='],[12,11,'='],
+      [13,3,'3'],[13,11,'3']
+        ],
+        rack: ['-','2','+','1','=','11','9','='],
+        bagComp: {'+/-':5,'0':5,'1':4,'10':2,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'20':1,'5':4,'6':4,'7':4,'8':4,'=':5,'BLANK':4,'×':4,'×/÷':4,'÷':4},
+        hint: 'Row 0 shows "4+2+3-1+4" at cols 0-8. Fill cols 9-14 to YoYo spanning 3E at cols 0 and 7!'
+      },
+      { scoreYou:203, scoreOpp:205, bagCount:6,
+        board:[
+      [3,3,'9'],[3,4,'-'],[3,5,'2'],[3,6,'-'],[3,7,'3'],[3,8,'+'],[3,9,'4'],[3,10,'='],[3,11,'8'],
+      [4,5,'+'],[4,9,'+'],
+      [5,5,'3'],[5,9,'3'],
+      [6,5,'+'],[6,9,'+'],
+      [7,3,'4'],[7,4,'+'],[7,5,'2'],[7,6,'+'],[7,7,'1'],[7,8,'+'],[7,9,'2'],[7,10,'='],[7,11,'9'],
+      [8,5,'-'],[8,9,'-'],
+      [9,5,'6'],[9,9,'7'],
+      [10,5,'='],[10,9,'='],
+      [11,3,'3'],[11,4,'+'],[11,5,'1'],[11,6,'+'],[11,7,'4'],[11,8,'-'],[11,9,'2'],[11,10,'='],[11,11,'6']
+        ],
+        rack: ['1','=','3','+','2','=','7','-'],
+        bagComp: {'+/-':5,'0':5,'1':3,'10':2,'11':1,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'2':1,'20':1,'4':2,'5':4,'6':2,'7':2,'8':3,'9':2,'=':4,'BLANK':4,'×':4,'×/÷':4,'÷':4},
+        hint: 'Down by 2pts, late game. Three H equations cross two V arms — find the highest scoring play before the bag runs out!'
+      }
+    ],
+  };
+
+// ─────────────────────────────────────────────
+//  BUILD INVENTORY MAP for tracker
+// ─────────────────────────────────────────────
+function getInventoryMap(){
+  var inv = C.getActiveInventory ? C.getActiveInventory() : C.TILE_INVENTORY;
+  var m={};
+  for(var i=0;i<inv.length;i++) m[inv[i].face]=inv[i].count;
+  return m;
+}
+
+// ─────────────────────────────────────────────
+//  RENDER BOARD
+// ─────────────────────────────────────────────
+function renderBoard(pzBoard){
+  var el=document.getElementById('pz-board');
+  el.innerHTML='';
+  for(var r=0;r<15;r++){
+    for(var c=0;c<15;c++){
+      var cell=document.createElement('div');
+      cell.className='pz-cell';
+      cell.dataset.r=r; cell.dataset.c=c;
+      var prem=C.PREMIUM_SQUARES[r][c];
+      if(prem==='3E') cell.classList.add('premium-3E');
+      else if(prem==='2E') cell.classList.add('premium-2E');
+      else if(prem==='3T') cell.classList.add('premium-3T');
+      else if(prem==='2T') cell.classList.add('premium-2T');
+      if(r===7&&c===7) cell.classList.add('center-star');
+      var boardCell=pzBoard.cells[r][c];
+      if(boardCell.tile){
+        cell.classList.add('has-tile');
+        renderTileInCell(cell, boardCell.tile, false);
+      } else {
+        // label the premium square
+        var lbl=prem;
+        if(r===7&&c===7) lbl='★';
+        if(lbl){
+          var s=document.createElement('span');
+          s.className='cell-label';
+          s.textContent=lbl;
+          cell.appendChild(s);
+        }
+        // drag events for empty cells
+        cell.addEventListener('dragover', onCellDragOver);
+        cell.addEventListener('dragleave', onCellDragLeave);
+        cell.addEventListener('drop', onCellDrop);
+      }
+      el.appendChild(cell);
+    }
+  }
+}
+
+function renderTileInCell(cell, tile, isNew){
+  cell.innerHTML='';
+  var d=document.createElement('div');
+  d.className='cell-tile';
+  var f=document.createElement('span');
+  f.className='cell-face';
+  f.textContent=tile.assigned||tile.face;
+  var p=document.createElement('span');
+  p.className='cell-pts';
+  p.textContent=tile.points>0?tile.points:'';
+  d.appendChild(f); d.appendChild(p);
+  cell.appendChild(d);
+  if(isNew) cell.classList.add('placed-new');
+}
+
+// ─────────────────────────────────────────────
+//  RENDER RACK
+// ─────────────────────────────────────────────
+function renderRack(tiles){
+  var el=document.getElementById('pz-rack');
+  el.innerHTML='';
+  for(var i=0;i<tiles.length;i++){
+    var t=tiles[i];
+    var div=document.createElement('div');
+    div.className='rack-tile';
+    if(t.face==='BLANK') div.classList.add('blank-tile');
+    var face=document.createElement('span');
+    face.textContent=t.assigned||t.face;
+    div.appendChild(face);
+    if(t.points>0){
+      var pts=document.createElement('span');
+      pts.className='tile-pts';
+      pts.textContent=t.points;
+      div.appendChild(pts);
+    }
+    div.dataset.idx=i;
+    div.setAttribute('draggable','true');
+    div.addEventListener('dragstart', onRackDragStart);
+    div.addEventListener('dragend', onRackDragEnd);
+    // check if already placed
+    var placed=placedTiles.find(function(p){return p.rackIdx===i;});
+    if(placed) div.classList.add('used');
+    el.appendChild(div);
+  }
+}
+
+// ─────────────────────────────────────────────
+//  DRAG & DROP HANDLERS
+// ─────────────────────────────────────────────
+function onRackDragStart(e){
+  var idx=parseInt(this.dataset.idx,10);
+  // don't drag already-placed tiles
+  if(placedTiles.find(function(p){return p.rackIdx===idx;})) { e.preventDefault(); return; }
+  dragRackIdx=idx;
+  dragTile=currentPuzzle.rack[idx];
+  this.classList.add('dragging');
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain',idx);
+}
+function onRackDragEnd(e){
+  this.classList.remove('dragging');
+}
+function onCellDragOver(e){
+  e.preventDefault();
+  if(dragTile===null) return;
+  var r=parseInt(this.dataset.r,10), c=parseInt(this.dataset.c,10);
+  if(board.cells[r][c].tile) return; // occupied
+  // allow replacing an existing placed-new tile
+  e.dataTransfer.dropEffect='move';
+  this.classList.add('drop-hover');
+}
+function onCellDragLeave(e){
+  this.classList.remove('drop-hover');
+}
+function onCellDrop(e){
+  e.preventDefault();
+  this.classList.remove('drop-hover');
+  if(dragTile===null||dragRackIdx===null) return;
+  var r=parseInt(this.dataset.r,10), c=parseInt(this.dataset.c,10);
+  // Check cell not occupied by permanent tile
+  if(board.cells[r][c].tile) return;
+  // Remove any previous placed-new tile on this cell
+  var existing=placedTiles.findIndex(function(p){return p.row===r&&p.col===c;});
+  if(existing!==-1){
+    var old=placedTiles.splice(existing,1)[0];
+    // Unmark old rack tile
+    var oldRackEl=document.querySelector('.rack-tile[data-idx="'+old.rackIdx+'"]');
+    if(oldRackEl) oldRackEl.classList.remove('used');
+  }
+  // BLANK tile: ask for assignment
+  if(dragTile.face==='BLANK'){
+    pendingBlankCell={row:r, col:c, rackIdx:dragRackIdx};
+    openBlankModal();
+    dragTile=null; dragRackIdx=null;
+    return;
+  }
+  placeOnBoard(r, c, dragRackIdx, dragTile);
+  dragTile=null; dragRackIdx=null;
+}
+
+function placeOnBoard(r, c, rackIdx, tile){
+  placedTiles.push({row:r, col:c, rackIdx:rackIdx, tile:tile});
+  // Visually update cell
+  var cells=document.getElementById('pz-board').children;
+  var cellEl=cells[r*15+c];
+  cellEl.innerHTML='';
+  renderTileInCell(cellEl, tile, true);
+  cellEl.removeEventListener('dragover', onCellDragOver);
+  cellEl.removeEventListener('dragleave', onCellDragLeave);
+  cellEl.removeEventListener('drop', onCellDrop);
+  // Add click-to-remove
+  (function(rr,cc,ri){
+    cellEl.addEventListener('click', function(){ removePlacedTile(rr,cc,ri); });
+  })(r,c,rackIdx);
+  // Mark rack tile used
+  var rackEl=document.querySelector('.rack-tile[data-idx="'+rackIdx+'"]');
+  if(rackEl) rackEl.classList.add('used');
+  // Enable submit if any tile placed
+  document.getElementById('btn-submit').disabled=(placedTiles.length===0);
+}
+
+function removePlacedTile(r, c, rackIdx){
+  var idx=placedTiles.findIndex(function(p){return p.row===r&&p.col===c;});
+  if(idx===-1) return;
+  placedTiles.splice(idx,1);
+  // Re-render cell
+  var cellEl=document.getElementById('pz-board').children[r*15+c];
+  cellEl.className='pz-cell';
+  var prem=C.PREMIUM_SQUARES[r][c];
+  if(prem==='3E') cellEl.classList.add('premium-3E');
+  else if(prem==='2E') cellEl.classList.add('premium-2E');
+  else if(prem==='3T') cellEl.classList.add('premium-3T');
+  else if(prem==='2T') cellEl.classList.add('premium-2T');
+  if(r===7&&c===7) cellEl.classList.add('center-star');
+  cellEl.innerHTML='';
+  var lbl=prem; if(r===7&&c===7) lbl='★';
+  if(lbl){var s=document.createElement('span');s.className='cell-label';s.textContent=lbl;cellEl.appendChild(s);}
+  cellEl.addEventListener('dragover', onCellDragOver);
+  cellEl.addEventListener('dragleave', onCellDragLeave);
+  cellEl.addEventListener('drop', onCellDrop);
+  // Unmark rack tile
+  var rackEl=document.querySelector('.rack-tile[data-idx="'+rackIdx+'"]');
+  if(rackEl) rackEl.classList.remove('used');
+  document.getElementById('btn-submit').disabled=(placedTiles.length===0);
+}
+
+// ─────────────────────────────────────────────
+//  BLANK MODAL
+// ─────────────────────────────────────────────
+function openBlankModal(){
+  var modal=document.getElementById('blank-modal');
+  var grid=document.getElementById('blank-grid');
+  grid.innerHTML='';
+  var inv=C.getActiveInventory ? C.getActiveInventory() : C.TILE_INVENTORY;
+  var faces=inv.map(function(x){return x.face;}).filter(function(f){return f!=='BLANK';});
+  faces.forEach(function(face){
+    var btn=document.createElement('div');
+    btn.className='blank-opt';
+    btn.textContent=face;
+    btn.addEventListener('click',function(){
+      if(!pendingBlankCell) return;
+      var tile=Object.assign({},currentPuzzle.rack[pendingBlankCell.rackIdx],{assigned:face});
+      placeOnBoard(pendingBlankCell.row, pendingBlankCell.col, pendingBlankCell.rackIdx, tile);
+      pendingBlankCell=null;
+      modal.classList.add('hidden');
+    });
+    grid.appendChild(btn);
+  });
+  modal.classList.remove('hidden');
+}
+document.getElementById('blank-modal').addEventListener('click',function(e){
+  if(e.target===this){ this.classList.add('hidden'); pendingBlankCell=null; }
+});
+
+// ─────────────────────────────────────────────
+//  TILE TRACKER + BAG RENDER
+// ─────────────────────────────────────────────
+function renderTrackerAndBag(puzzle){
+  var inv=getInventoryMap();
+  // Count what's on board
+  var onBoard={};
+  for(var r=0;r<15;r++){
+    for(var c=0;c<15;c++){
+      var t=board.cells[r][c].tile;
+      if(t){
+        var f=t.face;
+        onBoard[f]=(onBoard[f]||0)+1;
+      }
+    }
+  }
+  // unseen = total - onBoard - player's own rack
+  var playerRack={};
+  puzzle.rack.forEach(function(t){ playerRack[t.face]=(playerRack[t.face]||0)+1; });
+  var unseenGrid=document.getElementById('tile-tracker-grid');
+  unseenGrid.innerHTML='';
+  var invArr=C.getActiveInventory ? C.getActiveInventory() : C.TILE_INVENTORY;
+  invArr.forEach(function(def){
+    var onB=onBoard[def.face]||0;
+    var inRack=playerRack[def.face]||0;
+    var unseen=def.count - onB - inRack;
+    if(unseen<0) unseen=0;
+    var item=document.createElement('div');
+    item.className='ti'+(unseen===0?' zero':'');
+    item.innerHTML='<span class="tf">'+(def.face==='BLANK'?'?':def.face)+'</span><span class="tc">'+unseen+'</span>';
+    unseenGrid.appendChild(item);
+  });
+  // Bag display
+  var bagGrid=document.getElementById('bag-grid');
+  bagGrid.innerHTML='';
+  var bagComp=puzzle.bagComp||{};
+  var totalInBag=0;
+  invArr.forEach(function(def){
+    var cnt=bagComp[def.face]||0;
+    totalInBag+=cnt;
+    var item=document.createElement('div');
+    item.className='bi'+(cnt===0?' zero':'');
+    item.innerHTML='<span class="bf">'+(def.face==='BLANK'?'?':def.face)+'</span><span class="bc">'+cnt+'</span>';
+    bagGrid.appendChild(item);
+  });
+  document.getElementById('bag-total').textContent=totalInBag+' tiles in bag';
+}
+
+// ─────────────────────────────────────────────
+//  SOLVER  (find best plays)
+// ─────────────────────────────────────────────
+function findBestPlays(solveBoard, rackTiles, targetType){
+  var results=[];
+  var seen={};
+  var anchors=[];
+  for(var r=0;r<15;r++){
+    for(var c=0;c<15;c++){
+      if(solveBoard.cells[r][c].tile) continue;
+      var adj=[[r-1,c],[r+1,c],[r,c-1],[r,c+1]];
+      for(var a=0;a<adj.length;a++){
+        var ar=adj[a][0],ac=adj[a][1];
+        if(ar>=0&&ar<15&&ac>=0&&ac<15&&solveBoard.cells[ar][ac].tile){
+          anchors.push({row:r,col:c}); break;
+        }
+      }
+    }
+  }
+  var timeLimit=Date.now()+15000;
+  var maxLen=Math.min(rackTiles.length,8);
+  for(var ai=0;ai<anchors.length&&Date.now()<timeLimit;ai++){
+    var anchor=anchors[ai];
+    for(var len=2;len<=maxLen&&Date.now()<timeLimit;len++){
+      for(var sc=Math.max(0,anchor.col-len+1);sc<=anchor.col&&sc+len-1<15;sc++){
+        tryPlace(solveBoard,rackTiles,anchor.row,sc,len,'h');
+      }
+      for(var sr=Math.max(0,anchor.row-len+1);sr<=anchor.row&&sr+len-1<15;sr++){
+        tryPlace(solveBoard,rackTiles,sr,anchor.col,len,'v');
+      }
+    }
+  }
+  function tryPlace(bd,tiles,startR,startC,len,dir){
+    var emptyCells=[];
+    for(var i=0;i<len;i++){
+      var rr=dir==='h'?startR:startR+i;
+      var cc=dir==='h'?startC+i:startC;
+      if(rr>=15||cc>=15) return;
+      if(!bd.cells[rr][cc].tile) emptyCells.push({row:rr,col:cc});
+    }
+    if(emptyCells.length===0||emptyCells.length>tiles.length) return;
+    var perms=getPerms(tiles,emptyCells.length,emptyCells.length>=7?800:120);
+    for(var p=0;p<perms.length&&Date.now()<timeLimit;p++){
+      var perm=perms[p];
+      var placements=[];
+      for(var e=0;e<emptyCells.length;e++){
+        Board.placeTile(bd,emptyCells[e].row,emptyCells[e].col,perm[e]);
+        placements.push({row:emptyCells[e].row,col:emptyCells[e].col,tile:perm[e]});
+      }
+      var result=Placement.validatePlay(bd,placements,false);
+      if(result.ok){
+        var score=Scoring.scorePlay(result.equations,bd,placements.length);
+        var key=placements.map(function(p){return p.row+','+p.col+':'+p.tile.face;}).sort().join('|');
+        if(!seen[key]){
+          seen[key]=true;
+          var isBingo=placements.length>=8;
+          var isYoyo=checkYoyo(bd,placements);
+          results.push({
+            score:score.total,
+            placements:placements.map(function(p){return{row:p.row,col:p.col,face:p.tile.assigned||p.tile.face};}),
+            bingo:isBingo,
+            yoyo:isYoyo,
+            tilesUsed:placements.length,
+            equations:result.equations,
+            opensX9:checkOpensX9(bd,placements),
+            closesX9:checkClosesX9(bd,placements),
+          });
+        }
+      }
+      for(var e2=0;e2<emptyCells.length;e2++) Board.removeTile(bd,emptyCells[e2].row,emptyCells[e2].col);
+    }
+  }
+  function checkYoyo(bd,placements){
+    var rows={},cols={};
+    placements.forEach(function(p){rows[p.row]=true;cols[p.col]=true;});
+    for(var rk in rows){
+      var ok=true;
+      for(var c=0;c<15;c++){if(!bd.cells[rk][c].tile){ok=false;break;}}
+      if(ok) return true;
+    }
+    for(var ck in cols){
+      var ok2=true;
+      for(var r=0;r<15;r++){if(!bd.cells[r][ck].tile){ok2=false;break;}}
+      if(ok2) return true;
+    }
+    return false;
+  }
+  function checkOpensX9(bd,placements){
+    // After this play, does any 3E-containing row/col have exactly 7 consecutive tiles
+    // leaving only a 3E gap? That would let opponent ×9 easily.
+    var x9lines=C.X9_LINES||[];
+    for(var i=0;i<x9lines.length;i++){
+      var line=x9lines[i];
+      var empties=0,last3Efree=false;
+      for(var j=0;j<15;j++){
+        var r2=line.type==='row'?line.index:j;
+        var c2=line.type==='row'?j:line.index;
+        if(!bd.cells[r2][c2].tile) empties++;
+      }
+      // If only 1-3 cells remain empty on a 3E line, it's a ×9 threat
+      if(empties>=1&&empties<=3) return true;
+    }
+    return false;
+  }
+  function checkClosesX9(bd,placements){
+    // Does this play fill a previously dangerous gap on a 3E line?
+    return placements.some(function(p){
+      var prem=C.PREMIUM_SQUARES[p.row][p.col];
+      return prem==='3E';
+    });
+  }
+  // Filter by target type
+  results.sort(function(a,b){return b.score-a.score;});
+  var bigPlays=results.filter(function(r){return r.bingo||r.yoyo;});
+  var shortHigh=results.filter(function(r){return !r.bingo&&!r.yoyo&&r.score>=30;});
+  var filtered;
+  if(targetType==='bingo'){
+    filtered=results.filter(function(r){return r.bingo;}).slice(0,3);
+    if(filtered.length<3) filtered=filtered.concat(bigPlays.filter(function(r){return!r.bingo;}).slice(0,3-filtered.length));
+  } else if(targetType==='yoyo'){
+    filtered=results.filter(function(r){return r.yoyo;}).slice(0,3);
+    if(filtered.length<3) filtered=filtered.concat(bigPlays.filter(function(r){return!r.yoyo;}).slice(0,3-filtered.length));
+  } else {
+    filtered=bigPlays.slice(0,2);
+    if(filtered.length<3) filtered=filtered.concat(shortHigh.slice(0,3-filtered.length));
+  }
+  // Deduplicate
+  var seen2={};
+  filtered=filtered.filter(function(r){
+    var k=r.placements.map(function(p){return p.row+','+p.col;}).sort().join('|');
+    if(seen2[k]) return false; seen2[k]=true; return true;
+  });
+  return filtered.slice(0,3);
+}
+
+function getPerms(arr,k,limit){
+  var res=[];
+  function helper(rem,chosen){
+    if(res.length>=limit) return;
+    if(chosen.length===k){res.push(chosen.slice());return;}
+    for(var i=0;i<rem.length;i++){
+      if(i>0&&rem[i].face===rem[i-1].face&&rem[i].type===rem[i-1].type) continue;
+      chosen.push(rem[i]);
+      helper(rem.slice(0,i).concat(rem.slice(i+1)),chosen);
+      chosen.pop();
+    }
+  }
+  helper(arr,[]);
+  return res;
+}
+
+// ─────────────────────────────────────────────
+//  STRATEGIC COMMENTARY GENERATOR
+// ─────────────────────────────────────────────
+function buildNote(play, puzzle, rank){
+  var notes=[];
+  var youScore=puzzle.scoreYou||0, oppScore=puzzle.scoreOpp||0;
+  var gap=youScore-oppScore;
+
+  if(play.bingo) notes.push('✅ Uses all 8 tiles — earns +40pt Bingo bonus.');
+  if(play.yoyo){
+    // Check how many 3E squares the yoyo line passes through
+    var threeEcount=play.placements.filter(function(p){return C.PREMIUM_SQUARES[p.row][p.col]==='3E';}).length;
+    if(threeEcount>0)
+      notes.push('🪀 YoYo completing a 3E line — equation is multiplied ×3'+( threeEcount>1?' (×3 again for each 3E hit!)':'.'));
+    else
+      notes.push('🪀 YoYo completes a full row/column.');
+  }
+  if(play.opensX9){
+    if(rank===0)
+      notes.push('⚠️ Highest score but OPENS an ×9 threat on a 3E line — opponent could score massively next turn!');
+    else
+      notes.push('⚠️ This play leaves a 3E line nearly complete — danger of opponent ×9.');
+  }
+  if(play.closesX9 && !play.opensX9)
+    notes.push('🛡️ This play places a tile on a 3E square, closing an opponent ×9 threat.');
+
+  // Score context
+  if(gap < -80)
+    notes.push('📉 You are down '+Math.abs(gap)+'pts — only a Bingo or YoYo bridges the gap meaningfully.');
+  else if(gap > 80)
+    notes.push('📈 Leading by '+gap+'pts — safe yoyo or short play is fine; no need for risky all-in.');
+
+  // Swap hint (only if no good big play exists and rack is bad)
+  if(!play.bingo && !play.yoyo && play.score < 20 && puzzle.bagComp){
+    var bagTotal=Object.values(puzzle.bagComp).reduce(function(a,b){return a+b;},0);
+    if(bagTotal >= 8)
+      notes.push('🔄 Score is very low. Consider swapping your rack for better tiles — bag has '+bagTotal+' tiles remaining.');
+  }
+
+  if(play.tilesUsed<=3 && !play.yoyo && !play.bingo && rank===0)
+    notes.push('💡 Short equation — strong position on the board can justify this, but look for a longer play first.');
+
+  if(notes.length===0) notes.push('Solid play. No major risks or bonuses.');
+  return notes;
+}
+
+// ─────────────────────────────────────────────
+//  SUBMIT PLAY
+// ─────────────────────────────────────────────
+window.submitPlay = function(){
+  if(placedTiles.length===0) return;
+  if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
+
+  // Build a temp board copy with placed tiles
+  var testBoard=Board.createBoard();
+  // Copy permanent tiles
+  for(var r=0;r<15;r++){
+    for(var c=0;c<15;c++){
+      var t=board.cells[r][c].tile;
+      if(t) Board.placeTile(testBoard,r,c,t);
+    }
+  }
+  var newPlacements=[];
+  for(var i=0;i<placedTiles.length;i++){
+    var pt=placedTiles[i];
+    Board.placeTile(testBoard,pt.row,pt.col,pt.tile);
+    newPlacements.push({row:pt.row,col:pt.col,tile:pt.tile});
+  }
+  var valid=Placement.validatePlay(testBoard,newPlacements,false);
+  if(!valid.ok){
+    alert('Invalid play: '+valid.reason);
+    return;
+  }
+  var scoreResult=Scoring.scorePlay(valid.equations,testBoard,newPlacements.length);
+  var playerScore=scoreResult.total;
+  var isBingo=newPlacements.length>=8;
+  var isYoyo=currentPuzzle.answer&&currentPuzzle.answer.some(function(a){
+    return a.yoyo && a.placements.length===newPlacements.length;
+  });
+
+  // Compare to best answer
+  var bestScore=currentPuzzle.answer&&currentPuzzle.answer.length>0?currentPuzzle.answer[0].score:0;
+  var resultLabel=document.getElementById('player-result-label');
+  var diff=bestScore-playerScore;
+  if(diff<=0){
+    resultLabel.innerHTML='<span class="player-result perfect">🏆 Perfect! Best possible play ('+playerScore+'pts)</span>';
+    streak++;
+  } else if(diff<=15){
+    resultLabel.innerHTML='<span class="player-result good">👍 Good play ('+playerScore+'pts) — best was '+bestScore+'pts (+'+diff+')</span>';
+    streak++;
+  } else {
+    resultLabel.innerHTML='<span class="player-result miss">❌ '+playerScore+'pts scored — best was '+bestScore+'pts (missed +'+diff+')</span>';
+    streak=0;
+  }
+  document.getElementById('streak').textContent='Streak: '+streak;
+
+  revealAnswer(playerScore);
+  document.getElementById('btn-submit').disabled=true;
+};
+
+// ─────────────────────────────────────────────
+//  REVEAL ANSWER
+// ─────────────────────────────────────────────
+function revealAnswer(playerScore){
+  answerRevealed=true;
+  var answers=currentPuzzle.answer||[];
+  var box=document.getElementById('answer-box');
+  box.classList.remove('hidden');
+
+  if(!answers||answers.length===0){
+    document.getElementById('play-tabs').innerHTML='';
+    document.getElementById('play-detail').innerHTML='<div style="color:#f87171;padding:8px">No valid plays found.</div>';
+    return;
+  }
+
+  var colors=['gold','silver','bronze'];
+  var medals=['🥇','🥈','🥉'];
+  var tabs=document.getElementById('play-tabs');
+  tabs.innerHTML='';
+  for(var i=0;i<answers.length;i++){
+    var a=answers[i];
+    var label=medals[i]+' '+a.score+'pts';
+    if(a.bingo) label+=' BINGO';
+    else if(a.yoyo) label+=' YOYO';
+    var btn=document.createElement('button');
+    btn.className='play-tab';
+    btn.textContent=label;
+    btn.dataset.idx=i;
+    btn.addEventListener('click',(function(idx){
+      return function(){showPlay(idx,answers,playerScore);};
+    })(i));
+    tabs.appendChild(btn);
+  }
+  showPlay(0,answers,playerScore);
+}
+
+window.showPlay=function(idx,answers,playerScore){
+  if(!answers||!answers[idx]) return;
+  var a=answers[idx];
+  var colors=['gold','silver','bronze'];
+  var tabs=document.getElementById('play-tabs').children;
+  for(var t=0;t<tabs.length;t++){
+    tabs[t].className='play-tab';
+    if(t===idx) tabs[t].classList.add('active-'+colors[idx]||'active-gold');
+  }
+
+  // Highlight on board
+  resetBoardHighlights();
+  var hlClasses=['highlight-gold','highlight-silver','highlight-bronze'];
+  a.placements.forEach(function(p){
+    var cellEl=document.getElementById('pz-board').children[p.row*15+p.col];
+    if(cellEl){
+      cellEl.className='pz-cell '+hlClasses[idx];
+      cellEl.innerHTML='';
+      renderTileInCell(cellEl,{face:p.face,points:0},false);
+    }
+  });
+
+  // Build detail
+  var notes=buildNote(a, currentPuzzle, idx);
+  var tags='';
+  if(a.bingo) tags+='<span class="play-tag tag-bingo">🎰 BINGO +40</span>';
+  if(a.yoyo) tags+='<span class="play-tag tag-yoyo">🪀 YOYO</span>';
+  if(!a.bingo&&!a.yoyo) tags+='<span class="play-tag tag-short">Short Equation</span>';
+  if(a.opensX9) tags+='<span class="play-tag tag-x9warn">⚠️ Opens ×9</span>';
+  if(a.closesX9&&!a.opensX9) tags+='<span class="play-tag tag-x9safe">🛡️ Closes ×9</span>';
+
+  var noteClass=a.opensX9?'note-warn':(a.bingo||a.yoyo?'note-good':'note-info');
+  var noteHtml=notes.map(function(n){
+    return '<div class="play-note '+noteClass+'" style="margin-bottom:4px">'+n+'</div>';
+  }).join('');
+
+  var positions=a.placements.map(function(p){return p.face+'('+p.row+','+p.col+')'}).join(' ');
+
+  document.getElementById('play-detail').innerHTML=
+    '<div class="play-score '+colors[idx]+'">'+a.score+' pts</div>'+
+    '<div class="play-equation">'+positions+'</div>'+
+    '<div class="play-tags">'+tags+'</div>'+
+    noteHtml;
+};
+
+function resetBoardHighlights(){
+  // Restore board cells that were highlighted
+  var cells=document.getElementById('pz-board').children;
+  for(var r=0;r<15;r++){
+    for(var c=0;c<15;c++){
+      var el=cells[r*15+c];
+      if(el.classList.contains('highlight-gold')||el.classList.contains('highlight-silver')||el.classList.contains('highlight-bronze')){
+        el.className='pz-cell';
+        var prem=C.PREMIUM_SQUARES[r][c];
+        if(prem==='3E') el.classList.add('premium-3E');
+        else if(prem==='2E') el.classList.add('premium-2E');
+        else if(prem==='3T') el.classList.add('premium-3T');
+        else if(prem==='2T') el.classList.add('premium-2T');
+        if(r===7&&c===7) el.classList.add('center-star');
+        el.innerHTML='';
+        // Re-add label
+        if(prem){var s=document.createElement('span');s.className='cell-label';s.textContent=(r===7&&c===7)?'★':prem;el.appendChild(s);}
+      }
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+//  CLEAR PLAY
+// ─────────────────────────────────────────────
+window.clearPlay=function(){
+  placedTiles.forEach(function(p){
+    removePlacedTile(p.row, p.col, p.rackIdx);
+  });
+  placedTiles=[];
+  document.getElementById('btn-submit').disabled=true;
+};
+
+// ─────────────────────────────────────────────
+//  HINT
+// ─────────────────────────────────────────────
+window.showHint=function(){
+  if(!currentPuzzle) return;
+  var hint=currentPuzzle.hint||'Look for the longest equation you can form.';
+  alert('💡 '+hint);
+};
+
+// ─────────────────────────────────────────────
+//  GENERATE PUZZLE
+// ─────────────────────────────────────────────
+function generatePuzzle(type){
+  if(!Board) init();
+  var inv=C.getActiveInventory ? C.getActiveInventory() : C.TILE_INVENTORY;
+  function mk(f){
+    var d=inv.find(function(x){return x.face===f;})||{type:'digit',points:1};
+    return {id:'p'+Math.random(),face:f,type:d.type,points:d.points,assigned:null};
+  }
+
+  // Pick from bank
+  var bank;
+  if(type==='bingo') bank=PUZZLE_BANK.bingo;
+  else if(type==='yoyo') bank=PUZZLE_BANK.yoyo;
+  else {
+    // mixed: rotate through all
+    var all=PUZZLE_BANK.mixed.concat(PUZZLE_BANK.bingo).concat(PUZZLE_BANK.yoyo);
+    bank=all;
+  }
+  var template=bank[puzzleNum % bank.length];
+
+  // Build board
+  var b=Board.createBoard();
+  template.board.forEach(function(entry){
+    var r=entry[0],c=entry[1],f=entry[2];
+    Board.placeTile(b,r,c,mk(f));
+    b.cells[r][c].premiumUsed=true; // existing tiles consumed premium
+  });
+
+  var rackTiles=template.rack.map(function(f){return mk(f);});
+
+  return {
+    board:b,
+    rack:rackTiles,
+    hint:template.hint,
+    scoreYou:template.scoreYou||0,
+    scoreOpp:template.scoreOpp||0,
+    bagComp:template.bagComp||{},
+    bagCount:template.bagCount||0,
+    answer:null,
+  };
+}
+
+// ─────────────────────────────────────────────
+//  PUBLIC: START / NEXT
+// ─────────────────────────────────────────────
+window.startPuzzle=function(type){
+  if(!Board){
+    try{ init(); }catch(e){
+      alert('Init error: '+e.message); return;
+    }
+  }
+  puzzleType=type;
+  puzzleNum=0;
+  streak=0;
+  document.getElementById('screen-select').style.display='none';
+  document.getElementById('screen-puzzle').style.display='block';
+  var labels={mixed:'🔥 Mixed',bingo:'🎰 Bingo Only',yoyo:'🪀 YoYo Only'};
+  document.getElementById('puzzle-type-label').textContent=labels[type]||type;
+  nextPuzzle();
+};
+
+window.nextPuzzle=function(){
+  if(!Board){try{init();}catch(e){alert('Init error: '+e.message);return;}}
+  puzzleNum++;
+  answerRevealed=false;
+  placedTiles=[];
+  document.getElementById('answer-box').classList.add('hidden');
+  document.getElementById('btn-submit').disabled=true;
+  document.getElementById('puzzle-num').textContent='#'+puzzleNum;
+  document.getElementById('streak').textContent='Streak: '+streak;
+
+  try{
+    currentPuzzle=generatePuzzle(puzzleType);
+    board=currentPuzzle.board;
+    renderBoard(board);
+    renderRack(currentPuzzle.rack);
+    renderTrackerAndBag(currentPuzzle);
+    document.getElementById('score-you').textContent=currentPuzzle.scoreYou;
+    document.getElementById('score-opp').textContent=currentPuzzle.scoreOpp;
+  }catch(e){
+    alert('Puzzle error: '+e.message+'\n'+e.stack); return;
+  }
+
+  // Timer
+  timerSeconds=0;
+  if(timerInterval) clearInterval(timerInterval);
+  timerInterval=setInterval(function(){
+    timerSeconds++;
+    var m=Math.floor(timerSeconds/60);
+    var s=timerSeconds%60;
+    document.getElementById('timer').textContent=m+':'+(s<10?'0':'')+s;
+  },1000);
+
+  // Solve in background
+  currentPuzzle.answer=null;
+  var btnSubmit=document.getElementById('btn-submit');
+  setTimeout(function(){
+    try{
+      var solveBoard=Board.createBoard();
+      currentPuzzle.board.cells.forEach(function(row,r){
+        row.forEach(function(cell,c){
+          if(cell.tile){
+            Board.placeTile(solveBoard,r,c,cell.tile);
+            solveBoard.cells[r][c].premiumUsed=true;
+          }
+        });
+      });
+      currentPuzzle.answer=findBestPlays(solveBoard,currentPuzzle.rack,puzzleType);
+    }catch(e){
+      console.warn('Solver error:',e);
+      currentPuzzle.answer=[];
+    }
+  },200);
+};
+
+window.goBack=function(){
+  if(timerInterval) clearInterval(timerInterval);
+  window.location.href='lobby.html';
+};
+
+})();
+</script>
+</body>
+</html>
