@@ -26,6 +26,7 @@
   // (In Worker context, window is aliased to self by the worker bootstrap.)
   let _stateSettings = null;
   let _isEducationMode = false;
+  let _desperationRetryActive = false;  // set by decideMove during fallback retry
   let _lastTopPlays = [];  // Top plays from last search — survives any return path
   function getTimeBudgetMs() {
     try {
@@ -1543,6 +1544,32 @@
     }
 
     if (bagSize > C.SWAP_FORBIDDEN_BAG_THRESHOLD) {
+      // DESPERATION RETRY: before giving up and swapping, try findBestPlay
+      // once more with a hugely inflated candidate budget. This catches the
+      // case where the rack is "hard" (3+ blanks, multi-digit tile, multiple
+      // same operators) and the normal search ran out of candidates before
+      // finding ANY valid play. Without this, the AI swaps even when valid
+      // plays exist — a real bug observed with rack:
+      //   = = ×÷ ? ? +- ? 13   on a board with an 8-tile column equation.
+      if (!state.isFirstMove) {
+        console.log('[AI] No play found in normal search — running DESPERATION retry');
+        _desperationRetryActive = true;
+        try {
+          const retryPlay = await findBestPlay(state.board, state.aiRack, state.isFirstMove, startTime, threats, false, false);
+          if (retryPlay) {
+            console.log('[AI] Desperation retry FOUND play: ' + retryPlay.score + ' pts, ' +
+                        retryPlay.placements.length + ' tiles');
+            _desperationRetryActive = false;
+            recordPlay(rackOwner);
+            return makePlayResult(retryPlay);
+          }
+          console.log('[AI] Desperation retry also found nothing — swap is justified');
+        } catch (err) {
+          console.warn('[AI] Desperation retry threw:', err);
+        } finally {
+          _desperationRetryActive = false;
+        }
+      }
       return smartSwap(state);
     }
 
@@ -1622,17 +1649,13 @@
 
   async function findBestPlay(board, aiRack, isFirstMove, startTime, threats, bingoFeasible, bingoIsHard) {
     let bestPlay = null;
-    let bestNonRimPlay = null;  // Best play that doesn't violate rim rule
-    let bestSafePlay = null;    // Best play by adjusted score (penalizing rim hooks)
-    // Best play that blocks each detected threat at MEDIUM+ quality.
-    // Without this, the candidate pool in section 4 only sees top-1 results
-    // and may have nothing that blocks. By tracking blocking plays during the
-    // main search, section 4 always has options to consider.
+    let bestNonRimPlay = null;
+    let bestSafePlay = null;
     let bestBlockingPlay = null;
     let bestBlockingDefValue = -1;
-    let bestNoBlankPlay = null;   // Best play that uses zero BLANK tiles
-    let bestMinBlankPlay = null;  // Best play using minimum number of blanks
-    let topPlays = [];            // Top 3 plays at different positions (for education mode)
+    let bestNoBlankPlay = null;
+    let bestMinBlankPlay = null;
+    let topPlays = [];
     const rack = aiRack.tiles;
     if (rack.length === 0) return null;
 
@@ -1660,6 +1683,12 @@
     else if (twoDigitCount >= 1) candidateMultiplier *= 1.2;
     // Education mode (300s budget) — search deeper
     if (getTimeBudgetMs() >= 200000) candidateMultiplier *= 2;
+    // Desperation retry from decideMove — inflate budget 4× more so we
+    // actually exhaust the harder search spaces (3+ blanks + 2 twodigit etc.)
+    if (_desperationRetryActive) {
+      candidateMultiplier *= 4;
+      console.log('[AI] findBestPlay in DESPERATION mode — multiplier boosted 4×');
+    }
 
     const maxCandidatesThisRack = Math.floor(MAX_CANDIDATES_PER_STAGE * candidateMultiplier);
     if (candidateMultiplier > 1) {
