@@ -1425,12 +1425,24 @@
 
       // BLANK preservation — strict rule.
       //
-      // BLANKs are the most valuable tiles in A-Math (any value, 0 points cost).
-      // They should be saved for Bingo attempts. Using a BLANK in a short equation
-      // (e.g. 2=2 using a BLANK as the '=') is almost always a strategic disaster.
+      // BLANKs are the most valuable tiles in A-Math because they can hold
+      // ANY face for 0 points cost. They should be saved for Bingo attempts
+      // (the +40 BINGO_BONUS is the main reason — yoyo has NO bonus, it's
+      // just a regular equation that happens to be 15 cells long).
       //
-      // Rule: If the best play uses ANY blanks and is NOT a Bingo (8 tiles),
-      //   REJECT it and find a blank-free alternative or swap.
+      // Rule: A blank-using non-bingo play is justified when its score is
+      // high enough to outweigh the lost bingo opportunity.
+      //
+      // Math: each BLANK saved is worth ~10-15 pts of expected bingo bonus
+      // (40 BINGO_BONUS × probability of hitting bingo before game ends,
+      //  given current bag state). At mid-game with 3 blanks in rack,
+      //  bingo probability is reasonably high. At early game with 1 blank,
+      //  lower. We use a flat 15 pts/blank as a reasonable compromise.
+      //
+      // Previously: hard-rejected ANY blank-using non-bingo play, which
+      // caused the AI to SWAP (a 0-point turn) when a 15-25pt play was
+      // available. Mistakenly assumed yoyo had a +40 bonus which would
+      // make blanks worth more.
       //
       // Exceptions (blanks may be used in short equations):
       //   1. x9 defense — section 4 chose this play to block a ×9 threat.
@@ -1441,10 +1453,16 @@
       const blanksUsed = bestPlay.placements.filter(p => p.tile && p.tile.type === 'blank').length;
       const isBingo = bestPlay.placements.length === 8;
       const isEndgame = bagSize <= lateGameBagThreshold && !state.isFirstMove;
+      // Per-blank breakeven: 15 pts. So 1 blank → need ≥15 pts; 2 blanks → ≥30; 3 blanks → ≥45.
+      const BLANK_VALUE_PTS = 15;
+      const blankBreakeven = blanksUsed * BLANK_VALUE_PTS;
+      const scoreJustifiesBlanks = bestPlay.score >= blankBreakeven;
 
-      if (blanksUsed > 0 && !isBingo && !x9DefenseActive && !isEndgame && botLevel === 'hard') {
+      if (blanksUsed > 0 && !isBingo && !x9DefenseActive && !isEndgame
+          && !scoreJustifiesBlanks && botLevel === 'hard') {
         console.log('[AI] BLANK protection: best play uses ' + blanksUsed +
-                    ' BLANK(s) for ' + bestPlay.score + ' pts (not Bingo, not x9 defense, not endgame). Rejecting.');
+                    ' BLANK(s) for ' + bestPlay.score + ' pts (needs ' + blankBreakeven +
+                    '+ to justify). Looking for alternative.');
 
         // Try the tracked blank-free alternative from the search
         const noBlankAlt = bingoPlay && bingoPlay._bestNoBlank;
@@ -1492,13 +1510,18 @@
           }
         }
 
-        // No blank-free alternative — swap to preserve BLANKs for future Bingo/YoYo
-        if (bagSize > C.SWAP_FORBIDDEN_BAG_THRESHOLD) {
-          console.log('[AI] Swapping to preserve BLANKs for future Bingo/YoYo');
-          return smartSwap(state);
-        }
-        // Bag too small to swap — must play the blank-using play anyway
-        console.log('[AI] Bag too small to swap, playing blank-heavy play as last resort');
+        // No blank-free / min-blank / yoyo alternative found. Old behavior
+        // was to SWAP here — but swap is a 0-point turn and the bestPlay
+        // scores >0. Even after subtracting the "blank value" cost, the
+        // expected value of playing is usually better than swapping. So:
+        // play the bestPlay anyway. Score it as the AI's actual move.
+        //
+        // (Originally we swapped here because we incorrectly believed yoyo
+        // had a +40 bonus, making blanks much more valuable. Yoyo has NO
+        // bonus — only bingo does. So a blank saved for "future yoyo" was
+        // worth nothing extra over a future regular play.)
+        console.log('[AI] No better alternative found. Playing best play despite blank cost: ' +
+                    bestPlay.score + ' pts using ' + blanksUsed + ' blanks');
       }
 
       recordPlay(rackOwner);
