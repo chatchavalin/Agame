@@ -7,7 +7,7 @@
 // This script bumps version stamp every time we deploy. If the SW is stale,
 // it tells the SW to unregister, clears all caches, and reloads.
 (function(){
-  var DEPLOYED_VERSION = 'v13-2026-05-26';
+  var DEPLOYED_VERSION = 'v14-2026-05-26';
   var lastVersion = localStorage.getItem('pz_version');
   if (lastVersion !== DEPLOYED_VERSION) {
     localStorage.setItem('pz_version', DEPLOYED_VERSION);
@@ -68,6 +68,17 @@
   .pz-controls .pz-btn:active{transform:scale(.97);}
   .btn-hint{background:#1d4ed8;color:#fff;}
   .btn-skip{background:#7c3aed;color:#fff;}
+
+  /* Best plays quick-access buttons */
+  .pz-best-row{display:flex;gap:8px;justify-content:center;padding:0 12px 8px;width:100%;max-width:520px;margin:0 auto;}
+  .pz-best-btn{flex:1;padding:8px 4px;border:2px solid var(--border-medium,#334155);background:var(--bg-page,#0f172a);color:#94a3b8;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
+  .pz-best-btn:hover{border-color:#fbbf24;color:#fbbf24;}
+  .pz-best-btn:active{transform:scale(.97);}
+  .pz-best-btn.active{background:var(--bg-panel,#1e293b);}
+  .pz-best-btn.active-0{border-color:#fbbf24;color:#fbbf24;}
+  .pz-best-btn.active-1{border-color:#94a3b8;color:#cbd5e1;}
+  .pz-best-btn.active-2{border-color:#a78bfa;color:#c4b5fd;}
+  .pz-best-btn:disabled{opacity:.35;cursor:not-allowed;}
 
   /* Tile tracker (with bag count in header) below board */
   .pz-info-strip{width:100%;max-width:520px;margin:6px auto;padding:0 8px;box-sizing:border-box;}
@@ -161,7 +172,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v13</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v14</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -208,6 +219,11 @@ body.theme-dark .player-area .amath-tile-rack {
     <button class="pz-btn btn-hint" onclick="showHint()">💡 Hint</button>
     <button class="pz-btn btn-skip" onclick="nextPuzzle()">⏭️ Skip</button>
   </div>
+  <div class="pz-best-row">
+    <button class="pz-best-btn" id="best-btn-0" onclick="showBestPlay(0)">Best 1</button>
+    <button class="pz-best-btn" id="best-btn-1" onclick="showBestPlay(1)">Best 2</button>
+    <button class="pz-best-btn" id="best-btn-2" onclick="showBestPlay(2)">Best 3</button>
+  </div>
 
   <div class="pz-info-strip">
     <div class="pz-info-card" style="flex:1;">
@@ -224,7 +240,6 @@ body.theme-dark .player-area .amath-tile-rack {
       <h3>📊 Best Plays Analysis</h3>
       <div id="player-result-label"></div>
     </div>
-    <div class="play-tabs" id="play-tabs"></div>
     <div class="play-detail" id="play-detail"></div>
   </div>
 </div>
@@ -748,20 +763,15 @@ function revealAnswer(){
   var box = document.getElementById('answer-box');
   box.classList.remove('hidden');
   if(!answers||answers.length===0){
-    document.getElementById('play-tabs').innerHTML='';
     document.getElementById('play-detail').innerHTML='<div style="color:#f87171">No valid plays found.</div>';
     return;
   }
-  var medals=['🥇','🥈','🥉'];
-  var tabs=document.getElementById('play-tabs'); tabs.innerHTML='';
-  for(var i=0;i<answers.length;i++){
-    var a=answers[i];
-    var lbl = medals[i]+' '+a.score+'pts'+(a.bingo?' BINGO':a.yoyo?' YOYO':'');
-    var btn = document.createElement('button');
-    btn.className='play-tab';
-    btn.textContent=lbl;
-    btn.addEventListener('click',(function(idx){return function(){showPlay(idx);};})(i));
-    tabs.appendChild(btn);
+  // Update the Best buttons to show their scores
+  for(var i=0;i<3;i++){
+    var btn = document.getElementById('best-btn-'+i);
+    if(!btn) continue;
+    if(answers[i]) btn.textContent='Best '+(i+1)+' · '+answers[i].score+'pts';
+    else { btn.textContent='—'; btn.disabled=true; }
   }
   showPlay(0);
 }
@@ -771,14 +781,16 @@ function showPlay(idx){
   if(!answers[idx]) return;
   var a = answers[idx];
   var colors=['gold','silver','bronze'];
-  var tabs = document.getElementById('play-tabs').children;
-  for(var t=0;t<tabs.length;t++){
-    tabs[t].className='play-tab';
-    if(t===idx) tabs[t].classList.add('active-'+colors[t]);
+  // Highlight active Best button
+  for(var b=0;b<3;b++){
+    var btn = document.getElementById('best-btn-'+b);
+    if(btn){
+      btn.classList.remove('active-0','active-1','active-2');
+      if(b===idx) btn.classList.add('active-'+idx);
+    }
   }
   resetHighlights();
   var hl = ['pz-highlight-gold','pz-highlight-silver','pz-highlight-bronze'];
-  // Find board cells in the DOM
   var boardEl = document.querySelector('.amath-board');
   if(boardEl){
     a.placements.forEach(function(p){
@@ -793,6 +805,33 @@ function showPlay(idx){
   document.getElementById('play-detail').innerHTML =
     '<div class="play-score '+colors[idx]+'">'+a.score+' pts</div>'+
     '<div class="play-tags">'+tags+'</div>';
+}
+
+// Click any Best button to reveal and switch to that solution (works pre- or post-submit)
+window.showBestPlay = function(idx){
+  if(!currentPuzzle || !currentPuzzle.answer || !currentPuzzle.answer[idx]){
+    // Solver may not be done yet — wait a moment
+    if(currentPuzzle){
+      var tries = 0;
+      var wait = setInterval(function(){
+        tries++;
+        if(currentPuzzle.answer && currentPuzzle.answer[idx]){
+          clearInterval(wait);
+          actuallyShowBest(idx);
+        } else if(tries > 30){
+          clearInterval(wait);
+          alert('Solver still working — try again in a moment.');
+        }
+      }, 200);
+    }
+    return;
+  }
+  actuallyShowBest(idx);
+};
+
+function actuallyShowBest(idx){
+  document.getElementById('answer-box').classList.remove('hidden');
+  showPlay(idx);
 }
 
 function resetHighlights(){
@@ -862,6 +901,15 @@ window.nextPuzzle = function(){
   document.getElementById('answer-box').classList.add('hidden');
   document.getElementById('puzzle-num').textContent='#'+puzzleNum;
   document.getElementById('streak').textContent='Streak: '+streak;
+  // Reset Best buttons
+  for(var b=0;b<3;b++){
+    var btn = document.getElementById('best-btn-'+b);
+    if(btn){
+      btn.textContent='Best '+(b+1);
+      btn.disabled=false;
+      btn.classList.remove('active-0','active-1','active-2');
+    }
+  }
 
   // Generate the puzzle board state
   currentPuzzle = buildPuzzle(puzzleType);
