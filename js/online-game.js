@@ -57,6 +57,126 @@
   var swapSelected = {};         // { tileId: true } in swap mode
   var _gameStartedHook = false;  // ran one-time init (game-log, score-sheet) yet?
   var _lastSeenMoveCount = -1;   // detect when opponent plays so we fire sounds/animations
+  var _timerInterval = null;     // setInterval handle for local timer-display ticking
+  var INITIAL_TIME_MS = 22 * 60 * 1000;  // 22 minutes per side, matches PvA default
+
+  /**
+   * Calculate the point penalty for going over time. PvA rule: -10 points
+   * per minute (rounded up) of overrun. Returns a positive penalty (caller
+   * subtracts from score).
+   *   @param {number} remainingMs — may be negative if player ran out
+   *   @returns {number} penalty points (>= 0)
+   */
+  function calculateTimePenalty(remainingMs) {
+    if (remainingMs >= 0) return 0;
+    return Math.ceil(Math.abs(remainingMs) / 60000) * 10;
+  }
+
+  /**
+   * Given the current game state, return the effective remaining time in ms
+   * for each player AS OF NOW. The off-turn player's time is static (just
+   * gs.hostTimeMs / gs.guestTimeMs). The on-turn player's time is reduced
+   * by the elapsed time since gs.turnStartedAt — this is the live ticking
+   * value the UI displays.
+   */
+  function computeLiveTimes(gs) {
+    if (!gs) return { hostMs: INITIAL_TIME_MS, guestMs: INITIAL_TIME_MS };
+    var hostMs = gs.hostTimeMs != null ? gs.hostTimeMs : INITIAL_TIME_MS;
+    var guestMs = gs.guestTimeMs != null ? gs.guestTimeMs : INITIAL_TIME_MS;
+    if (gs.gameOver) return { hostMs: hostMs, guestMs: guestMs };
+    var elapsed = gs.turnStartedAt ? Math.max(0, Date.now() - gs.turnStartedAt) : 0;
+    if (gs.turn === 'host') hostMs -= elapsed;
+    else if (gs.turn === 'guest') guestMs -= elapsed;
+    return { hostMs: hostMs, guestMs: guestMs };
+  }
+
+  /**
+   * Apply the elapsed-on-turn delta when a move commits. Returns a new
+   * gameState with the moving player's timer decremented and turnStartedAt
+   * reset to now (which becomes the start of the next player's turn).
+   *   @param {object} gs — gameState at start of moving player's turn
+   *   @param {string} movingRole — 'host' or 'guest'
+   *   @returns {object} updated gameState (new object, gs unchanged)
+   */
+  function applyTurnElapsed(gs, movingRole) {
+    var elapsed = gs.turnStartedAt ? Math.max(0, Date.now() - gs.turnStartedAt) : 0;
+    var timeKey = movingRole + 'TimeMs';
+    var currentTime = gs[timeKey] != null ? gs[timeKey] : INITIAL_TIME_MS;
+    var out = Object.assign({}, gs);
+    out[timeKey] = currentTime - elapsed;
+    out.turnStartedAt = Date.now();
+    return out;
+  }
+
+  /**
+   * Apply end-of-game time penalty IN PLACE on the gameState's score fields.
+   * Mutates gs.hostScore and gs.guestScore by subtracting the time penalty
+   * for each side (10 points per minute of overrun, rounded up). Should be
+   * called once when game enters 'finished' status.
+   */
+  function applyEndOfGameTimePenalty(gs) {
+    if (!gs) return;
+    var hostPenalty = calculateTimePenalty(gs.hostTimeMs != null ? gs.hostTimeMs : INITIAL_TIME_MS);
+    var guestPenalty = calculateTimePenalty(gs.guestTimeMs != null ? gs.guestTimeMs : INITIAL_TIME_MS);
+    if (hostPenalty > 0) {
+      gs.hostScore = (gs.hostScore || 0) - hostPenalty;
+      gs.hostTimePenalty = hostPenalty;  // for game-end card display
+    }
+    if (guestPenalty > 0) {
+      gs.guestScore = (gs.guestScore || 0) - guestPenalty;
+      gs.guestTimePenalty = guestPenalty;
+    }
+  }
+
+  /**
+   * Render the two timer boxes from the latest gameState. Uses
+   * computeLiveTimes to get the live ticking value for the on-turn player.
+   *
+   * The PvA UI.renderTimer helper takes SECONDS (not ms) and applies the
+   * 'timer-negative' class when value < 0, so we just convert.
+   */
+  function renderTimers() {
+    if (!localSession || !_uiParts) return;
+    var UI = window.AMath.ui;
+    if (!UI || !UI.renderTimer) return;
+    var gs = localSession._rawGameState;
+    if (!gs) return;
+    var live = computeLiveTimes(gs);
+    var myMs = (myRole === 'host') ? live.hostMs : live.guestMs;
+    var oppMs = (myRole === 'host') ? live.guestMs : live.hostMs;
+    var mySec = Math.floor(myMs / 1000);
+    var oppSec = Math.floor(oppMs / 1000);
+    // Use opponent's actual name when available; fall back to generic labels
+    var oppName = (myRole === 'host')
+      ? (roomData && roomData.guestName || 'Opp')
+      : (roomData && roomData.hostName || 'Opp');
+    // Trim long names so the timer label stays readable
+    var oppLabel = (oppName.length > 8 ? oppName.substring(0, 8) + '…' : oppName) + ' Time';
+    if (_uiParts.playerTimer) UI.renderTimer(_uiParts.playerTimer, 'Your Time', mySec);
+    if (_uiParts.opponentTimer) UI.renderTimer(_uiParts.opponentTimer, oppLabel, oppSec);
+    if (_uiParts.playerTimerMobile) UI.renderTimer(_uiParts.playerTimerMobile, 'Your Time', mySec);
+    if (_uiParts.opponentTimerMobile) UI.renderTimer(_uiParts.opponentTimerMobile, oppLabel, oppSec);
+  }
+
+  /**
+   * Start a 1Hz interval that re-renders the timer display. The active
+   * player's time counts down via the live computation in computeLiveTimes.
+   * Idempotent — multiple calls are no-ops.
+   */
+  function startTimerTicker() {
+    if (_timerInterval) return;
+    _timerInterval = setInterval(function () {
+      if (!localSession || localSession.gameOver) return;
+      renderTimers();
+    }, 1000);
+  }
+
+  function stopTimerTicker() {
+    if (_timerInterval) {
+      clearInterval(_timerInterval);
+      _timerInterval = null;
+    }
+  }
 
   // -----------------------------------------------------------------------
   // BOOT
@@ -206,6 +326,15 @@
       moveCount: 0,
       moves: [],
       startedAt: Date.now(),
+      // Timer fields — chess clock matching PvA. Both sides start with 22
+      // minutes (1,320,000 ms). turnStartedAt is the wall-clock time the
+      // CURRENT player's turn began; their live remaining time is
+      // gs.<role>TimeMs - (Date.now() - gs.turnStartedAt). The off-turn
+      // player's time is static. On every move commit we apply the elapsed
+      // delta via applyTurnElapsed.
+      hostTimeMs: INITIAL_TIME_MS,
+      guestTimeMs: INITIAL_TIME_MS,
+      turnStartedAt: Date.now(),
       hostBingos: 0,
       guestBingos: 0,
       chat: [],          // append-only [{ from, text, ts }], pruned to last 50
@@ -456,6 +585,11 @@
       UI.renderScore(_uiParts.playerScoreBox, myName, localSession.playerScore);
       UI.renderScore(_uiParts.opponentScoreBox, oppName, localSession.aiScore);
     }
+
+    // Render timers from current state
+    renderTimers();
+    // Start the 1Hz ticker so the active player's timer counts down. Idempotent.
+    startTimerTicker();
 
     // Re-wire board click + drag because renderBoard wipes children & handlers
     wireBoardClicks(_uiParts.boardArea);
@@ -1149,7 +1283,10 @@
     var moveRec = buildMoveRecord(gs, { who: myRole, type: 'swap', count: tilesToSwap.length });
     var newMoves = (gs.moves || []).slice();
     newMoves.push(moveRec);
-    var newGs = Object.assign({}, gs, {
+    // Apply timer: deduct elapsed-on-turn from the moving player, reset
+    // turnStartedAt for the next player.
+    var withTime = applyTurnElapsed(gs, myRole);
+    var newGs = Object.assign({}, withTime, {
       bag: newBag,
       turn: newTurn,
       consecutiveNonScoring: newConsec,
@@ -1162,11 +1299,15 @@
     newGs[myRackKey] = newRack;
     var update = { gameState: newGs, turn: newTurn };
     if (gameOver) {
+      // Apply time penalty (PvA rule: -10 pts per minute over)
+      applyEndOfGameTimePenalty(newGs);
       newGs.winner = newGs.hostScore > newGs.guestScore ? 'host'
                    : newGs.guestScore > newGs.hostScore ? 'guest' : 'tie';
       newGs.endReason = '6_consecutive_passes';
       update.status = 'finished';
       update.winner = newGs.winner;
+      update.hostScore = newGs.hostScore;
+      update.guestScore = newGs.guestScore;
     }
     tentativePlacements = [];
     selectedTileId = null;
@@ -1354,7 +1495,10 @@
       }),
     };
 
-    var newGs = Object.assign({}, gs, {
+    // Apply timer: deduct elapsed-on-turn from the moving player, reset
+    // turnStartedAt for the next player.
+    var withTime = applyTurnElapsed(gs, myRole);
+    var newGs = Object.assign({}, withTime, {
       board: newBoard,
       bag: newBag,
       hostScore: newHostScore,
@@ -1403,6 +1547,10 @@
         newGs.guestScore = newGuestScore + oppRackPoints * 2;
         update.guestScore = newGs.guestScore;
       }
+      // Apply time penalty AFTER rack-empty bonus is added (PvA order)
+      applyEndOfGameTimePenalty(newGs);
+      update.hostScore = newGs.hostScore;
+      update.guestScore = newGs.guestScore;
       newGs.gameOver = true;
       newGs.winner = newGs.hostScore > newGs.guestScore ? 'host'
                    : newGs.guestScore > newGs.hostScore ? 'guest' : 'tie';
@@ -1565,7 +1713,10 @@
     var newTurn = (gs.turn === 'host') ? 'guest' : 'host';
     var newConsec = (gs.consecutiveNonScoring || 0) + 1;
     var gameOver = newConsec >= 6;
-    var newGs = Object.assign({}, gs, {
+    // The challenger (myRole) is the current turn-holder, so deduct elapsed
+    // from their timer before flipping turn.
+    var withTime = applyTurnElapsed(gs, myRole);
+    var newGs = Object.assign({}, withTime, {
       turn: newTurn,
       consecutiveNonScoring: newConsec,
       lastMove: {
@@ -1584,11 +1735,14 @@
     });
     var update = { gameState: newGs, turn: newTurn };
     if (gameOver) {
+      applyEndOfGameTimePenalty(newGs);
       newGs.winner = newGs.hostScore > newGs.guestScore ? 'host'
                    : newGs.guestScore > newGs.hostScore ? 'guest' : 'tie';
       newGs.endReason = '6_consecutive_passes';
       update.status = 'finished';
       update.winner = newGs.winner;
+      update.hostScore = newGs.hostScore;
+      update.guestScore = newGs.guestScore;
     }
     await window.AMath.onlineRoom.updateRoom(roomCode, update);
     if (gameOver) await saveReplayDoc(newGs, roomData);
@@ -1670,12 +1824,25 @@
     var el = document.getElementById('online-last-move');
     if (!el) return;
     var gs = data.gameState;
+    // Game is over — stop the local timer ticker so we don't waste cycles
+    stopTimerTicker();
+    // Build a time-penalty summary line if either side was penalized
+    var penaltyLine = '';
+    if (gs.hostTimePenalty || gs.guestTimePenalty) {
+      var hp = gs.hostTimePenalty || 0;
+      var gp = gs.guestTimePenalty || 0;
+      penaltyLine =
+        '<div style="margin-top:6px;font-size:12px;color:#fca5a5;">' +
+        '⏱️ Time penalty: ' +
+        'host −' + hp + ' / guest −' + gp + '</div>';
+    }
     el.innerHTML =
       '<div style="background:#1e293b;padding:14px;border-radius:8px;text-align:center;margin-top:10px;">' +
       '<div style="font-size:18px;font-weight:700;color:#fbbf24;">Game over</div>' +
       '<div>Winner: ' + escapeHtml(gs.winner === 'host' ? data.hostName : gs.winner === 'guest' ? data.guestName : 'Tie') + '</div>' +
       '<div style="margin-top:6px;font-size:13px;color:#94a3b8;">' +
       'Final: ' + gs.hostScore + ' (host) – ' + gs.guestScore + ' (guest)</div>' +
+      penaltyLine +
       '<button id="online-show-sheet" style="margin-top:10px;background:#fbbf24;color:#1e293b;' +
         'border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:700;' +
         'margin-right:8px;">📊 Score Sheet</button>' +
@@ -1733,30 +1900,37 @@
     var newMoves = (gs.moves || []).slice();
     newMoves.push(moveRec);
 
+    // Apply timer: deduct elapsed-on-turn from the passing player, reset
+    // turnStartedAt for the next player.
+    var withTime = applyTurnElapsed(gs, myRole);
+    var nextGs = Object.assign({}, withTime, {
+      turn: newTurn,
+      consecutiveNonScoring: newConsec,
+      lastMove: {
+        who: myRole,
+        type: 'pass',
+        timestamp: Date.now(),
+      },
+      moves: newMoves,
+      moveCount: (gs.moveCount || 0) + 1,
+      gameOver: gameOver,
+      prevPlayState: null,  // pass clears the last challengeable play
+    });
     var update = {
-      gameState: Object.assign({}, gs, {
-        turn: newTurn,
-        consecutiveNonScoring: newConsec,
-        lastMove: {
-          who: myRole,
-          type: 'pass',
-          timestamp: Date.now(),
-        },
-        moves: newMoves,
-        moveCount: (gs.moveCount || 0) + 1,
-        gameOver: gameOver,
-        prevPlayState: null,  // pass clears the last challengeable play
-      }),
+      gameState: nextGs,
       turn: newTurn,
     };
     if (gameOver) {
-      // 6-pass end: nobody wins (or use rack-point tiebreak — keep simple)
-      var winner = gs.hostScore > gs.guestScore ? 'host'
-                 : gs.guestScore > gs.hostScore ? 'guest' : 'tie';
-      update.gameState.winner = winner;
-      update.gameState.endReason = '6_consecutive_passes';
+      // 6-pass end: apply time penalty before winner determination
+      applyEndOfGameTimePenalty(nextGs);
+      var winner = nextGs.hostScore > nextGs.guestScore ? 'host'
+                 : nextGs.guestScore > nextGs.hostScore ? 'guest' : 'tie';
+      nextGs.winner = winner;
+      nextGs.endReason = '6_consecutive_passes';
       update.status = 'finished';
       update.winner = winner;
+      update.hostScore = nextGs.hostScore;
+      update.guestScore = nextGs.guestScore;
     }
     try {
       await window.AMath.onlineRoom.updateRoom(roomCode, update);
@@ -1942,5 +2116,6 @@
 
   window.addEventListener('beforeunload', function () {
     if (unsubscribe) unsubscribe();
+    stopTimerTicker();
   });
 })();
