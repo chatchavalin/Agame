@@ -559,6 +559,170 @@
     return out;
   }
 
+  /**
+   * Classify each placement position's role based on its IMMEDIATE static
+   * neighbors (existing tiles or out-of-bounds). Positions whose neighbors
+   * are also placements (dynamic) get the conservative 'any' role — they
+   * can hold any tile, since their actual role depends on what gets placed
+   * around them during permutation.
+   *
+   * Roles:
+   *   'num'   — must be a number (digit, twodigit, or blank-as-digit).
+   *             Triggered when adjacent to op/equals tiles, or at line end
+   *             where the equation must terminate.
+   *   'op'    — must be an operator or '='. Triggered when both neighbors
+   *             are number tiles (existing) WITH NO multi-digit possibility.
+   *   'after-twodigit' — prev is twodigit (atomic). Cannot extend with a digit
+   *                      since twodigits don't concatenate. Must be op or '='.
+   *                      Same as 'op' for our purposes.
+   *   'any'   — both neighbors empty/dynamic, or other unconstrained cases.
+   *             Tile can be anything.
+   *
+   * Sound (conservative): we only assign 'num' or 'op' when we're certain.
+   * False positives (over-pruning) would skip valid placements, so when
+   * unsure we use 'any' and let the validator decide later.
+   *
+   * @returns array of roles, one per position in `positions`.
+   */
+  function computePositionRoles(board, line, positions, existing) {
+    const isRow = line.type === 'row';
+    const lineIndex = line.index;
+    // Build a set of {row,col} -> 'placement' for positions in this set
+    // so we know which neighbors are dynamic (about to be placed) vs static.
+    const placementSet = new Set();
+    for (const p of positions) {
+      placementSet.add(p.row + ',' + p.col);
+    }
+    function neighborStatic(row, col) {
+      // Returns { tile } if there's an existing static tile, { outOfBounds: true } if off-board,
+      // { dynamic: true } if it's another placement position, or null if empty.
+      if (!Board.inBounds(row, col)) return { outOfBounds: true };
+      const key = row + ',' + col;
+      if (placementSet.has(key)) return { dynamic: true };
+      const cell = Board.getCell(board, row, col);
+      if (cell && cell.tile) return { tile: cell.tile };
+      return null;
+    }
+    const roles = [];
+    for (const p of positions) {
+      let prevR, prevC, nextR, nextC;
+      if (isRow) {
+        prevR = p.row; prevC = p.col - 1;
+        nextR = p.row; nextC = p.col + 1;
+      } else {
+        prevR = p.row - 1; prevC = p.col;
+        nextR = p.row + 1; nextC = p.col;
+      }
+      const prev = neighborStatic(prevR, prevC);
+      const next = neighborStatic(nextR, nextC);
+      // Helpers — classify neighbor as number / op-equals / unknown
+      function neighborType(n) {
+        if (!n) return 'empty';                              // null = empty cell
+        if (n.outOfBounds) return 'boundary';                // off-board
+        if (n.dynamic) return 'dynamic';                     // another placement
+        if (n.tile) {
+          const t = n.tile.type;
+          if (t === 'digit' || t === 'twodigit') return 'num';
+          if (t === 'op' || t === 'equals' || t === 'choice') return 'op';
+        }
+        return 'empty';
+      }
+      const prevT = neighborType(prev);
+      const nextT = neighborType(next);
+      // Rule: if EITHER static neighbor is twodigit, we're "after twodigit"
+      // — this position can't be a digit (since twodigit doesn't concatenate).
+      // Must be op or '='.
+      const prevIsTwoDigit = prev && prev.tile && prev.tile.type === 'twodigit';
+      const nextIsTwoDigit = next && next.tile && next.tile.type === 'twodigit';
+
+      // Rule (TERMINAL-END-CELL): this position is at the END line edge
+      // (row 14 for vertical line, col 14 for horizontal). Equations
+      // cannot end with op or '=' — must be a number.
+      //
+      // We do NOT apply this rule to the START edge (row 0 / col 0) because
+      // A-Math equations CAN start with unary '-' before a number. So a
+      // start-edge placement could be either a number OR a '-' choice tile.
+      // Conservative: leave start-edge as 'any' so we don't miss unary cases.
+      const isEndEdgeCell = isRow
+        ? (p.col === C.BOARD_SIZE - 1)
+        : (p.row === C.BOARD_SIZE - 1);
+      if (isEndEdgeCell) {
+        roles.push('num');
+        continue;
+      }
+
+      // Position is at line edge with the OTHER side being boundary (so the
+      // equation must terminate here). Equation can't end on op/'='.
+      // → role 'num'.
+      if ((prevT === 'boundary' && nextT === 'op') ||
+          (nextT === 'boundary' && prevT === 'op')) {
+        roles.push('num');
+        continue;
+      }
+      // Position adjacent to twodigit tile + the OTHER side is empty/dynamic:
+      // can't be a digit (twodigit doesn't concat). Must be op or '='.
+      if (prevIsTwoDigit && (nextT === 'empty' || nextT === 'dynamic' || nextT === 'boundary')) {
+        roles.push('op');
+        continue;
+      }
+      if (nextIsTwoDigit && (prevT === 'empty' || prevT === 'dynamic' || prevT === 'boundary')) {
+        roles.push('op');
+        continue;
+      }
+      // Position between two static numbers: typically must be op, BUT if
+      // both numbers are single digits they could be part of a multi-digit
+      // grouping (e.g. '1' '_' '2' could form the number 12 if '_' is also
+      // a digit). To stay sound, only set 'op' when at least one neighbor
+      // is twodigit (already handled above). Otherwise leave as 'any'.
+      // [conservative: skip the 'between two single digits' optimization]
+      // Position between two static ops/equals: must be a number (you can't
+      // have three adjacent operators except unary '-' after '='. The unary
+      // case isn't reached here since both neighbors are static ops.)
+      if (prevT === 'op' && nextT === 'op') {
+        roles.push('num');
+        continue;
+      }
+      // Position adjacent to op on one side + boundary on the other:
+      // equation can't end on op/'=' so this position is the terminal
+      // number. → role 'num'.
+      if ((prevT === 'op' && nextT === 'boundary') ||
+          (prevT === 'boundary' && nextT === 'op')) {
+        roles.push('num');
+        continue;
+      }
+      // Boundary on one side + empty/dynamic on the other: the equation
+      // must terminate at the boundary. Whether THIS specific position is
+      // the terminator depends on placements yet to be made. Stay 'any'.
+      roles.push('any');
+    }
+    return roles;
+  }
+
+  /**
+   * Check if a rack tile is compatible with a position's role.
+   * Used to prune the permutation search at every recursion level.
+   *
+   * Sound: returns true when in doubt. False return = definite incompatibility.
+   */
+  function isTileCompatibleWithRole(tile, role) {
+    if (role === 'any') return true;
+    const t = tile.type;
+    if (role === 'num') {
+      // Must be a number. digit/twodigit OK, blank OK (will be assigned a
+      // digit face later). Op/equals/choice all reject.
+      if (t === 'digit' || t === 'twodigit' || t === 'blank') return true;
+      return false;
+    }
+    if (role === 'op') {
+      // Must be an operator or '='. op/equals/choice OK, blank OK (assigned
+      // as op face). digit/twodigit reject.
+      if (t === 'op' || t === 'equals' || t === 'choice' || t === 'blank') return true;
+      return false;
+    }
+    // Unknown role → allow (sound default)
+    return true;
+  }
+
   function searchTileAssignments(state, line, existing, positions, startTime, timeBudget, existingTarget) {
     const results = [];
     const rackTiles = state.aiRack.tiles.slice();
@@ -590,12 +754,46 @@
     // the acceptable faces so the target-relevant ones run first.
     const targetFaces = targetAwareFaces(existingTarget);
     const targetFaceSet = new Set(targetFaces);
+
+    // STRUCTURAL ROLE PRUNING — classify each placement position's role
+    // (must-be-number, must-be-op, or unconstrained) based on its static
+    // neighbors. This lets us skip incompatible rack tiles at EVERY level
+    // of the permutation recursion instead of waiting until all 7 are
+    // placed and validation fails.
+    const positionRolesRaw = computePositionRoles(state.board, line, positions, existing);
+
+    // Optimization: process MOST-CONSTRAINED positions FIRST. A position
+    // with role 'num' or 'op' rejects half (or more) of the 8 rack tiles
+    // immediately, so picking that position early prunes large subtrees.
+    // We build a permutation array `permOrder` that reorders position
+    // indices by strictness: 'num'/'op' first, then 'any'.
+    //
+    // CRITICAL: we keep the original positions[] array intact because
+    // downstream code (placements built from chosen tiles) uses positions[i]
+    // by ORIGINAL index. We only reorder the recursion order via permOrder.
+    const permOrder = [];
+    const constrained = [];
+    const unconstrained = [];
+    for (let pi = 0; pi < positions.length; pi++) {
+      if (positionRolesRaw[pi] === 'any') unconstrained.push(pi);
+      else constrained.push(pi);
+    }
+    for (const pi of constrained) permOrder.push(pi);
+    for (const pi of unconstrained) permOrder.push(pi);
+
+    // Build positionRoles in the new recursion-order so positionRoles[chosen.length]
+    // returns the right role for the position we're filling next.
+    const positionRoles = permOrder.map(idx => positionRolesRaw[idx]);
+
     function tryPermutation(remaining, chosen) {
       if (Date.now() > setDeadline) return;
       if (chosen.length === numPositions) {
+        // Remap: chosen[i] was placed for the position at permOrder[i] in
+        // the original positions[] array. Reconstruct the placements list
+        // so that each placement's (row, col) matches its assigned tile.
         const placements = chosen.map((tile, i) => ({
-          row: positions[i].row,
-          col: positions[i].col,
+          row: positions[permOrder[i]].row,
+          col: positions[permOrder[i]].col,
           tile: tile,
         }));
         const tryAssignments = (idx) => {
@@ -612,8 +810,10 @@
           }
           const p = placements[idx];
           if (p.tile.type === 'blank') {
-            // CONTEXT-AWARE: order BLANK assignments by what's likely to fit
-            const hint = contextHints[idx];
+            // CONTEXT-AWARE: order BLANK assignments by what's likely to fit.
+            // contextHints[] was computed for the ORIGINAL positions[] order;
+            // map back via permOrder so we read the hint for the actual cell.
+            const hint = contextHints[permOrder[idx]];
             const basePriority = blankFacesForHint(hint, allBlankChoices);
             // TARGET-AWARE: if we know the existing equation's target value,
             // try faces that contribute to building sub-expressions of that
@@ -665,8 +865,15 @@
         tryAssignments(0);
         return;
       }
+      // Pick the next tile for position `chosen.length`. Apply role-based
+      // pruning: if this position MUST be a number (or MUST be an op/=),
+      // skip rack tiles of incompatible types entirely. This is the main
+      // speedup mechanism — without it the search burns budget exploring
+      // permutations doomed to fail validation.
+      const targetRole = positionRoles[chosen.length];
       for (let i = 0; i < remaining.length; i++) {
         const tile = remaining[i];
+        if (!isTileCompatibleWithRole(tile, targetRole)) continue;
         const next = remaining.slice(0, i).concat(remaining.slice(i + 1));
         chosen.push(tile);
         tryPermutation(next, chosen);
