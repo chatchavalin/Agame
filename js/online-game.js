@@ -1687,7 +1687,13 @@
     var sheetBtn = document.getElementById('online-show-sheet');
     if (sheetBtn) {
       sheetBtn.onclick = function () {
-        if (window.AMath.scoreSheet && window.AMath.scoreSheet.showPopup) {
+        // Use the inline-styled helper from online.html which works
+        // reliably across all CSS-variable / theme states. The
+        // score-sheet.js .showPopup uses CSS classes that don't render
+        // properly inside this room context for some users.
+        if (typeof window.openOnlineScoreSheet === 'function') {
+          window.openOnlineScoreSheet();
+        } else if (window.AMath.scoreSheet && window.AMath.scoreSheet.showPopup) {
           var myScoreEnd = (myRole === 'host') ? gs.hostScore : gs.guestScore;
           var oppScoreEnd = (myRole === 'host') ? gs.guestScore : gs.hostScore;
           window.AMath.scoreSheet.showPopup(myScoreEnd, oppScoreEnd);

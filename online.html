@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>A-Math — Online Room</title>
-  <link rel="stylesheet" href="styles.css?v=20260526h">
+  <link rel="stylesheet" href="styles.css?v=20260526i">
   <style>
     body { background: #0f172a; color: #e2e8f0; font-family: 'Outfit', sans-serif; }
     /* The outer room-wrap is the waiting-room shell. Once a game starts the
@@ -125,31 +125,31 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <script src="js/firebase-config.js?v=20260526h"></script>
+  <script src="js/firebase-config.js?v=20260526i"></script>
   <!-- Game-core modules required by the online controller -->
-  <script src="js/constants.js?v=20260526h"></script>
-  <script src="js/utils.js?v=20260526h"></script>
-  <script src="js/evaluator.js?v=20260526h"></script>
-  <script src="js/bag.js?v=20260526h"></script>
-  <script src="js/rack.js?v=20260526h"></script>
-  <script src="js/board.js?v=20260526h"></script>
-  <script src="js/scoring.js?v=20260526h"></script>
-  <script src="js/placement.js?v=20260526h"></script>
-  <script src="js/ui.js?v=20260526h"></script>
-  <script src="js/online-room.js?v=20260526h"></script>
-  <script src="js/game-bridge.js?v=20260526h"></script>
+  <script src="js/constants.js?v=20260526i"></script>
+  <script src="js/utils.js?v=20260526i"></script>
+  <script src="js/evaluator.js?v=20260526i"></script>
+  <script src="js/bag.js?v=20260526i"></script>
+  <script src="js/rack.js?v=20260526i"></script>
+  <script src="js/board.js?v=20260526i"></script>
+  <script src="js/scoring.js?v=20260526i"></script>
+  <script src="js/placement.js?v=20260526i"></script>
+  <script src="js/ui.js?v=20260526i"></script>
+  <script src="js/online-room.js?v=20260526i"></script>
+  <script src="js/game-bridge.js?v=20260526i"></script>
   <!-- PvA feature modules brought into online PvP per user request: timer
        skipped, education off, trash-talk skipped. Everything else loaded
        so online has settings (themes), sounds, animations, game log, tile
        tracker, score sheet, and challenge module. -->
-  <script src="js/settings.js?v=20260526h"></script>
-  <script src="js/sounds.js?v=20260526h"></script>
-  <script src="js/animations.js?v=20260526h"></script>
-  <script src="js/game-log.js?v=20260526h"></script>
-  <script src="js/tile-tracker.js?v=20260526h"></script>
-  <script src="js/score-sheet.js?v=20260526h"></script>
-  <script src="js/challenge.js?v=20260526h"></script>
-  <script src="js/online-game.js?v=20260526h"></script>
+  <script src="js/settings.js?v=20260526i"></script>
+  <script src="js/sounds.js?v=20260526i"></script>
+  <script src="js/animations.js?v=20260526i"></script>
+  <script src="js/game-log.js?v=20260526i"></script>
+  <script src="js/tile-tracker.js?v=20260526i"></script>
+  <script src="js/score-sheet.js?v=20260526i"></script>
+  <script src="js/challenge.js?v=20260526i"></script>
+  <script src="js/online-game.js?v=20260526i"></script>
   <script>
     var roomCode = new URLSearchParams(window.location.search).get('room');
     var role = new URLSearchParams(window.location.search).get('role');
@@ -236,19 +236,7 @@
       if (sheetBtn) {
         sheetBtn.addEventListener('click', function (ev) {
           ev.preventDefault();
-          var og = window.AMath && window.AMath.onlineGame;
-          var role = og && og.getRole && og.getRole();
-          var data = og && og.getRoomData && og.getRoomData();
-          var myScore = 0, oppScore = 0;
-          if (data) {
-            myScore = role === 'host' ? (data.hostScore || 0) : (data.guestScore || 0);
-            oppScore = role === 'host' ? (data.guestScore || 0) : (data.hostScore || 0);
-          }
-          if (window.AMath && window.AMath.scoreSheet && window.AMath.scoreSheet.showPopup) {
-            window.AMath.scoreSheet.showPopup(myScore, oppScore);
-          } else {
-            alert('Score sheet not available.');
-          }
+          openOnlineScoreSheet();
         });
       }
       var logBtn = document.getElementById('online-btn-log');
@@ -274,6 +262,147 @@
         });
       }
     })();
+
+    /**
+     * Render the score sheet popup using inline styles only — does NOT rely
+     * on the score-sheet.js .showPopup() which uses CSS classes that may not
+     * resolve correctly in the online.html context (user reported the popup
+     * never appeared, while settings + game-log popups work fine; the
+     * difference is the latter use inline styles).
+     *
+     * Reads the entries from window.AMath.scoreSheet.getAllEntries(), or
+     * shows an empty-state if the module isn't loaded.
+     *
+     * Exposed on window so online-game.js can call this from the game-end
+     * card's Score Sheet button.
+     */
+    window.openOnlineScoreSheet = function () {
+      // Remove any existing instance
+      var existing = document.getElementById('online-score-sheet-overlay');
+      if (existing) existing.remove();
+
+      var og = window.AMath && window.AMath.onlineGame;
+      var role = og && og.getRole && og.getRole();
+      var data = og && og.getRoomData && og.getRoomData();
+      var myName = 'You';
+      var oppName = 'Opponent';
+      var myScore = 0, oppScore = 0;
+      if (data) {
+        myScore = role === 'host' ? (data.hostScore || 0) : (data.guestScore || 0);
+        oppScore = role === 'host' ? (data.guestScore || 0) : (data.hostScore || 0);
+        oppName = role === 'host'
+          ? (data.guestName || 'Guest')
+          : (data.hostName || 'Host');
+      }
+
+      var entries = [];
+      if (window.AMath && window.AMath.scoreSheet
+          && window.AMath.scoreSheet.getAllEntries) {
+        try { entries = window.AMath.scoreSheet.getAllEntries() || []; } catch (e) {}
+      }
+
+      // Build overlay
+      var overlay = document.createElement('div');
+      overlay.id = 'online-score-sheet-overlay';
+      overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;' +
+        'background:rgba(0,0,0,0.65);z-index:10001;display:flex;' +
+        'align-items:center;justify-content:center;padding:16px;';
+
+      var dialog = document.createElement('div');
+      dialog.style.cssText = 'background:#ffffff;color:#1f2937;border-radius:12px;' +
+        'padding:20px;max-width:520px;width:100%;max-height:85vh;display:flex;' +
+        'flex-direction:column;box-shadow:0 12px 36px rgba(0,0,0,0.4);';
+
+      // Header
+      var header = document.createElement('div');
+      header.style.cssText = 'display:flex;justify-content:space-between;' +
+        'align-items:center;margin-bottom:12px;';
+      var title = document.createElement('h2');
+      title.textContent = '📊 Score Sheet';
+      title.style.cssText = 'margin:0;font-size:20px;font-weight:700;color:#1f2937;';
+      var closeBtn = document.createElement('button');
+      closeBtn.textContent = '✕';
+      closeBtn.style.cssText = 'background:none;border:none;font-size:24px;' +
+        'cursor:pointer;padding:4px 10px;color:#6b7280;';
+      closeBtn.onclick = function () { overlay.remove(); };
+      header.appendChild(title);
+      header.appendChild(closeBtn);
+      dialog.appendChild(header);
+
+      // Totals
+      var totals = document.createElement('div');
+      totals.style.cssText = 'display:flex;justify-content:space-around;' +
+        'background:#f3f4f6;padding:12px;border-radius:8px;margin-bottom:14px;' +
+        'font-size:15px;';
+      totals.innerHTML =
+        '<div><span style="color:#6b7280;">' + escapeHtml(oppName) + ':</span> ' +
+        '<b style="color:#1f2937;">' + oppScore + '</b></div>' +
+        '<div><span style="color:#6b7280;">' + escapeHtml(myName) + ':</span> ' +
+        '<b style="color:#1f2937;">' + myScore + '</b></div>';
+      dialog.appendChild(totals);
+
+      // Table
+      var tableWrap = document.createElement('div');
+      tableWrap.style.cssText = 'overflow-y:auto;flex:1;min-height:0;';
+      var table = document.createElement('table');
+      table.style.cssText = 'width:100%;border-collapse:collapse;font-size:14px;';
+      var thead = '<thead><tr style="background:#f9fafb;">' +
+        '<th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb;color:#374151;">' +
+        escapeHtml(oppName) + '</th>' +
+        '<th style="padding:8px;text-align:center;border-bottom:2px solid #e5e7eb;color:#6b7280;width:50px;">#</th>' +
+        '<th style="padding:8px;text-align:right;border-bottom:2px solid #e5e7eb;color:#374151;">' +
+        escapeHtml(myName) + '</th>' +
+        '</tr></thead>';
+      var tbody;
+      if (entries.length === 0) {
+        tbody = '<tbody><tr><td colspan="3" style="text-align:center;padding:24px;' +
+          'color:#9ca3af;">No moves yet</td></tr></tbody>';
+      } else {
+        tbody = '<tbody>';
+        for (var i = 0; i < entries.length; i++) {
+          var e = entries[i];
+          var isMe = (e.who === 'player');
+          var actionText = formatScoreSheetAction(e);
+          var bingoStyle = e.isBingo ? 'font-weight:bold;color:#059669;' : '';
+          var oppCell = isMe ? '<td></td>' :
+            '<td style="padding:6px 8px;text-align:left;border-bottom:1px solid #f3f4f6;' +
+            bingoStyle + '">' + actionText + '</td>';
+          var meCell = isMe ?
+            '<td style="padding:6px 8px;text-align:right;border-bottom:1px solid #f3f4f6;' +
+            bingoStyle + '">' + actionText + '</td>' : '<td></td>';
+          tbody += '<tr>' + oppCell +
+            '<td style="padding:6px 8px;text-align:center;color:#9ca3af;font-size:12px;' +
+            'border-bottom:1px solid #f3f4f6;">' + e.turn + '</td>' +
+            meCell + '</tr>';
+        }
+        tbody += '</tbody>';
+      }
+      table.innerHTML = thead + tbody;
+      tableWrap.appendChild(table);
+      dialog.appendChild(tableWrap);
+
+      // Backdrop click dismisses
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) overlay.remove();
+      });
+
+      overlay.appendChild(dialog);
+      document.body.appendChild(overlay);
+    };
+
+    function formatScoreSheetAction(e) {
+      if (e.action === 'play') {
+        var t = '+' + e.score;
+        if (e.isBingo) t += ' 🎉';
+        return t;
+      }
+      if (e.action === 'pass') return 'Pass';
+      if (e.action === 'swap') return 'Swap' + (e.swapCount ? ' ' + e.swapCount : '');
+      if (e.action === 'challenged') return '⚠️ Challenged';
+      if (e.action === 'challenge-failed') return '❌ Failed challenge';
+      if (e.action === 'play-uncontested-invalid') return '+0 (let slide)';
+      return String(e.score || '');
+    }
 
     function escapeHtml(s) {
       if (s == null) return '';
