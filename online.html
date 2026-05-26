@@ -4,10 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>A-Math — Online Room</title>
-  <link rel="stylesheet" href="styles.css?v=20260525e">
+  <link rel="stylesheet" href="styles.css?v=20260525p">
   <style>
     body { background: #0f172a; color: #e2e8f0; font-family: 'Outfit', sans-serif; }
-    .room-wrap { max-width: 900px; margin: 0 auto; padding: 14px; }
+    /* The outer room-wrap is the waiting-room shell. Once a game starts the
+       PvA-style layout takes over inside #room-content, which is wrapped by
+       #app to inherit the PvA edge-to-edge board sizing rules. Wrap no longer
+       caps width so #app can claim full screen width on mobile/tablet. */
+    .room-wrap { margin: 0 auto; padding: 14px 0 0 0; }
+    .room-header, .players-row, .room-status { padding: 0 14px; max-width: 900px; margin-left: auto; margin-right: auto; }
+    /* When the game has started, #room-content holds the PvA layout —
+       remove side padding so the board can claim full screen width on
+       mobile (matches PvA which has zero side padding on small screens). */
+    #room-content { padding: 0; margin: 0; }
     .room-header {
       display: flex; justify-content: space-between; align-items: center;
       gap: 14px; margin-bottom: 12px;
@@ -81,7 +90,12 @@
 
     <div class="room-status waiting" id="room-status">Loading…</div>
 
-    <div id="room-content"></div>
+    <!-- #app wrapper matches PvA's index.html so the .amath-app layout
+         inside renders with the same cell-size variables and full screen
+         width on mobile. -->
+    <div id="app">
+      <div id="room-content"></div>
+    </div>
   </div>
 
   <div id="copy-feedback" class="copy-feedback">Copied to clipboard!</div>
@@ -89,20 +103,20 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <script src="js/firebase-config.js?v=20260525o"></script>
+  <script src="js/firebase-config.js?v=20260525p"></script>
   <!-- Game-core modules required by the online controller -->
-  <script src="js/constants.js?v=20260525o"></script>
-  <script src="js/utils.js?v=20260525o"></script>
-  <script src="js/evaluator.js?v=20260525o"></script>
-  <script src="js/bag.js?v=20260525o"></script>
-  <script src="js/rack.js?v=20260525o"></script>
-  <script src="js/board.js?v=20260525o"></script>
-  <script src="js/scoring.js?v=20260525o"></script>
-  <script src="js/placement.js?v=20260525o"></script>
-  <script src="js/ui.js?v=20260525o"></script>
-  <script src="js/online-room.js?v=20260525o"></script>
-  <script src="js/game-bridge.js?v=20260525o"></script>
-  <script src="js/online-game.js?v=20260525o"></script>
+  <script src="js/constants.js?v=20260525p"></script>
+  <script src="js/utils.js?v=20260525p"></script>
+  <script src="js/evaluator.js?v=20260525p"></script>
+  <script src="js/bag.js?v=20260525p"></script>
+  <script src="js/rack.js?v=20260525p"></script>
+  <script src="js/board.js?v=20260525p"></script>
+  <script src="js/scoring.js?v=20260525p"></script>
+  <script src="js/placement.js?v=20260525p"></script>
+  <script src="js/ui.js?v=20260525p"></script>
+  <script src="js/online-room.js?v=20260525p"></script>
+  <script src="js/game-bridge.js?v=20260525p"></script>
+  <script src="js/online-game.js?v=20260525p"></script>
   <script>
     var roomCode = new URLSearchParams(window.location.search).get('room');
     var role = new URLSearchParams(window.location.search).get('role');

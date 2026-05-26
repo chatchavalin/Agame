@@ -53,6 +53,8 @@
   var submitInFlight = false;    // prevent double-submit
   var myMaxDeficit = 0;          // peak score gap when I was behind
   var statsFinalized = false;    // prevent double-save of game-end stats
+  var swapMode = false;          // PvA-parity inline swap state
+  var swapSelected = {};         // { tileId: true } in swap mode
 
   // -----------------------------------------------------------------------
   // BOOT
@@ -478,19 +480,37 @@
       if (!tileId) return;
       tileEl.style.cursor = localSession.isPlayerTurn ? 'pointer' : 'default';
       tileEl.style.touchAction = 'none';
-      if (selectedTileId === tileId) {
-        tileEl.style.outline = '3px solid #fbbf24';
-        tileEl.style.outlineOffset = '-2px';
+
+      // Visual state — swap selection takes precedence over placement select
+      if (swapMode && swapSelected[tileId]) {
+        // Use PvA's tile-swap-selected class so styling matches PvA exactly
+        tileEl.classList.add('tile-swap-selected');
+      } else {
+        tileEl.classList.remove('tile-swap-selected');
+        if (selectedTileId === tileId) {
+          tileEl.style.outline = '3px solid #fbbf24';
+          tileEl.style.outlineOffset = '-2px';
+        }
       }
-      // Click: toggle selection
+
+      // Click: in swap mode toggle swap-selection; otherwise toggle
+      // placement-selection (the existing flow)
       tileEl.addEventListener('click', function () {
         if (!localSession.isPlayerTurn) return;
         if (tileEl.dataset.didDrag === '1') { tileEl.dataset.didDrag = '0'; return; }
+        if (swapMode) {
+          if (swapSelected[tileId]) delete swapSelected[tileId];
+          else swapSelected[tileId] = true;
+          // Refresh rack visuals + Submit button label
+          wireRackTileHandlers();
+          updateActionButtonStates();
+          return;
+        }
         selectedTileId = (selectedTileId === tileId) ? null : tileId;
-        // Refresh just the rack highlight without a full re-render
         wireRackTileHandlers();
       });
-      attachDragHandlers(tileEl, tileId);
+      // Drag-to-place is disabled in swap mode (no need; we just tap to select)
+      if (!swapMode) attachDragHandlers(tileEl, tileId);
     });
   }
 
@@ -502,19 +522,44 @@
     var gs = localSession._rawGameState;
     var myTurn = localSession.isPlayerTurn;
     var hasTentative = tentativePlacements.length > 0;
+    var swapCount = 0;
+    if (swapMode) {
+      for (var sk in swapSelected) if (swapSelected[sk]) swapCount++;
+    }
     var canChallenge = !!(myTurn && gs && gs.prevPlayState
                           && gs.prevPlayState.who && gs.prevPlayState.who !== myRole
-                          && !hasTentative);
+                          && !hasTentative && !swapMode);
 
     var setEnabled = function (id, on) {
       var el = document.getElementById(id);
       if (el) el.disabled = !on;
     };
-    setEnabled('btn-submit', myTurn && hasTentative);
-    setEnabled('btn-reset', myTurn && hasTentative);
-    setEnabled('btn-pass', myTurn);
+    var submitBtn = document.getElementById('btn-submit');
+    if (submitBtn) {
+      if (swapMode) {
+        submitBtn.textContent = 'Confirm Swap (' + swapCount + ')';
+        submitBtn.disabled = (swapCount === 0);
+      } else {
+        submitBtn.textContent = 'Submit';
+        submitBtn.disabled = !(myTurn && hasTentative);
+      }
+    }
+    setEnabled('btn-reset', myTurn && (hasTentative || swapMode));
+    setEnabled('btn-pass', myTurn && !swapMode);
+    // Swap button stays enabled in swap mode so it acts as a cancel toggle
     setEnabled('btn-swap', myTurn);
     setEnabled('btn-challenge', canChallenge);
+    // Visual indicator that swap mode is active
+    var swapBtn = document.getElementById('btn-swap');
+    if (swapBtn) {
+      if (swapMode) {
+        swapBtn.classList.add('btn-active-mode');
+        swapBtn.textContent = 'Cancel Swap';
+      } else {
+        swapBtn.classList.remove('btn-active-mode');
+        swapBtn.textContent = 'Swap';
+      }
+    }
   }
 
   // -----------------------------------------------------------------------
@@ -859,6 +904,7 @@
   }
 
   function onResetClick() {
+    if (swapMode) { exitSwapMode(); return; }
     // Move all tentative tiles back to the rack
     for (var i = tentativePlacements.length - 1; i >= 0; i--) {
       returnTileToRack(i);
@@ -867,6 +913,8 @@
 
   function onSwapClick() {
     if (!localSession || !localSession.isPlayerTurn) return;
+    // If already in swap mode, this acts as a cancel toggle.
+    if (swapMode) { exitSwapMode(); return; }
     var C = window.AMath.constants;
     var bagSize = (localSession._rawGameState.bag.tiles || []).length;
     if (bagSize < (C.SWAP_FORBIDDEN_BAG_THRESHOLD + 1)) {
@@ -874,107 +922,44 @@
             '(minimum ' + (C.SWAP_FORBIDDEN_BAG_THRESHOLD + 1) + ' required).');
       return;
     }
-    showSwapModal();
+    enterSwapMode();
   }
 
   /**
-   * Modal that lets the player tap tiles to add/remove them from a swap set,
-   * then confirm. Replaces the previous prompt()-based picker.
+   * Inline swap mode — same UX as PvA. Tiles on the rack become tap-to-select
+   * and the Submit button changes to 'Confirm Swap (N)'. Cancel via Reset or
+   * by tapping Swap again.
    */
-  function showSwapModal() {
-    var UI = window.AMath.ui;
-    var selected = {}; // tileId -> true
-    var tiles = localSession.playerRack.tiles.slice();
+  function enterSwapMode() {
+    swapMode = true;
+    swapSelected = {};
+    selectedTileId = null;
+    // If the player had tentative placements down, send them back to the rack
+    // first so we don't mix swap-select with placed-tiles state.
+    for (var i = tentativePlacements.length - 1; i >= 0; i--) returnTileToRack(i);
+    refreshUIWithoutSync();
+  }
 
-    var overlay = document.createElement('div');
-    overlay.style.cssText =
-      'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99999;' +
-      'display:flex;align-items:center;justify-content:center;padding:14px;';
+  function exitSwapMode() {
+    swapMode = false;
+    swapSelected = {};
+    refreshUIWithoutSync();
+  }
 
-    var card = document.createElement('div');
-    card.style.cssText =
-      'background:#1e293b;padding:18px;border-radius:12px;max-width:420px;' +
-      'width:100%;color:#e2e8f0;';
-    card.innerHTML =
-      '<div style="font-weight:700;font-size:16px;margin-bottom:6px;">Swap tiles</div>' +
-      '<div style="font-size:12px;color:#94a3b8;margin-bottom:12px;">' +
-      'Tap the tiles you want to return to the bag. You\'ll draw the same ' +
-      'number of fresh tiles. Tap a selected tile again to unselect it.' +
-      '</div>';
-
-    var rackWrap = document.createElement('div');
-    rackWrap.style.cssText =
-      'display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:#0f172a;' +
-      'border-radius:8px;margin-bottom:12px;justify-content:center;';
-    card.appendChild(rackWrap);
-
-    function rerender() {
-      rackWrap.innerHTML = '';
-      for (var i = 0; i < tiles.length; i++) {
-        (function (t) {
-          var tileEl = UI && UI.renderTile
-            ? UI.renderTile(t, false, false)
-            : (function () {
-                var d = document.createElement('div');
-                d.className = 'amath-tile';
-                d.textContent = t.assigned || t.face;
-                return d;
-              })();
-          tileEl.style.cursor = 'pointer';
-          tileEl.style.transition = 'transform .15s';
-          if (selected[t.id]) {
-            tileEl.style.outline = '3px solid #ef4444';
-            tileEl.style.transform = 'scale(0.92)';
-            tileEl.style.opacity = '0.7';
-          }
-          tileEl.addEventListener('click', function () {
-            if (selected[t.id]) delete selected[t.id];
-            else selected[t.id] = true;
-            rerender();
-            updateConfirmLabel();
-          });
-          rackWrap.appendChild(tileEl);
-        })(tiles[i]);
-      }
+  /**
+   * Called when Submit is clicked in swap mode — collects selected tiles
+   * and calls submitSwap, then exits swap mode.
+   */
+  function confirmSwapFromMode() {
+    var tilesToSwap = [];
+    var tiles = localSession.playerRack.tiles;
+    for (var i = 0; i < tiles.length; i++) {
+      if (swapSelected[tiles[i].id]) tilesToSwap.push(tiles[i]);
     }
-
-    var btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display:flex;gap:8px;margin-top:6px;';
-    var cancelBtn = document.createElement('button');
-    cancelBtn.textContent = 'Cancel';
-    cancelBtn.style.cssText =
-      'flex:1;background:#334155;color:#e2e8f0;border:none;padding:10px;' +
-      'border-radius:6px;cursor:pointer;';
-    cancelBtn.onclick = function () { document.body.removeChild(overlay); };
-
-    var confirmBtn = document.createElement('button');
-    confirmBtn.style.cssText =
-      'flex:2;background:#fbbf24;color:#1e293b;border:none;padding:10px;' +
-      'border-radius:6px;font-weight:700;cursor:pointer;';
-
-    function updateConfirmLabel() {
-      var n = Object.keys(selected).length;
-      confirmBtn.textContent = n === 0 ? 'Select tiles…' : 'Swap ' + n + ' tile' + (n === 1 ? '' : 's');
-      confirmBtn.disabled = (n === 0);
-      confirmBtn.style.opacity = (n === 0) ? '0.5' : '1';
-      confirmBtn.style.cursor = (n === 0) ? 'not-allowed' : 'pointer';
-    }
-
-    confirmBtn.onclick = function () {
-      var toSwap = tiles.filter(function (t) { return !!selected[t.id]; });
-      if (toSwap.length === 0) return;
-      document.body.removeChild(overlay);
-      submitSwap(toSwap);
-    };
-
-    btnRow.appendChild(cancelBtn);
-    btnRow.appendChild(confirmBtn);
-    card.appendChild(btnRow);
-    overlay.appendChild(card);
-    document.body.appendChild(overlay);
-
-    rerender();
-    updateConfirmLabel();
+    if (tilesToSwap.length === 0) return;
+    swapMode = false;
+    swapSelected = {};
+    submitSwap(tilesToSwap);
   }
 
   async function submitSwap(tilesToSwap) {
@@ -1073,6 +1058,8 @@
   async function onSubmitClick() {
     if (submitInFlight) return;
     if (!localSession || !localSession.isPlayerTurn) return;
+    // In swap mode, Submit confirms the swap selection
+    if (swapMode) { confirmSwapFromMode(); return; }
     if (tentativePlacements.length === 0) return;
     var Placement = window.AMath.placement;
     var Scoring = window.AMath.scoring;
@@ -1101,17 +1088,36 @@
     // Build the new gameState reflecting the committed move
     var gs = localSession._rawGameState;
     var newBoard = serializeBoard(localSession.board);
-    // Mark premium-used on the freshly-placed cells (scoring already accounted
-    // for them; future plays must not double-count)
-    for (var i = 0; i < placementsToValidate.length; i++) {
-      var p = placementsToValidate[i];
-      newBoard.cells[p.row][p.col].premiumUsed = true;
+    // Mark premium-used on the freshly-placed cells. newBoard.cells is a
+    // FLAT 1D array (Firestore constraint — no nested arrays), so look up
+    // each placed cell by scanning for matching r/c, NOT by [r][c] indexing.
+    var placedKey = {};
+    for (var pi = 0; pi < placementsToValidate.length; pi++) {
+      placedKey[placementsToValidate[pi].row + ',' + placementsToValidate[pi].col] = true;
+    }
+    for (var ci = 0; ci < newBoard.cells.length; ci++) {
+      var fc = newBoard.cells[ci];
+      if (placedKey[fc.r + ',' + fc.c]) fc.premiumUsed = true;
     }
 
     var myRackKey = (myRole === 'host') ? 'hostRack' : 'guestRack';
+    // Start from the snapshot rack (still has all 8 tiles) and REMOVE the
+    // tiles that just got placed on the board. Otherwise the rack would
+    // still have them after submit, and the refill would never trigger
+    // since the rack count is already 8.
     var newRack = JSON.parse(JSON.stringify(gs[myRackKey]));
-    var newBag = JSON.parse(JSON.stringify(gs.bag));
+    var placedTileIds = {};
+    for (var ti = 0; ti < placementsToValidate.length; ti++) {
+      placedTileIds[placementsToValidate[ti].tile.id] = true;
+    }
+    newRack.tiles = newRack.tiles.filter(function (t) {
+      return !placedTileIds[t.id];
+    });
     if (!newRack.slotMap) newRack.slotMap = {};
+    // Drop slot mappings for the placed tiles so their slots are reusable
+    for (var pid in placedTileIds) delete newRack.slotMap[pid];
+
+    var newBag = JSON.parse(JSON.stringify(gs.bag));
     // Refill rack from bag up to 8, assigning each new tile to an empty slot
     // so UI.renderRack (slot-stable) shows it in a stable position.
     while (newRack.tiles.length < 8 && newBag.tiles.length > 0) {
