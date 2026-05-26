@@ -593,10 +593,19 @@
         }
       }
 
-      // Flag hard racks (3+ equals) for reduced budget
-      bingoIsHard = bingoFeasible && eqCount >= 3;
+      // Flag hard racks (combinatorially expensive bingo searches) for
+      // reduced budget. We trigger on any of:
+      //   - 3+ equals (chained equation search, was the only original trigger)
+      //   - 3+ blanks combined with 2+ equals or 2+ twodigit (multi-blank +
+      //     multi-special-tile racks blow up the brute-force search; the
+      //     bingo's almost never findable in the available time, so spending
+      //     full budget here just delays yoyo and adds 30-60s of wasted time)
+      const twoDigitCountForHard = tiles.filter(t => t.type === 'twodigit').length;
+      const isMultiBlankComplex = blankCount >= 3 && (eqCount >= 2 || twoDigitCountForHard >= 2);
+      bingoIsHard = bingoFeasible && (eqCount >= 3 || isMultiBlankComplex);
       if (bingoIsHard) {
-        console.log('[AI] Bingo HARD: ' + eqCount + ' equals — chained search, reduced budget');
+        const reason = eqCount >= 3 ? (eqCount + ' equals') : (blankCount + ' blanks + complex');
+        console.log('[AI] Bingo HARD: ' + reason + ' — reduced budget');
       }
 
       if (!bingoFeasible) {
@@ -723,19 +732,32 @@
     // Yoyo search — ALWAYS runs with reserved budget
     let yoyoPlay = null;
     if (window.AMath.aiYoyo) {
-      const yoyoTimeLeft = Math.max(yoyoReserveMs, timeBudget - (Date.now() - startTime));
-      const yoyoBudget = hasMultiBlanks ? yoyoTimeLeft : yoyoTimeLeft;
-      console.log('[AI] Yoyo search: budget=' + Math.round(yoyoBudget / 1000) + 's');
-      yoyoPlay = window.AMath.aiYoyo.findBestYoYo({
-        board: state.board,
-        aiRack: state.aiRack,
-        isFirstMove: state.isFirstMove,
-        _maxTimeMs: yoyoBudget,
-      });
-      if (yoyoPlay) {
-        console.log('[AI] YoYo found: score=' + yoyoPlay.score + ' tiles=' + yoyoPlay.placements.length);
+      // Budget for yoyo: the reserved amount, but CAPPED at the remaining
+      // total budget. Previously used Math.max which let yoyo overrun the
+      // total budget by 30+ seconds when findBestPlay ran long — causing
+      // the AI to think for 4+ minutes on hard racks and appear hung.
+      //
+      // Floor at 3s so yoyo at least tries; if zero time left, skip.
+      const remainingMs = timeBudget - (Date.now() - startTime);
+      let yoyoBudget = Math.min(yoyoReserveMs, Math.max(3000, remainingMs));
+      if (remainingMs <= 0) yoyoBudget = 0;
+      console.log('[AI] Yoyo search: budget=' + Math.round(yoyoBudget / 1000) + 's' +
+                  ' (reserve=' + Math.round(yoyoReserveMs / 1000) + 's, remaining=' +
+                  Math.round(remainingMs / 1000) + 's)');
+      if (yoyoBudget > 0) {
+        yoyoPlay = window.AMath.aiYoyo.findBestYoYo({
+          board: state.board,
+          aiRack: state.aiRack,
+          isFirstMove: state.isFirstMove,
+          _maxTimeMs: yoyoBudget,
+        });
+        if (yoyoPlay) {
+          console.log('[AI] YoYo found: score=' + yoyoPlay.score + ' tiles=' + yoyoPlay.placements.length);
+        } else {
+          console.log('[AI] YoYo: no valid extension found');
+        }
       } else {
-        console.log('[AI] YoYo: no valid extension found');
+        console.log('[AI] YoYo: skipped (no time left)');
       }
     }
 
@@ -1849,12 +1871,14 @@
     //   Size 1: 10s
     //   Total: ~160s, leaving slack for YoYo + scoring
     const totalBudgetMs = getTimeBudgetMs();
-    // Hard racks (3+ equals): reduce bingo budget to 15% (chained search only needs structured attempt)
-    // Normal: 33% of budget for bingo stage
-    // Education mode: never reduce — accuracy matters more than speed
+    // Hard racks: reduce all stage budgets so total findBestPlay time stays
+    // bounded. On 3-blank + 2-equals racks the bingo brute-force almost
+    // never finds anything, AND the smaller-size stages also have huge
+    // permutation spaces. Spending full budget here starves yoyo of time.
     const bingoBudgetPct = (bingoIsHard && !_isEducationMode) ? 0.15 : 0.33;
+    const otherBudgetPct = (bingoIsHard && !_isEducationMode) ? 0.04 : 0.08;
     const bingoStageMs = Math.floor(totalBudgetMs * bingoBudgetPct * Math.min(candidateMultiplier, 1.5));
-    const otherStageMs = Math.floor(totalBudgetMs * 0.08 * Math.min(candidateMultiplier, 1.5));
+    const otherStageMs = Math.floor(totalBudgetMs * otherBudgetPct * Math.min(candidateMultiplier, 1.5));
     const singleTileMs = Math.floor(totalBudgetMs * 0.05);
 
     const searchPlan = [];
