@@ -2823,6 +2823,8 @@
     const Challenge = window.AMath.challenge;
     const UI = window.AMath.ui;
     const Rack = window.AMath.rack;
+    const Interactions = window.AMath.interactions;
+    const Board = window.AMath.board;
 
     hideChallengeButton();
 
@@ -2833,34 +2835,82 @@
 
     const play = session.lastAiPlay;
 
-    // Verify the play by re-running validation on its placements
-    // (tiles are still on board; we treat them as "new" again temporarily by
-    // checking each — but really, since Placement.validatePlay reads from board,
-    // we need to remove and re-place them for proper validation)
-    // Simpler approach: validate the formed equations directly via evaluator
-    // (which the AI's logic guarantees were valid before placement).
-
-    // For now: AI plays are always valid (the AI search guarantees this),
-    // so all player challenges will fail. Just inform the user.
-    const aiPlayWasValid = true; // AI's algorithm guarantees validity
+    // AI's algorithm guarantees its plays are valid (every search engine
+    // calls validatePlay before accepting a candidate), so all player
+    // challenges against AI plays will fail. The remaining question is
+    // what happens on a failed challenge.
+    //
+    // A-Math standard rule: a failed challenge FORFEITS the challenger's
+    // turn. The challenged play stays on the board; the challenger gets
+    // no turn this round, and the move counts toward the 6-consecutive-
+    // non-scoring game-end rule.
+    //
+    // Previous behavior was "no penalty" — but that made challenge
+    // risk-free, which isn't the standard game rule.
+    const aiPlayWasValid = true;
 
     if (aiPlayWasValid) {
-      // Challenge failed — in Hard mode, no penalty
-      showStatus('❌ Challenge failed. AI\'s play was valid.', 'error');
-    } else {
-      // Challenge succeeded — revert AI's play
-      Challenge.revertPlay(session, play);
-      UI.renderScore(session.uiParts.opponentScoreBox, 'AI', session.aiScore);
+      // FAILED CHALLENGE — forfeit player's turn.
+      // 1. Return any tentative tiles the player had placed (cancel their
+      //    intended move)
+      for (const p of [...session.tentativePlacements]) {
+        const tile = Board.removeTile(session.board, p.row, p.col);
+        if (tile) {
+          tile.assigned = null;
+          Rack.addTile(session.playerRack, tile);
+        }
+      }
+      Interactions.clearTentativePlacements();
 
-      // Update score sheet — remove that AI play entry? For simplicity, add a "challenged" note
+      // 2. Count as non-scoring turn (toward 6-consecutive game-end rule)
+      session.consecutiveNonScoringTurns++;
+
+      // 3. Record in replay + score sheet
+      if (window.AMath.replayRecorder && !session.isPvP) {
+        window.AMath.replayRecorder.recordPass({ who: 'player', reason: 'challenge_failed' });
+      }
       if (window.AMath.scoreSheet) {
-        window.AMath.scoreSheet.recordTurn('player', 'challenge-win', play.score, false, session.playerScore);
+        window.AMath.scoreSheet.recordTurn('player', 'challenge-failed', 0, false, session.playerScore);
+      }
+      if (window.AMath.gameLog) {
+        window.AMath.gameLog.log('Player failed challenge - forfeit turn');
+        window.AMath.gameLog.logState('After failed challenge', session);
       }
 
+      // 4. Status + warning about 6-pass rule
+      showStatus('❌ Challenge failed. AI\'s play was valid — your turn is forfeit.', 'error');
+      var sixPassOff = false;
+      try { sixPassOff = window.AMath.settings.get('disableSixPassEnd') === true; } catch (e) {}
+      if (!sixPassOff && session.consecutiveNonScoringTurns >= 4) {
+        var warnMsg = session.consecutiveNonScoringTurns >= 5
+          ? '⚠️ ' + session.consecutiveNonScoringTurns + ' consecutive pass/swap! One more = game end!'
+          : '⚠️ ' + session.consecutiveNonScoringTurns + ' consecutive pass/swap already (6 = game end)';
+        showStatus(warnMsg, 'error');
+      }
+
+      // 5. Clear last-AI-play highlight (turn ended)
+      clearLastAiPlayHighlight();
       session.lastAiPlay = null;
-      window.AMath.interactions.refreshUI();
-      showStatus('✅ Challenge successful! AI\'s play reverted.', 'success');
+
+      // 6. Check for game-end (6-pass rule), then advance to AI's turn
+      autoSave();
+      if (checkGameEnd()) return;
+      Interactions.setPlayerTurn(false);
+      resetStallingWatch();
+      startNextTurn();
+      return;
     }
+
+    // (Unreachable as long as aiPlayWasValid is hardcoded true, but kept
+    // for when a real validator is wired in.)
+    Challenge.revertPlay(session, play);
+    UI.renderScore(session.uiParts.opponentScoreBox, 'AI', session.aiScore);
+    if (window.AMath.scoreSheet) {
+      window.AMath.scoreSheet.recordTurn('player', 'challenge-win', play.score, false, session.playerScore);
+    }
+    session.lastAiPlay = null;
+    Interactions.refreshUI();
+    showStatus('✅ Challenge successful! AI\'s play reverted.', 'success');
   }
 
   // ============================================================================
