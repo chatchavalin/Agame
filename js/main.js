@@ -2844,28 +2844,73 @@
     // turn. The challenged play stays on the board; the challenger gets
     // no turn this round, and the move counts toward the 6-consecutive-
     // non-scoring game-end rule.
-    //
-    // Previous behavior was "no penalty" — but that made challenge
-    // risk-free, which isn't the standard game rule.
     const aiPlayWasValid = true;
 
-    if (aiPlayWasValid) {
-      // FAILED CHALLENGE — forfeit player's turn.
-      // 1. Return any tentative tiles the player had placed (cancel their
-      //    intended move)
-      for (const p of [...session.tentativePlacements]) {
-        const tile = Board.removeTile(session.board, p.row, p.col);
-        if (tile) {
-          tile.assigned = null;
-          Rack.addTile(session.playerRack, tile);
-        }
+    if (!aiPlayWasValid) {
+      // (Unreachable today, kept for forward compat — see comment below.)
+      Challenge.revertPlay(session, play);
+      UI.renderScore(session.uiParts.opponentScoreBox, 'AI', session.aiScore);
+      if (window.AMath.scoreSheet) {
+        window.AMath.scoreSheet.recordTurn('player', 'challenge-win', play.score, false, session.playerScore);
       }
-      Interactions.clearTentativePlacements();
+      session.lastAiPlay = null;
+      Interactions.refreshUI();
+      showStatus('✅ Challenge successful! AI\'s play reverted.', 'success');
+      return;
+    }
 
-      // 2. Count as non-scoring turn (toward 6-consecutive game-end rule)
+    // FAILED CHALLENGE flow — three-step reveal so the result feels weighty
+    // (not just a silent status banner change).
+    //
+    // Step 1 (immediate):   status "Verifying challenge…" — short suspense
+    // Step 2 (after 700ms): big result banner "❌ Challenge FAILED"
+    // Step 3 (after 1500ms): AI trash-talk gloat
+    // Step 4 (after 2300ms): commit the forfeit + advance to AI turn
+
+    // Capture session ref so a mid-animation game-reset doesn't crash us
+    const sessionAtStart = session;
+    function stillCurrent() { return sessionAtStart === session && !session.gameOver; }
+
+    // Disable player controls during the reveal so they can't act
+    Interactions.setPlayerTurn(false);
+
+    // Return tentative tiles immediately so the rack is correct on screen
+    for (const p of [...session.tentativePlacements]) {
+      const tile = Board.removeTile(session.board, p.row, p.col);
+      if (tile) {
+        tile.assigned = null;
+        Rack.addTile(session.playerRack, tile);
+      }
+    }
+    Interactions.clearTentativePlacements();
+    Interactions.refreshUI();
+
+    // STEP 1: suspense
+    showStatus('⏳ Verifying challenge…');
+
+    // STEP 2: result reveal
+    setTimeout(function () {
+      if (!stillCurrent()) return;
+      showStatus('❌ Challenge FAILED — AI\'s play was valid. You forfeit your turn.', 'error');
+      if (window.AMath.sounds && window.AMath.sounds.submitFail) {
+        try { window.AMath.sounds.submitFail(); } catch (e) {}
+      }
+    }, 700);
+
+    // STEP 3: AI trash-talk gloat
+    setTimeout(function () {
+      if (!stillCurrent()) return;
+      fireTrashTalk('player_challenge_failed', { force: true });
+    }, 1500);
+
+    // STEP 4: commit forfeit + advance to AI turn
+    setTimeout(function () {
+      if (!stillCurrent()) return;
+
+      // Count as non-scoring turn (toward 6-consecutive game-end rule)
       session.consecutiveNonScoringTurns++;
 
-      // 3. Record in replay + score sheet
+      // Record in replay + score sheet
       if (window.AMath.replayRecorder && !session.isPvP) {
         window.AMath.replayRecorder.recordPass({ who: 'player', reason: 'challenge_failed' });
       }
@@ -2877,8 +2922,7 @@
         window.AMath.gameLog.logState('After failed challenge', session);
       }
 
-      // 4. Status + warning about 6-pass rule
-      showStatus('❌ Challenge failed. AI\'s play was valid — your turn is forfeit.', 'error');
+      // 6-pass warning
       var sixPassOff = false;
       try { sixPassOff = window.AMath.settings.get('disableSixPassEnd') === true; } catch (e) {}
       if (!sixPassOff && session.consecutiveNonScoringTurns >= 4) {
@@ -2888,29 +2932,15 @@
         showStatus(warnMsg, 'error');
       }
 
-      // 5. Clear last-AI-play highlight (turn ended)
+      // Clear the last-AI-play highlight (turn over)
       clearLastAiPlayHighlight();
       session.lastAiPlay = null;
 
-      // 6. Check for game-end (6-pass rule), then advance to AI's turn
       autoSave();
       if (checkGameEnd()) return;
-      Interactions.setPlayerTurn(false);
       resetStallingWatch();
       startNextTurn();
-      return;
-    }
-
-    // (Unreachable as long as aiPlayWasValid is hardcoded true, but kept
-    // for when a real validator is wired in.)
-    Challenge.revertPlay(session, play);
-    UI.renderScore(session.uiParts.opponentScoreBox, 'AI', session.aiScore);
-    if (window.AMath.scoreSheet) {
-      window.AMath.scoreSheet.recordTurn('player', 'challenge-win', play.score, false, session.playerScore);
-    }
-    session.lastAiPlay = null;
-    Interactions.refreshUI();
-    showStatus('✅ Challenge successful! AI\'s play reverted.', 'success');
+    }, 2300);
   }
 
   // ============================================================================

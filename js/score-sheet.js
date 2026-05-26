@@ -105,6 +105,8 @@
           actionText = 'Swap' + (e.swapCount ? ' ' + e.swapCount : '');
         } else if (e.action === 'challenged') {
           actionText = '⚠️ Challenged';
+        } else if (e.action === 'challenge-failed') {
+          actionText = '❌ Failed challenge';
         } else if (e.action === 'play-uncontested-invalid') {
           actionText = '+0 (let slide)';
         } else {
@@ -226,6 +228,8 @@
         actionText = '↻' + (e.swapCount ? e.swapCount : '');
       } else if (e.action === 'challenged') {
         actionText = '⚠️';
+      } else if (e.action === 'challenge-failed') {
+        actionText = '❌';
       } else if (e.action === 'play-uncontested-invalid') {
         actionText = '+0';
       } else {

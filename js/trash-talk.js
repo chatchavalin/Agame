@@ -485,6 +485,29 @@
     ],
 
     // ─────────────────────────────────────────────────────────────────
+    // PLAYER_CHALLENGE_FAILED: Player tried to challenge the AI's play but
+    // it was valid. AI gloats — their play was fine all along. Fires every
+    // time the player loses a challenge.
+    // ─────────────────────────────────────────────────────────────────
+    PLAYER_CHALLENGE_FAILED: [
+      "🛡️ Challenge มาเหรอ? โค้ชตี๋เล่นถูกต้องเสมอ 😏",
+      "🛡️ ฮ่าๆ challenge ผิดแล้ว — เสียเทิร์นฟรีๆ",
+      "🛡️ โค้ชตี๋: 'สมการของฉันถูกต้อง 100% นะ' — เสียเทิร์นเลย",
+      "🛡️ พีซ: 'อ้าว... เล่นถูกหนิ ทำไมท้าทายล่ะ?' 🤔",
+      "🛡️ ฟ้า: 'โค้ชเล่นแบบมีหลักการเสมอ challenge ไปก็เสียเทิร์น'",
+      "🛡️ ใช่หรออออออ ที่จะ challenge? พลาดเอง 😂",
+      "🛡️ จิณตา: 'อืม... ทำการบ้านก่อนค่อย challenge นะ'",
+      "🛡️ Challenge มา — ฉันก็ตอบไป: เล่นถูก! 💯",
+      "🛡️ โค้ชตี๋ยิ้มเย็น 'challenge อีกมั้ย?' 😏",
+      "🛡️ เทิร์นนี้เสียฟรี — challenge ที่ผิดก็เสียเทิร์นนะจ๊ะ",
+      "🛡️ ปุญ: 'ดูจากสมการแล้ว... ถูกหมดเลยโค้ช challenge ผิดละ'",
+      "🛡️ เพลงรักร้อง: 'challenge ผิดอีกแล้ว... challenge ผิดอีกแล้ว...' 🎵",
+      "🛡️ challenge ไม่ผ่าน — เสียเทิร์น ขอบคุณค่ะ ✨",
+      "🛡️ หึหึ คิดว่าจะจับผิดได้เหรอ — สมการสมบูรณ์แบบ",
+      "🛡️ ทั้งโต๊ะส่ายหัว 'challenge อะไรหนิ มันถูกชัดๆ'",
+    ],
+
+    // ─────────────────────────────────────────────────────────────────
     // AI_X9_PLAY: AI just played a ×9 multiplier (two 3E squares on one
     // equation = score × 9). Pure gloat material — fires 100% of the time
     // because ×9 plays are rare and dramatic.
@@ -699,6 +722,7 @@
     if (event === 'challenge_buildup') return 'CHALLENGE_BUILDUP';
     if (event === 'challenge_reveal') return 'CHALLENGE_REVEAL';
     if (event === 'challenge_miss') return 'CHALLENGE_MISS';
+    if (event === 'player_challenge_failed') return 'PLAYER_CHALLENGE_FAILED';
     if (event === 'ai_x9') return 'AI_X9_PLAY';
     if (event === 'ai_play') {
       if (state.lastScore && state.lastScore >= 50) return 'HIGH_SCORE_PLAY';
