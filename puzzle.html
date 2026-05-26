@@ -7,7 +7,7 @@
 // This script bumps version stamp every time we deploy. If the SW is stale,
 // it tells the SW to unregister, clears all caches, and reloads.
 (function(){
-  var DEPLOYED_VERSION = 'v11-2026-05-26';
+  var DEPLOYED_VERSION = 'v12-2026-05-26';
   var lastVersion = localStorage.getItem('pz_version');
   if (lastVersion !== DEPLOYED_VERSION) {
     localStorage.setItem('pz_version', DEPLOYED_VERSION);
@@ -69,18 +69,17 @@
   .btn-hint{background:#1d4ed8;color:#fff;}
   .btn-skip{background:#7c3aed;color:#fff;}
 
-  /* Tile tracker + bag below board */
-  .pz-info-strip{display:grid;grid-template-columns:1.4fr 1fr;gap:8px;width:100%;max-width:520px;margin:6px auto;padding:0 8px;box-sizing:border-box;}
+  /* Tile tracker (with bag count in header) below board */
+  .pz-info-strip{width:100%;max-width:520px;margin:6px auto;padding:0 8px;box-sizing:border-box;}
+  .info-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
   .pz-info-card{background:var(--bg-panel,#1e293b);border-radius:10px;padding:8px 10px;border:1px solid var(--border-medium,#334155);}
   .pz-info-card h4{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin:0 0 6px;font-weight:700;}
-  .pz-tracker-grid,.pz-bag-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(28px,1fr));gap:2px;}
-  .ti,.bi{display:flex;flex-direction:column;align-items:center;background:var(--bg-page,#0f172a);border-radius:4px;padding:2px 1px;}
-  .ti .tf,.bi .bf{font-size:9px;font-weight:800;line-height:1;}
-  .ti .tf{color:#e2e8f0;}
-  .bi .bf{color:#fbbf24;}
-  .ti .tc,.bi .bc{font-size:8px;color:#94a3b8;line-height:1;}
-  .ti.zero,.bi.zero{opacity:.3;}
-  .bag-total{font-size:11px;color:#94a3b8;margin-top:4px;text-align:center;}
+  .pz-tracker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(28px,1fr));gap:2px;}
+  .ti{display:flex;flex-direction:column;align-items:center;background:var(--bg-page,#0f172a);border-radius:4px;padding:2px 1px;}
+  .ti .tf{font-size:9px;font-weight:800;line-height:1;color:#e2e8f0;}
+  .ti .tc{font-size:8px;color:#94a3b8;line-height:1;}
+  .ti.zero{opacity:.3;}
+  .bag-total{font-size:11px;color:#fbbf24;font-weight:700;}
 
   /* Answer reveal */
   .answer-box{width:100%;max-width:520px;margin:6px auto;background:var(--bg-panel,#1e293b);border-radius:12px;border:1px solid var(--border-medium,#334155);overflow:hidden;}
@@ -162,7 +161,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v11</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v12</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -211,14 +210,12 @@ body.theme-dark .player-area .amath-tile-rack {
   </div>
 
   <div class="pz-info-strip">
-    <div class="pz-info-card">
-      <h4>Tile Tracker <span style="color:#475569;font-weight:400;">(unseen)</span></h4>
+    <div class="pz-info-card" style="flex:1;">
+      <div class="info-card-header">
+        <h4 style="margin:0;">Tile Tracker <span style="color:#475569;font-weight:400;">(unseen)</span></h4>
+        <span class="bag-total" id="bag-total">0 tiles in bag</span>
+      </div>
       <div class="pz-tracker-grid" id="tile-tracker-grid"></div>
-    </div>
-    <div class="pz-info-card">
-      <h4>Bag</h4>
-      <div class="pz-bag-grid" id="bag-grid"></div>
-      <div class="bag-total" id="bag-total">0 tiles</div>
     </div>
   </div>
 
@@ -569,19 +566,14 @@ function renderTrackerAndBag(){
     trackEl.appendChild(d);
   });
 
-  var bagEl = document.getElementById('bag-grid');
-  bagEl.innerHTML = '';
-  var bagComp = currentPuzzle.bagComp||{};
-  var total = 0;
-  inv.forEach(function(def){
-    var cnt = bagComp[def.face]||0;
-    total += cnt;
-    var d = document.createElement('div');
-    d.className = 'bi'+(cnt===0?' zero':'');
-    d.innerHTML = '<span class="bf">'+(def.face==='BLANK'?'?':def.face)+'</span><span class="bc">'+cnt+'</span>';
-    bagEl.appendChild(d);
-  });
-  document.getElementById('bag-total').textContent = total+' tiles in bag';
+  // Bag: just compute total from currentPuzzle.bagCount (or sum bagComp)
+  var bagTotal = currentPuzzle.bagCount;
+  if (bagTotal == null || bagTotal === undefined) {
+    var bagComp = currentPuzzle.bagComp||{};
+    bagTotal = 0;
+    for (var k in bagComp) if (bagComp.hasOwnProperty(k)) bagTotal += bagComp[k];
+  }
+  document.getElementById('bag-total').textContent = bagTotal+' tiles in bag';
 }
 
 // ════════════════════════════════════════════════════════════════════
