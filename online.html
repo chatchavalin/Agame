@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>A-Math — Online Room</title>
-  <link rel="stylesheet" href="styles.css?v=20260526i">
+  <link rel="stylesheet" href="styles.css?v=20260526j">
   <style>
     body { background: #0f172a; color: #e2e8f0; font-family: 'Outfit', sans-serif; }
     /* The outer room-wrap is the waiting-room shell. Once a game starts the
@@ -125,31 +125,31 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <script src="js/firebase-config.js?v=20260526i"></script>
+  <script src="js/firebase-config.js?v=20260526j"></script>
   <!-- Game-core modules required by the online controller -->
-  <script src="js/constants.js?v=20260526i"></script>
-  <script src="js/utils.js?v=20260526i"></script>
-  <script src="js/evaluator.js?v=20260526i"></script>
-  <script src="js/bag.js?v=20260526i"></script>
-  <script src="js/rack.js?v=20260526i"></script>
-  <script src="js/board.js?v=20260526i"></script>
-  <script src="js/scoring.js?v=20260526i"></script>
-  <script src="js/placement.js?v=20260526i"></script>
-  <script src="js/ui.js?v=20260526i"></script>
-  <script src="js/online-room.js?v=20260526i"></script>
-  <script src="js/game-bridge.js?v=20260526i"></script>
+  <script src="js/constants.js?v=20260526j"></script>
+  <script src="js/utils.js?v=20260526j"></script>
+  <script src="js/evaluator.js?v=20260526j"></script>
+  <script src="js/bag.js?v=20260526j"></script>
+  <script src="js/rack.js?v=20260526j"></script>
+  <script src="js/board.js?v=20260526j"></script>
+  <script src="js/scoring.js?v=20260526j"></script>
+  <script src="js/placement.js?v=20260526j"></script>
+  <script src="js/ui.js?v=20260526j"></script>
+  <script src="js/online-room.js?v=20260526j"></script>
+  <script src="js/game-bridge.js?v=20260526j"></script>
   <!-- PvA feature modules brought into online PvP per user request: timer
        skipped, education off, trash-talk skipped. Everything else loaded
        so online has settings (themes), sounds, animations, game log, tile
        tracker, score sheet, and challenge module. -->
-  <script src="js/settings.js?v=20260526i"></script>
-  <script src="js/sounds.js?v=20260526i"></script>
-  <script src="js/animations.js?v=20260526i"></script>
-  <script src="js/game-log.js?v=20260526i"></script>
-  <script src="js/tile-tracker.js?v=20260526i"></script>
-  <script src="js/score-sheet.js?v=20260526i"></script>
-  <script src="js/challenge.js?v=20260526i"></script>
-  <script src="js/online-game.js?v=20260526i"></script>
+  <script src="js/settings.js?v=20260526j"></script>
+  <script src="js/sounds.js?v=20260526j"></script>
+  <script src="js/animations.js?v=20260526j"></script>
+  <script src="js/game-log.js?v=20260526j"></script>
+  <script src="js/tile-tracker.js?v=20260526j"></script>
+  <script src="js/score-sheet.js?v=20260526j"></script>
+  <script src="js/challenge.js?v=20260526j"></script>
+  <script src="js/online-game.js?v=20260526j"></script>
   <script>
     var roomCode = new URLSearchParams(window.location.search).get('room');
     var role = new URLSearchParams(window.location.search).get('role');
@@ -236,7 +236,16 @@
       if (sheetBtn) {
         sheetBtn.addEventListener('click', function (ev) {
           ev.preventDefault();
-          openOnlineScoreSheet();
+          // window.openOnlineScoreSheet is defined later in this same script
+          // block. We can't reference it as a bare identifier here because
+          // function expressions assigned to window.X are not hoisted —
+          // by the time of the click, the assignment HAS run, so we just
+          // need to look it up via window.
+          if (typeof window.openOnlineScoreSheet === 'function') {
+            window.openOnlineScoreSheet();
+          } else {
+            alert('Score sheet helper not loaded yet.');
+          }
         });
       }
       var logBtn = document.getElementById('online-btn-log');
