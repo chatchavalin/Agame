@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>A-Math — Online Room</title>
-  <link rel="stylesheet" href="styles.css?v=20260526j">
+  <link rel="stylesheet" href="styles.css?v=20260526k">
   <style>
     body { background: #0f172a; color: #e2e8f0; font-family: 'Outfit', sans-serif; }
     /* The outer room-wrap is the waiting-room shell. Once a game starts the
@@ -75,13 +75,22 @@
     <div class="room-header">
       <a href="lobby.html" class="room-back">← Leave room</a>
       <div class="room-header-tools">
-        <!-- Mid-game access to PvA-style modules brought into online PvP -->
-        <button id="online-btn-sheet" type="button" class="room-header-tool-btn"
-                title="Score sheet" aria-label="Score sheet">📊</button>
-        <button id="online-btn-log" type="button" class="room-header-tool-btn"
-                title="Game log" aria-label="Game log">📜</button>
+        <!-- Mid-game access to PvA-style modules brought into online PvP.
+             Diagnostic note: 📊 was originally first in the row but the
+             user reported no taps registered for that single button (the
+             ⚙️ and 📜 worked). Reordered so the buttons are now
+             ⚙️ 📜 📊 — if 📊 now works, the issue was layout overlap
+             of the leftmost button (something extending from the Leave
+             room link or some hidden element).
+             Each button uses both 'click' and explicit 'touchend' to
+             cover any mobile browser quirks where one but not the other
+             gets dispatched. -->
         <button id="online-btn-settings" type="button" class="room-header-tool-btn"
                 title="Settings" aria-label="Settings">⚙️</button>
+        <button id="online-btn-log" type="button" class="room-header-tool-btn"
+                title="Game log" aria-label="Game log">📜</button>
+        <button id="online-btn-sheet" type="button" class="room-header-tool-btn"
+                title="Score sheet" aria-label="Score sheet">📊</button>
       </div>
       <div class="room-code-display" id="room-code"
            onclick="copyRoomCode()" role="button" tabindex="0">…</div>
@@ -125,31 +134,31 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <script src="js/firebase-config.js?v=20260526j"></script>
+  <script src="js/firebase-config.js?v=20260526k"></script>
   <!-- Game-core modules required by the online controller -->
-  <script src="js/constants.js?v=20260526j"></script>
-  <script src="js/utils.js?v=20260526j"></script>
-  <script src="js/evaluator.js?v=20260526j"></script>
-  <script src="js/bag.js?v=20260526j"></script>
-  <script src="js/rack.js?v=20260526j"></script>
-  <script src="js/board.js?v=20260526j"></script>
-  <script src="js/scoring.js?v=20260526j"></script>
-  <script src="js/placement.js?v=20260526j"></script>
-  <script src="js/ui.js?v=20260526j"></script>
-  <script src="js/online-room.js?v=20260526j"></script>
-  <script src="js/game-bridge.js?v=20260526j"></script>
+  <script src="js/constants.js?v=20260526k"></script>
+  <script src="js/utils.js?v=20260526k"></script>
+  <script src="js/evaluator.js?v=20260526k"></script>
+  <script src="js/bag.js?v=20260526k"></script>
+  <script src="js/rack.js?v=20260526k"></script>
+  <script src="js/board.js?v=20260526k"></script>
+  <script src="js/scoring.js?v=20260526k"></script>
+  <script src="js/placement.js?v=20260526k"></script>
+  <script src="js/ui.js?v=20260526k"></script>
+  <script src="js/online-room.js?v=20260526k"></script>
+  <script src="js/game-bridge.js?v=20260526k"></script>
   <!-- PvA feature modules brought into online PvP per user request: timer
        skipped, education off, trash-talk skipped. Everything else loaded
        so online has settings (themes), sounds, animations, game log, tile
        tracker, score sheet, and challenge module. -->
-  <script src="js/settings.js?v=20260526j"></script>
-  <script src="js/sounds.js?v=20260526j"></script>
-  <script src="js/animations.js?v=20260526j"></script>
-  <script src="js/game-log.js?v=20260526j"></script>
-  <script src="js/tile-tracker.js?v=20260526j"></script>
-  <script src="js/score-sheet.js?v=20260526j"></script>
-  <script src="js/challenge.js?v=20260526j"></script>
-  <script src="js/online-game.js?v=20260526j"></script>
+  <script src="js/settings.js?v=20260526k"></script>
+  <script src="js/sounds.js?v=20260526k"></script>
+  <script src="js/animations.js?v=20260526k"></script>
+  <script src="js/game-log.js?v=20260526k"></script>
+  <script src="js/tile-tracker.js?v=20260526k"></script>
+  <script src="js/score-sheet.js?v=20260526k"></script>
+  <script src="js/challenge.js?v=20260526k"></script>
+  <script src="js/online-game.js?v=20260526k"></script>
   <script>
     var roomCode = new URLSearchParams(window.location.search).get('room');
     var role = new URLSearchParams(window.location.search).get('role');
@@ -232,44 +241,49 @@
     // fired (especially if any earlier <script> blocked parsing). A
     // listener attached after DOMContentLoaded fires never runs.
     (function wireHeaderButtons() {
-      var sheetBtn = document.getElementById('online-btn-sheet');
-      if (sheetBtn) {
-        sheetBtn.addEventListener('click', function (ev) {
+      function attachTapHandler(btn, fn) {
+        if (!btn) return;
+        // Bind both click and touchend so any mobile browser quirk where
+        // one event is suppressed doesn't break the button. We guard
+        // against double-fire on the same tap with a 'handled' flag
+        // that the touchend listener sets and click clears.
+        var handling = false;
+        function handler(ev) {
+          if (handling) return;
+          handling = true;
+          setTimeout(function () { handling = false; }, 300);
           ev.preventDefault();
-          // window.openOnlineScoreSheet is defined later in this same script
-          // block. We can't reference it as a bare identifier here because
-          // function expressions assigned to window.X are not hoisted —
-          // by the time of the click, the assignment HAS run, so we just
-          // need to look it up via window.
-          if (typeof window.openOnlineScoreSheet === 'function') {
-            window.openOnlineScoreSheet();
-          } else {
-            alert('Score sheet helper not loaded yet.');
+          try { fn(); }
+          catch (err) {
+            console.error('Header tap handler error:', err);
+            alert('Error: ' + (err && err.message ? err.message : err));
           }
-        });
+        }
+        btn.addEventListener('click', handler);
+        btn.addEventListener('touchend', handler);
       }
-      var logBtn = document.getElementById('online-btn-log');
-      if (logBtn) {
-        logBtn.addEventListener('click', function (ev) {
-          ev.preventDefault();
-          if (window.AMath && window.AMath.gameLog && window.AMath.gameLog.show) {
-            window.AMath.gameLog.show();
-          } else {
-            alert('Game log not available.');
-          }
-        });
-      }
-      var setBtn = document.getElementById('online-btn-settings');
-      if (setBtn) {
-        setBtn.addEventListener('click', function (ev) {
-          ev.preventDefault();
-          if (window.AMath && window.AMath.settings && window.AMath.settings.showPopup) {
-            window.AMath.settings.showPopup();
-          } else {
-            alert('Settings not available.');
-          }
-        });
-      }
+
+      attachTapHandler(document.getElementById('online-btn-sheet'), function () {
+        if (typeof window.openOnlineScoreSheet === 'function') {
+          window.openOnlineScoreSheet();
+        } else {
+          alert('Score sheet helper not loaded.');
+        }
+      });
+      attachTapHandler(document.getElementById('online-btn-log'), function () {
+        if (window.AMath && window.AMath.gameLog && window.AMath.gameLog.show) {
+          window.AMath.gameLog.show();
+        } else {
+          alert('Game log not available.');
+        }
+      });
+      attachTapHandler(document.getElementById('online-btn-settings'), function () {
+        if (window.AMath && window.AMath.settings && window.AMath.settings.showPopup) {
+          window.AMath.settings.showPopup();
+        } else {
+          alert('Settings not available.');
+        }
+      });
     })();
 
     /**
