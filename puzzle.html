@@ -7,7 +7,7 @@
 // This script bumps version stamp every time we deploy. If the SW is stale,
 // it tells the SW to unregister, clears all caches, and reloads.
 (function(){
-  var DEPLOYED_VERSION = 'v12-2026-05-26';
+  var DEPLOYED_VERSION = 'v13-2026-05-26';
   var lastVersion = localStorage.getItem('pz_version');
   if (lastVersion !== DEPLOYED_VERSION) {
     localStorage.setItem('pz_version', DEPLOYED_VERSION);
@@ -161,7 +161,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v12</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v13</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -699,26 +699,6 @@ function getPerms(arr,k,limit){
   return res;
 }
 
-function buildNote(play, puzzle, rank){
-  var notes=[];
-  var gap = (puzzle.scoreYou||0) - (puzzle.scoreOpp||0);
-  if(play.bingo) notes.push('✅ Uses all 8 tiles — +40pt Bingo bonus.');
-  if(play.yoyo){
-    var threeE = play.placements.filter(function(p){return C.PREMIUM_SQUARES[p.row][p.col]==='3E';}).length;
-    notes.push(threeE>0 ? '🪀 YoYo across '+threeE+' 3E square(s) — massive multiplier!' : '🪀 YoYo completes a full line.');
-  }
-  if(play.opensX9 && rank===0) notes.push('⚠️ Highest score but OPENS an ×9 threat — opponent could devastate you next turn!');
-  if(play.closesX9 && !play.opensX9) notes.push('🛡️ Closes opponent ×9 threat by placing on 3E square.');
-  if(gap<-80) notes.push('📉 Down '+Math.abs(gap)+'pts — Bingo/YoYo essential.');
-  else if(gap>80) notes.push('📈 Leading by '+gap+'pts — short play is safe.');
-  if(!play.bingo && !play.yoyo && play.score<20){
-    var totalBag = puzzle.bagComp ? Object.values(puzzle.bagComp).reduce(function(a,b){return a+b;},0) : 0;
-    if(totalBag>=8) notes.push('🔄 Low score. Consider swapping — bag has '+totalBag+' tiles.');
-  }
-  if(notes.length===0) notes.push('Solid play with no major risks.');
-  return notes;
-}
-
 // ════════════════════════════════════════════════════════════════════
 //  SUBMIT HANDLER (called by main game's interactions module)
 // ════════════════════════════════════════════════════════════════════
@@ -806,17 +786,13 @@ function showPlay(idx){
       if(cellEl) cellEl.classList.add(hl[idx]);
     });
   }
-  var notes = buildNote(a, currentPuzzle, idx);
   var tags = '';
   if(a.bingo) tags += '<span class="play-tag tag-bingo">🎰 BINGO +40</span>';
   if(a.yoyo) tags += '<span class="play-tag tag-yoyo">🪀 YOYO</span>';
   if(!a.bingo && !a.yoyo) tags += '<span class="play-tag tag-short">Short</span>';
-  if(a.opensX9) tags += '<span class="play-tag tag-x9warn">⚠️ Opens ×9</span>';
-  if(a.closesX9 && !a.opensX9) tags += '<span class="play-tag tag-x9safe">🛡️ Closes ×9</span>';
-  var noteHtml = notes.map(function(n){return '<div class="play-note">'+n+'</div>';}).join('');
   document.getElementById('play-detail').innerHTML =
     '<div class="play-score '+colors[idx]+'">'+a.score+' pts</div>'+
-    '<div class="play-tags">'+tags+'</div>'+noteHtml;
+    '<div class="play-tags">'+tags+'</div>';
 }
 
 function resetHighlights(){
