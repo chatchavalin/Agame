@@ -575,39 +575,68 @@
     tileEls.forEach(function (tileEl) {
       var tileId = tileEl.dataset.tileId;
       if (!tileId) return;
+
+      // CRITICAL: prevent stale-listener accumulation. wireRackTileHandlers
+      // gets called on every snapshot and every swap-selection change, but
+      // the tile DOM nodes persist across calls (UI.renderRack only rebuilds
+      // them when the rack itself changes). If we just .addEventListener
+      // again, each tile ends up with N listeners after N taps, and the
+      // swap toggle fires N times — producing the 'can only select one tile'
+      // bug the user reported.
+      //
+      // Mark each tile once with a flag; only attach listeners if not yet
+      // wired. The flag is cleared when UI.renderRack rebuilds the tile
+      // (new DOM node = no flag).
+      if (!tileEl._amathWired) {
+        tileEl._amathWired = true;
+        tileEl.addEventListener('click', function () {
+          if (!localSession.isPlayerTurn) return;
+          if (tileEl.dataset.didDrag === '1') { tileEl.dataset.didDrag = '0'; return; }
+          if (swapMode) {
+            if (swapSelected[tileId]) delete swapSelected[tileId];
+            else swapSelected[tileId] = true;
+            refreshRackVisuals();
+            updateActionButtonStates();
+            return;
+          }
+          selectedTileId = (selectedTileId === tileId) ? null : tileId;
+          refreshRackVisuals();
+        });
+        // Drag handlers also attach only once per tile
+        attachDragHandlers(tileEl, tileId);
+      }
+    });
+    // Always refresh visual state (classes / outlines) since selection
+    // changed even if listeners didn't.
+    refreshRackVisuals();
+  }
+
+  /**
+   * Update tile visual state (selection outline, swap-selected class) and
+   * cursor / touchAction style on every rack tile. Does NOT attach event
+   * listeners — those persist from the first wireRackTileHandlers call
+   * after each UI.renderRack rebuild.
+   */
+  function refreshRackVisuals() {
+    if (!_uiParts || !_uiParts.playerRack) return;
+    var tileEls = _uiParts.playerRack.querySelectorAll('.amath-tile');
+    tileEls.forEach(function (tileEl) {
+      var tileId = tileEl.dataset.tileId;
+      if (!tileId) return;
       tileEl.style.cursor = localSession.isPlayerTurn ? 'pointer' : 'default';
       tileEl.style.touchAction = 'none';
-
-      // Visual state — swap selection takes precedence over placement select
       if (swapMode && swapSelected[tileId]) {
-        // Use PvA's tile-swap-selected class so styling matches PvA exactly
         tileEl.classList.add('tile-swap-selected');
+        tileEl.style.outline = '';
       } else {
         tileEl.classList.remove('tile-swap-selected');
-        if (selectedTileId === tileId) {
+        if (!swapMode && selectedTileId === tileId) {
           tileEl.style.outline = '3px solid #fbbf24';
           tileEl.style.outlineOffset = '-2px';
+        } else {
+          tileEl.style.outline = '';
         }
       }
-
-      // Click: in swap mode toggle swap-selection; otherwise toggle
-      // placement-selection (the existing flow)
-      tileEl.addEventListener('click', function () {
-        if (!localSession.isPlayerTurn) return;
-        if (tileEl.dataset.didDrag === '1') { tileEl.dataset.didDrag = '0'; return; }
-        if (swapMode) {
-          if (swapSelected[tileId]) delete swapSelected[tileId];
-          else swapSelected[tileId] = true;
-          // Refresh rack visuals + Submit button label
-          wireRackTileHandlers();
-          updateActionButtonStates();
-          return;
-        }
-        selectedTileId = (selectedTileId === tileId) ? null : tileId;
-        wireRackTileHandlers();
-      });
-      // Drag-to-place is disabled in swap mode (no need; we just tap to select)
-      if (!swapMode) attachDragHandlers(tileEl, tileId);
     });
   }
 
@@ -942,6 +971,10 @@
 
     function onPointerDown(ev) {
       if (!localSession || !localSession.isPlayerTurn) return;
+      // In swap mode, taps select for swap (handled by the click listener).
+      // We must NOT start a drag here — the pointerup→onCellClick path
+      // would try to place the tile, which is wrong in swap mode.
+      if (swapMode) return;
       if (ev.button !== undefined && ev.button !== 0) return;
       dragging = true;
       moved = false;
