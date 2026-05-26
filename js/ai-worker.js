@@ -28,27 +28,32 @@
 // Alias window → self so all `window.AMath.*` references in AI modules work
 self.window = self;
 
+// Cache-bust version — bumped whenever any imported AI module changes.
+// Without this, the worker would serve cached old AI code even after a
+// hard refresh on the main page (worker has its own cache lifecycle).
+const CACHE_V = '?v=20260526a';
+
 // Load all AI dependencies. Order matters — match what index.html loads.
 try {
   importScripts(
-    'constants.js',
-    'utils.js',
-    'evaluator.js',
-    'bag.js',
-    'rack.js',
-    'board.js',
-    'scoring.js',
-    'placement.js',
-    'ai-yoyo.js',
-    'ai-x9.js',
-    'ai-x4.js',
-    'ai-patterns-data.js',
-    'ai-patterns-engine.js',
-    'ai-bingo-fast.js',
-    'ai-bingo-grammar.js',
-    'ai-swap.js',
-    'ai-swap-brain2.js',
-    'ai-player.js'
+    'constants.js' + CACHE_V,
+    'utils.js' + CACHE_V,
+    'evaluator.js' + CACHE_V,
+    'bag.js' + CACHE_V,
+    'rack.js' + CACHE_V,
+    'board.js' + CACHE_V,
+    'scoring.js' + CACHE_V,
+    'placement.js' + CACHE_V,
+    'ai-yoyo.js' + CACHE_V,
+    'ai-x9.js' + CACHE_V,
+    'ai-x4.js' + CACHE_V,
+    'ai-patterns-data.js' + CACHE_V,
+    'ai-patterns-engine.js' + CACHE_V,
+    'ai-bingo-fast.js' + CACHE_V,
+    'ai-bingo-grammar.js' + CACHE_V,
+    'ai-swap.js' + CACHE_V,
+    'ai-swap-brain2.js' + CACHE_V,
+    'ai-player.js' + CACHE_V
   );
 } catch (err) {
   self.postMessage({ type: 'error', error: 'Worker importScripts failed: ' + err.message });

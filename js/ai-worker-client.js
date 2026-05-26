@@ -30,7 +30,7 @@
     if (worker) return worker;
 
     try {
-      worker = new Worker('js/ai-worker.js');
+      worker = new Worker('js/ai-worker.js?v=20260526a');
       worker.onmessage = handleWorkerMessage;
       worker.onerror = function (err) {
         console.error('[AI Worker] error:', err.message, 'at', err.filename, ':', err.lineno);
