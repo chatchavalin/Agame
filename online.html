@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>A-Math — Online Room</title>
-  <link rel="stylesheet" href="styles.css?v=20260525p">
+  <link rel="stylesheet" href="styles.css?v=20260526f">
   <style>
     body { background: #0f172a; color: #e2e8f0; font-family: 'Outfit', sans-serif; }
     /* The outer room-wrap is the waiting-room shell. Once a game starts the
@@ -62,7 +62,19 @@
   <div class="room-wrap">
     <div class="room-header">
       <a href="lobby.html" class="room-back">← Leave room</a>
-      <div class="room-code-display" id="room-code" onclick="copyRoomCode()">…</div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <!-- Mid-game access to PvA-style modules brought into online PvP -->
+        <button id="online-btn-sheet" title="Score sheet"
+                style="background:#334155;color:#e2e8f0;border:none;padding:6px 10px;
+                       border-radius:6px;cursor:pointer;font-size:13px;">📊</button>
+        <button id="online-btn-log" title="Game log"
+                style="background:#334155;color:#e2e8f0;border:none;padding:6px 10px;
+                       border-radius:6px;cursor:pointer;font-size:13px;">📜</button>
+        <button id="online-btn-settings" title="Settings"
+                style="background:#334155;color:#e2e8f0;border:none;padding:6px 10px;
+                       border-radius:6px;cursor:pointer;font-size:13px;">⚙️</button>
+        <div class="room-code-display" id="room-code" onclick="copyRoomCode()">…</div>
+      </div>
     </div>
 
     <!-- Player cards & MVP warning hidden when the game is in progress -
@@ -103,20 +115,31 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <script src="js/firebase-config.js?v=20260525p"></script>
+  <script src="js/firebase-config.js?v=20260526f"></script>
   <!-- Game-core modules required by the online controller -->
-  <script src="js/constants.js?v=20260525p"></script>
-  <script src="js/utils.js?v=20260525p"></script>
-  <script src="js/evaluator.js?v=20260525p"></script>
-  <script src="js/bag.js?v=20260525p"></script>
-  <script src="js/rack.js?v=20260525p"></script>
-  <script src="js/board.js?v=20260525p"></script>
-  <script src="js/scoring.js?v=20260525p"></script>
-  <script src="js/placement.js?v=20260525p"></script>
-  <script src="js/ui.js?v=20260525p"></script>
-  <script src="js/online-room.js?v=20260525p"></script>
-  <script src="js/game-bridge.js?v=20260525p"></script>
-  <script src="js/online-game.js?v=20260525p"></script>
+  <script src="js/constants.js?v=20260526f"></script>
+  <script src="js/utils.js?v=20260526f"></script>
+  <script src="js/evaluator.js?v=20260526f"></script>
+  <script src="js/bag.js?v=20260526f"></script>
+  <script src="js/rack.js?v=20260526f"></script>
+  <script src="js/board.js?v=20260526f"></script>
+  <script src="js/scoring.js?v=20260526f"></script>
+  <script src="js/placement.js?v=20260526f"></script>
+  <script src="js/ui.js?v=20260526f"></script>
+  <script src="js/online-room.js?v=20260526f"></script>
+  <script src="js/game-bridge.js?v=20260526f"></script>
+  <!-- PvA feature modules brought into online PvP per user request: timer
+       skipped, education off, trash-talk skipped. Everything else loaded
+       so online has settings (themes), sounds, animations, game log, tile
+       tracker, score sheet, and challenge module. -->
+  <script src="js/settings.js?v=20260526f"></script>
+  <script src="js/sounds.js?v=20260526f"></script>
+  <script src="js/animations.js?v=20260526f"></script>
+  <script src="js/game-log.js?v=20260526f"></script>
+  <script src="js/tile-tracker.js?v=20260526f"></script>
+  <script src="js/score-sheet.js?v=20260526f"></script>
+  <script src="js/challenge.js?v=20260526f"></script>
+  <script src="js/online-game.js?v=20260526f"></script>
   <script>
     var roomCode = new URLSearchParams(window.location.search).get('room');
     var role = new URLSearchParams(window.location.search).get('role');
@@ -188,6 +211,38 @@
 
     // online-game.js calls this via window.AMathOnlineHeader (defined below)
     window.AMathOnlineHeader = { render: renderHeader };
+
+    // Wire the header utility buttons (score sheet / game log / settings).
+    // These are visible throughout the game so users can check progress
+    // or open settings at any point.
+    document.addEventListener('DOMContentLoaded', function () {
+      var sheetBtn = document.getElementById('online-btn-sheet');
+      if (sheetBtn) sheetBtn.onclick = function () {
+        var og = window.AMath.onlineGame;
+        var role = og && og.getRole && og.getRole();
+        var data = og && og.getRoomData && og.getRoomData();
+        var myScore = 0, oppScore = 0;
+        if (data) {
+          myScore = role === 'host' ? (data.hostScore || 0) : (data.guestScore || 0);
+          oppScore = role === 'host' ? (data.guestScore || 0) : (data.hostScore || 0);
+        }
+        if (window.AMath.scoreSheet && window.AMath.scoreSheet.showPopup) {
+          window.AMath.scoreSheet.showPopup(myScore, oppScore);
+        }
+      };
+      var logBtn = document.getElementById('online-btn-log');
+      if (logBtn) logBtn.onclick = function () {
+        if (window.AMath.gameLog && window.AMath.gameLog.show) {
+          window.AMath.gameLog.show();
+        }
+      };
+      var setBtn = document.getElementById('online-btn-settings');
+      if (setBtn) setBtn.onclick = function () {
+        if (window.AMath.settings && window.AMath.settings.showPopup) {
+          window.AMath.settings.showPopup();
+        }
+      };
+    });
 
     function escapeHtml(s) {
       if (s == null) return '';

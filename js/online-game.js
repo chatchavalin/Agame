@@ -55,6 +55,8 @@
   var statsFinalized = false;    // prevent double-save of game-end stats
   var swapMode = false;          // PvA-parity inline swap state
   var swapSelected = {};         // { tileId: true } in swap mode
+  var _gameStartedHook = false;  // ran one-time init (game-log, score-sheet) yet?
+  var _lastSeenMoveCount = -1;   // detect when opponent plays so we fire sounds/animations
 
   // -----------------------------------------------------------------------
   // BOOT
@@ -127,7 +129,31 @@
     }
 
     if (data.status === 'playing' && data.gameState) {
+      // One-time hook the first time we see 'playing' status. Resets the
+      // shared modules (game log, score sheet, tile tracker) and logs
+      // game start. Without this they'd carry state from any previous
+      // PvA game on the same tab.
+      if (!_gameStartedHook) {
+        _gameStartedHook = true;
+        if (window.AMath.gameLog) {
+          try {
+            window.AMath.gameLog.startGame({ mode: 'PvP-Online', tileSet: 'prathom' });
+          } catch (e) { /* gameLog may not be loaded — non-fatal */ }
+        }
+        if (window.AMath.scoreSheet) {
+          try { window.AMath.scoreSheet.reset(); } catch (e) {}
+        }
+      }
       rebuildLocalSession(data.gameState);
+      // Detect opponent move arrival (moveCount increased AND last move was
+      // NOT mine) so we can fire sound/animation/score-sheet for it.
+      var gs = data.gameState;
+      var newMoveCount = gs.moveCount || 0;
+      if (_lastSeenMoveCount !== -1 && newMoveCount > _lastSeenMoveCount
+          && gs.lastMove && gs.lastMove.who && gs.lastMove.who !== myRole) {
+        handleOpponentMoveArrived(gs);
+      }
+      _lastSeenMoveCount = newMoveCount;
       renderGameUI();
     }
 
@@ -192,6 +218,77 @@
       hostScore: 0,
       guestScore: 0,
     });
+  }
+
+  /**
+   * Called from onSnapshot when the opponent just made a move (moveCount
+   * increased and lastMove.who is not us). Fires the UX side effects that
+   * PvA fires when AI moves: sound, score-sheet entry, game-log entry,
+   * animation cue.
+   *
+   * Note: my OWN moves trigger these effects locally in onSubmitClick /
+   * onPassClick / onSwapClick, so this function only handles opponent
+   * moves to avoid double-firing.
+   */
+  function handleOpponentMoveArrived(gs) {
+    var lm = gs.lastMove || {};
+    var oppName = (myRole === 'host')
+      ? (roomData && roomData.guestName || 'Opponent')
+      : (roomData && roomData.hostName || 'Opponent');
+    var oppRole = (myRole === 'host') ? 'guest' : 'host';
+    var oppScoreField = (oppRole === 'host') ? 'hostScore' : 'guestScore';
+    var oppScore = gs[oppScoreField] || 0;
+
+    // Sound effect
+    if (window.AMath.sounds) {
+      try {
+        if (lm.type === 'play') {
+          // Use the AI-play sound for opponent play (it's a positive cue)
+          if (window.AMath.sounds.aiPlay) window.AMath.sounds.aiPlay();
+          else if (window.AMath.sounds.submitSuccess) window.AMath.sounds.submitSuccess();
+        } else if (lm.type === 'pass' || lm.type === 'swap') {
+          if (window.AMath.sounds.pass) window.AMath.sounds.pass();
+        } else if (lm.type === 'challenge_failed') {
+          if (window.AMath.sounds.submitFail) window.AMath.sounds.submitFail();
+        }
+      } catch (e) {}
+    }
+
+    // Score sheet entry — use 'ai' as the 'who' field for opponent moves
+    // so the score-sheet's 3-column rendering puts them in the opposite
+    // column from my plays (which use 'player').
+    if (window.AMath.scoreSheet) {
+      try {
+        if (lm.type === 'play') {
+          var bingo = !!lm.bingo;
+          window.AMath.scoreSheet.recordTurn('ai', 'play', lm.score || 0, bingo, oppScore);
+        } else if (lm.type === 'pass') {
+          window.AMath.scoreSheet.recordTurn('ai', 'pass', 0, false, oppScore);
+        } else if (lm.type === 'swap') {
+          window.AMath.scoreSheet.recordTurn('ai', 'swap', 0, false, oppScore,
+            { swapCount: lm.count || 0 });
+        } else if (lm.type === 'challenge_failed') {
+          window.AMath.scoreSheet.recordTurn('ai', 'challenge-failed', 0, false, oppScore);
+        }
+      } catch (e) {}
+    }
+
+    // Game log entry
+    if (window.AMath.gameLog) {
+      try {
+        if (lm.type === 'play') {
+          window.AMath.gameLog.log(oppName + ' played +' + (lm.score || 0)
+            + 'pts (' + ((lm.placements || []).length) + ' tiles)'
+            + (lm.bingo ? ' 🎉 BINGO' : ''));
+        } else if (lm.type === 'pass') {
+          window.AMath.gameLog.log(oppName + ' passed');
+        } else if (lm.type === 'swap') {
+          window.AMath.gameLog.log(oppName + ' swapped ' + (lm.count || 0) + ' tiles');
+        } else if (lm.type === 'challenge_failed') {
+          window.AMath.gameLog.log(oppName + ' failed challenge - forfeit turn');
+        }
+      } catch (e) {}
+    }
   }
 
   /**
@@ -1043,6 +1140,17 @@
     try {
       await window.AMath.onlineRoom.updateRoom(roomCode, update);
       if (gameOver) await saveReplayDoc(newGs, roomData);
+      try {
+        if (window.AMath.sounds && window.AMath.sounds.pass) window.AMath.sounds.pass();
+        var myScore = (myRole === 'host') ? (newGs.hostScore || 0) : (newGs.guestScore || 0);
+        if (window.AMath.scoreSheet) {
+          window.AMath.scoreSheet.recordTurn('player', 'swap', 0, false, myScore,
+            { swapCount: tilesToSwap.length });
+        }
+        if (window.AMath.gameLog) {
+          window.AMath.gameLog.log('You swapped ' + tilesToSwap.length + ' tiles');
+        }
+      } catch (e) { /* non-fatal */ }
     } catch (err) {
       alert('Swap failed: ' + err.message);
     } finally {
@@ -1275,6 +1383,22 @@
     try {
       await window.AMath.onlineRoom.updateRoom(roomCode, update);
       if (update.status === 'finished') await saveReplayDoc(newGs, roomData);
+      // Side effects for MY play (sound + score sheet + game log). Opponent
+      // moves fire similar effects via handleOpponentMoveArrived.
+      try {
+        if (window.AMath.sounds && window.AMath.sounds.submitSuccess) {
+          window.AMath.sounds.submitSuccess();
+        }
+        var myScoreField = (myRole === 'host') ? newHostScore : newGuestScore;
+        if (window.AMath.scoreSheet) {
+          window.AMath.scoreSheet.recordTurn('player', 'play', scoreResult.total,
+            isBingo, myScoreField);
+        }
+        if (window.AMath.gameLog) {
+          window.AMath.gameLog.log('You played +' + scoreResult.total + 'pts ('
+            + placementsToValidate.length + ' tiles)' + (isBingo ? ' 🎉 BINGO' : ''));
+        }
+      } catch (e) { /* non-fatal */ }
     } catch (err) {
       alert('Submit failed: ' + err.message);
     } finally {
@@ -1519,8 +1643,40 @@
       '<div>Winner: ' + escapeHtml(gs.winner === 'host' ? data.hostName : gs.winner === 'guest' ? data.guestName : 'Tie') + '</div>' +
       '<div style="margin-top:6px;font-size:13px;color:#94a3b8;">' +
       'Final: ' + gs.hostScore + ' (host) – ' + gs.guestScore + ' (guest)</div>' +
+      '<button id="online-show-sheet" style="margin-top:10px;background:#fbbf24;color:#1e293b;' +
+        'border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:700;' +
+        'margin-right:8px;">📊 Score Sheet</button>' +
+      '<button id="online-show-log" style="margin-top:10px;background:#334155;color:#e2e8f0;' +
+        'border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:600;' +
+        'margin-right:8px;">📜 Game Log</button>' +
       '<a href="lobby.html" style="color:#fbbf24;display:inline-block;margin-top:10px;">Back to lobby</a>' +
       '</div>';
+    var sheetBtn = document.getElementById('online-show-sheet');
+    if (sheetBtn) {
+      sheetBtn.onclick = function () {
+        if (window.AMath.scoreSheet && window.AMath.scoreSheet.showPopup) {
+          var myScoreEnd = (myRole === 'host') ? gs.hostScore : gs.guestScore;
+          var oppScoreEnd = (myRole === 'host') ? gs.guestScore : gs.hostScore;
+          window.AMath.scoreSheet.showPopup(myScoreEnd, oppScoreEnd);
+        }
+      };
+    }
+    var logBtn = document.getElementById('online-show-log');
+    if (logBtn) {
+      logBtn.onclick = function () {
+        if (window.AMath.gameLog && window.AMath.gameLog.show) {
+          window.AMath.gameLog.show();
+        } else if (window.AMath.gameLog && window.AMath.gameLog.exportLog) {
+          // Fallback: open as text
+          var txt = window.AMath.gameLog.exportLog();
+          var w = window.open('', '_blank');
+          if (w) {
+            w.document.body.innerHTML = '<pre style="white-space:pre-wrap;font-family:monospace;">'
+              + escapeHtml(txt) + '</pre>';
+          }
+        }
+      };
+    }
   }
 
   // -----------------------------------------------------------------------
@@ -1566,6 +1722,16 @@
     try {
       await window.AMath.onlineRoom.updateRoom(roomCode, update);
       if (gameOver) await saveReplayDoc(update.gameState, roomData);
+      try {
+        if (window.AMath.sounds && window.AMath.sounds.pass) window.AMath.sounds.pass();
+        var myScoreP = (myRole === 'host') ? (gs.hostScore || 0) : (gs.guestScore || 0);
+        if (window.AMath.scoreSheet) {
+          window.AMath.scoreSheet.recordTurn('player', 'pass', 0, false, myScoreP);
+        }
+        if (window.AMath.gameLog) {
+          window.AMath.gameLog.log('You passed');
+        }
+      } catch (e) { /* non-fatal */ }
     } catch (err) {
       alert('Failed to send pass: ' + err.message);
     }
@@ -1725,6 +1891,7 @@
     boot: boot,
     getRoomCode: function () { return roomCode; },
     getRole: function () { return myRole; },
+    getRoomData: function () { return roomData; },
     toggleChat: toggleChat,
   };
 
