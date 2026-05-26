@@ -7,7 +7,7 @@
 // This script bumps version stamp every time we deploy. If the SW is stale,
 // it tells the SW to unregister, clears all caches, and reloads.
 (function(){
-  var DEPLOYED_VERSION = 'v9-2026-05-26';
+  var DEPLOYED_VERSION = 'v10-2026-05-26';
   var lastVersion = localStorage.getItem('pz_version');
   if (lastVersion !== DEPLOYED_VERSION) {
     localStorage.setItem('pz_version', DEPLOYED_VERSION);
@@ -162,7 +162,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v9</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v10</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -851,11 +851,14 @@ window.startPuzzle = function(type){
 
   // Hide opponent area via CSS (no opponent in puzzle)
 
-  // Initialize session — same structure as PvA
+  // Initialize session — same structure as PvA.
+  // NOTE: aiRack must be a Rack OBJECT (with .tiles + .slotMap), not a plain
+  // array, because refreshUI() calls UI.renderRack(aiRack, ...) every interaction.
+  var R = window.AMath.rack;
   session = {
     board: null,             // will be set per puzzle
     playerRack: null,
-    aiRack: [],
+    aiRack: R.createRack('ai'),    // empty rack object (opponent area is hidden by CSS)
     bag: { tiles: [] },
     uiParts: parts,
     isPlayerTurn: true,
