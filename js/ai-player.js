@@ -674,9 +674,35 @@
 
     const timeBudget = getTimeBudgetMs();
 
-    // Reserve 15% of budget (min 10s) for yoyo — it's high-value and must always run
-    const yoyoReserveMs = window.AMath.aiYoyo ? Math.max(10000, Math.floor(timeBudget * 0.15)) : 0;
-    const findBestBudgetMs = timeBudget - yoyoReserveMs;
+    // Reserve time for yoyo — it's high-value and must always run. The
+    // reserve scales with blank count because heavy-blank racks need
+    // much more time for the yoyo's target-aware permutation search to
+    // converge. Without this, yoyo searches return null on hard racks
+    // even when valid 80+ pt yoyos exist (observed bug: rack
+    //   = = ×÷ ? ? +- ? 13   missed an 81pt yoyo on col 7).
+    //   0-1 blanks: 15% of total, min 10s
+    //   2 blanks:   20%, min 12s
+    //   3 blanks:   30%, min 35s
+    //   4+ blanks:  40%, min 45s
+    const rackBlanksForReserve = state.aiRack.tiles.filter(t => t.type === 'blank').length;
+    let yoyoReserveMs = 0;
+    if (window.AMath.aiYoyo) {
+      if (rackBlanksForReserve >= 4) {
+        yoyoReserveMs = Math.max(45000, Math.floor(timeBudget * 0.40));
+      } else if (rackBlanksForReserve === 3) {
+        yoyoReserveMs = Math.max(35000, Math.floor(timeBudget * 0.30));
+      } else if (rackBlanksForReserve === 2) {
+        yoyoReserveMs = Math.max(12000, Math.floor(timeBudget * 0.20));
+      } else {
+        yoyoReserveMs = Math.max(10000, Math.floor(timeBudget * 0.15));
+      }
+      // Cap: yoyo reserve must not exceed 60% of total budget, or
+      // findBestPlay starves. Especially important for easy/normal bots
+      // with smaller total budgets (30s/90s).
+      const capMs = Math.floor(timeBudget * 0.60);
+      if (yoyoReserveMs > capMs) yoyoReserveMs = capMs;
+    }
+    const findBestBudgetMs = Math.max(5000, timeBudget - yoyoReserveMs);
 
     // Temporarily reduce time budget so findBestPlay leaves room for yoyo
     const origThinkSeconds = _stateSettings ? _stateSettings.aiThinkSeconds : null;

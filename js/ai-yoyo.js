@@ -49,8 +49,12 @@
     // If the caller passed _maxTimeMs (e.g., from ai-player.js telling us how
     // much of the AI's total budget remains), respect that as an upper bound.
     const blanks = state.aiRack.tiles.filter(t => t.type === 'blank').length;
-    const adaptive = blanks >= 4 ? 30000
-                   : blanks === 3 ? 25000
+    // Bumped from {3blanks=25s, 4blanks=30s} to {3blanks=35s, 4blanks=45s}.
+    // Combined with the new target-aware blank-face heuristic, these extra
+    // seconds are now productively spent on promising assignments rather
+    // than dumb brute force.
+    const adaptive = blanks >= 4 ? 45000
+                   : blanks === 3 ? 35000
                                   : 20000;
     const TIME_BUDGET_MS = (typeof state._maxTimeMs === 'number')
                          ? Math.min(adaptive, state._maxTimeMs)
@@ -66,6 +70,12 @@
       const numToPlace = C.YOYO_TOTAL_LENGTH - existing.length;
       if (numToPlace < C.YOYO_PLACE_MIN || numToPlace > C.YOYO_PLACE_MAX) continue;
       if (numToPlace > state.aiRack.tiles.length) continue;
+      // Compute target value of the existing equation. Used by the
+      // blank-face heuristic to prioritize assignments likely to form
+      // valid sub-expressions equal to the target. Null if equation has
+      // a non-integer or unparseable value — heuristic falls back to
+      // the default context-hint ordering in that case.
+      const existingTarget = computeExistingTarget(existing);
       // Find candidate placement positions (3 strategies: forward, backward, both-ends)
       const positionSets = enumeratePlacementPositions(state.board, line, existing, numToPlace);
       for (const positions of positionSets) {
@@ -74,7 +84,7 @@
         const hits3E = positions.some(p => isThreeE(p.row, p.col));
         if (!hits3E) continue;
         // Try tile permutations on these positions
-        const yoyoResults = searchTileAssignments(state, line, existing, positions, startTime, TIME_BUDGET_MS);
+        const yoyoResults = searchTileAssignments(state, line, existing, positions, startTime, TIME_BUDGET_MS, existingTarget);
         for (const yr of yoyoResults) results.push(yr);
       }
     }
@@ -435,7 +445,121 @@
    *  - We need to find at least ONE valid YoYo per position set, ideally high-scoring
    *  - The validator (validateAndScore) catches invalid equations, so we can be liberal here
    */
-  function searchTileAssignments(state, line, existing, positions, startTime, timeBudget) {
+  /**
+   * Compute the numerical target an existing yoyo-eligible equation
+   * resolves to. For an existing line like '-1+4+13=16', the target is 16.
+   * For chained existing like 'A=B=C', returns the common value if all
+   * segments evaluate consistently, otherwise null.
+   *
+   * The yoyo extension must produce additional segments that ALSO equal
+   * this target value (since A-Math chained equations require every
+   * '='-separated segment to evaluate identically). Knowing the target
+   * lets us drastically prune blank assignments — only digits and ops
+   * that can build sub-expressions equaling the target are worth trying
+   * first.
+   *
+   * Returns a number or null if uncomputable.
+   */
+  function computeExistingTarget(existing) {
+    if (!existing || !existing.tiles || existing.tiles.length === 0) return null;
+    // Build the face sequence as the evaluator would tokenize it
+    const faces = existing.tiles.map(c => {
+      const t = c.tile;
+      return t.assigned || t.face;
+    });
+    try {
+      const tokRes = Evaluator.tokenize(faces);
+      if (!tokRes || !tokRes.tokens) return null;
+      // Find any segment to evaluate (they all equal the target in a valid eq)
+      const tokens = tokRes.tokens;
+      // Walk segments between '=' tokens; evaluate the first one
+      let seg = [];
+      for (const t of tokens) {
+        if (t.type === 'eq') break;
+        seg.push(t);
+      }
+      if (seg.length === 0) return null;
+      const evalRes = Evaluator.evaluateSegment(seg);
+      if (!evalRes || !evalRes.ok) return null;
+      // evaluateSegment returns a fraction { num, den }; we want integer values
+      // only (since A-Math equations always have integer targets)
+      const v = evalRes.value;
+      if (!v) return null;
+      if (typeof v === 'number') return v;
+      if (typeof v === 'object' && typeof v.num === 'number') {
+        if (v.den === 1 || v.den === undefined) return v.num;
+        // Non-integer target — won't help heuristic
+        return null;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
+   * Build a list of faces "useful" for forming sub-expressions equaling
+   * the target. Used to bias blank-face iteration so promising assignments
+   * run first.
+   *
+   * Strategy (target T, integer in 0..160 range):
+   *   - T itself if it's a valid face (≤20 single-tile twodigit)
+   *   - factors of T (T=16 → 2,4,8; T=12 → 2,3,4,6)
+   *   - small digits (0,1,2,3) — identities and common building blocks
+   *   - T mod 10 (last digit, for chained 'X-Y=T' style splits)
+   *   - T's individual digits if T is two-digit
+   *   - operators in priority order
+   *
+   * Caller intersects this with the allChoices set already filtered by
+   * computeContextHints to avoid proposing faces the position can't accept.
+   */
+  function targetAwareFaces(target) {
+    if (target === null || target === undefined) return [];
+    if (!isFinite(target) || target < 0 || target > 200) return [];
+    const out = [];
+    const seen = new Set();
+    function add(f) {
+      const s = String(f);
+      if (!seen.has(s)) { out.push(s); seen.add(s); }
+    }
+    const T = Math.round(target);
+    // T itself if a valid single tile
+    if (T <= 20) add(T);
+    // Factors of T (skip 1 and T since handled separately)
+    if (T > 0) {
+      for (let i = 2; i <= 9; i++) {
+        if (T % i === 0 && (T / i) <= 20) {
+          add(i);
+          add(T / i);
+        }
+      }
+    }
+    // Small digits — useful as 0 (additive identity), 1 (multiplicative)
+    add(0);
+    add(1);
+    add(2);
+    // Individual digits of T (so 'X-Y=T' splits where X,Y are two-digit)
+    if (T >= 10) {
+      const s = String(T);
+      for (const ch of s) add(parseInt(ch, 10));
+      // Numbers near T: T-1, T+1, T+10 etc. that combine with small digits
+      if (T - 10 >= 0 && T - 10 <= 20) add(T - 10);
+      if (T + 10 <= 20) add(T + 10);
+    }
+    // Pairs that sum/diff to T (digits only, both ≤ 9)
+    for (let i = 1; i <= 9; i++) {
+      if (T - i >= 0 && T - i <= 9) add(i);  // i + (T-i) = T
+    }
+    // Operators always useful at last
+    add('=');
+    add('+');
+    add('-');
+    add('×');
+    add('÷');
+    return out;
+  }
+
+  function searchTileAssignments(state, line, existing, positions, startTime, timeBudget, existingTarget) {
     const results = [];
     const rackTiles = state.aiRack.tiles.slice();
     const numPositions = positions.length;
@@ -444,17 +568,28 @@
     // With many BLANKs, each set needs more time to find valid permutations.
     //   0-1 BLANKs: 3s
     //   2 BLANKs:   5s
-    //   3 BLANKs:   8s
-    //   4+ BLANKs:  10s
+    //   3 BLANKs:  12s  (was 8s — bumped after the col-7 yoyo miss bug)
+    //   4+ BLANKs: 15s  (was 10s)
+    // Bumped specifically for the "= = ×÷ ? ? +- ? 13" rack on col 7
+    // case where the 81pt yoyo existed but couldn't be found in 8s.
+    // The target-aware heuristic (existingTarget arg below) makes this
+    // extra time more productive than it would have been pre-heuristic.
     const blankCount = rackTiles.filter(t => t.type === 'blank').length;
-    const perSetMs = blankCount >= 4 ? 10000
-                   : blankCount === 3 ? 8000
+    const perSetMs = blankCount >= 4 ? 15000
+                   : blankCount === 3 ? 12000
                    : blankCount === 2 ? 5000
                                       : 3000;
     const setDeadline = Math.min(startTime + timeBudget, Date.now() + perSetMs);
     // Pre-compute context hints for each position (cuts BLANK enumeration drastically)
     const contextHints = computeContextHints(state.board, line, positions);
     const allBlankChoices = (C.getBlankChoices ? C.getBlankChoices() : C.BLANK_CHOICES);
+
+    // Target-aware face priority — computed ONCE per call. The blank loop
+    // intersects this with the position's context-hint list so we never
+    // propose a face that the grammar/position can't accept; we just reorder
+    // the acceptable faces so the target-relevant ones run first.
+    const targetFaces = targetAwareFaces(existingTarget);
+    const targetFaceSet = new Set(targetFaces);
     function tryPermutation(remaining, chosen) {
       if (Date.now() > setDeadline) return;
       if (chosen.length === numPositions) {
@@ -479,7 +614,36 @@
           if (p.tile.type === 'blank') {
             // CONTEXT-AWARE: order BLANK assignments by what's likely to fit
             const hint = contextHints[idx];
-            const priorityFaces = blankFacesForHint(hint, allBlankChoices);
+            const basePriority = blankFacesForHint(hint, allBlankChoices);
+            // TARGET-AWARE: if we know the existing equation's target value,
+            // try faces that contribute to building sub-expressions of that
+            // value FIRST. Falls back to basePriority order for the rest.
+            // This drastically speeds up the search on hard yoyos (3+ blanks)
+            // by exploring promising assignments early — the budget is now
+            // spent on likely-valid permutations instead of brute-forcing.
+            let priorityFaces;
+            if (targetFaceSet.size > 0) {
+              const front = [];
+              const back = [];
+              const seen = new Set();
+              // Push target-aware faces first (in target order), only those
+              // also valid per context hint
+              for (const f of targetFaces) {
+                if (basePriority.indexOf(f) !== -1 && !seen.has(f)) {
+                  front.push(f);
+                  seen.add(f);
+                }
+              }
+              for (const f of basePriority) {
+                if (!seen.has(f)) {
+                  back.push(f);
+                  seen.add(f);
+                }
+              }
+              priorityFaces = front.concat(back);
+            } else {
+              priorityFaces = basePriority;
+            }
             for (const ch of priorityFaces) {
               p.tile.assigned = ch;
               tryAssignments(idx + 1);
