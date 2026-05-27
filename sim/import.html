@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>A-Math Puzzle Importer</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 700px; margin: 40px auto; padding: 20px; background: #0f172a; color: #e2e8f0; }
+  h1 { color: #fbbf24; }
+  textarea { width: 100%; height: 250px; background: #1e293b; color: #e2e8f0; border: 1px solid #334155; border-radius: 8px; padding: 10px; font-family: monospace; font-size: 11px; box-sizing: border-box; }
+  button { background: #fbbf24; color: #1f2937; border: none; padding: 12px 24px; font-size: 14px; font-weight: 700; border-radius: 8px; cursor: pointer; margin: 8px 4px; }
+  button:hover { background: #fcd34d; }
+  button.danger { background: #dc2626; color: #fff; }
+  button.secondary { background: #334155; color: #e2e8f0; }
+  pre { background: #1e293b; padding: 10px; border-radius: 6px; overflow-x: auto; font-size: 12px; }
+  .ok { color: #34d399; }
+  .err { color: #f87171; }
+  .info { color: #94a3b8; font-size: 13px; }
+  .row { background: #1e293b; padding: 16px; border-radius: 8px; margin: 12px 0; border: 1px solid #334155; }
+  .row h3 { margin: 0 0 8px; color: #fbbf24; }
+  ol { line-height: 1.7; }
+  code { background: #0f172a; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fbbf24; }
+</style>
+</head>
+<body>
+<h1>🧩 A-Math Puzzle Importer</h1>
+
+<div class="row">
+  <h3>📊 Current Status</h3>
+  <div id="status" class="info">Loading...</div>
+</div>
+
+<div class="row">
+  <h3>📥 Import Puzzles</h3>
+  <p class="info">Paste the contents of <code>captured.json</code> (from the simulator) below, then click <b>Import</b>.</p>
+  <textarea id="paste" placeholder="Paste the JSON output from: node sim/run-simulator.js NN > captured.json"></textarea>
+  <div style="margin-top: 10px;">
+    <button onclick="doImport(false)">📥 Import (add to existing)</button>
+    <button onclick="doImport(true)" class="secondary">🔄 Replace All</button>
+    <button onclick="exportBank()" class="secondary">💾 Export Current Bank</button>
+    <button onclick="clearBank()" class="danger">🗑️ Clear All</button>
+  </div>
+  <pre id="result"></pre>
+</div>
+
+<div class="row">
+  <h3>📖 How to Use</h3>
+  <ol>
+    <li>On your computer: <code>node sim/run-simulator.js 20 > captured.json</code></li>
+    <li>Open <code>captured.json</code> in a text editor, copy ALL contents</li>
+    <li>Paste into the box above</li>
+    <li>Click <b>Import</b></li>
+    <li>Go to <a href="../puzzle.html" style="color:#fbbf24">puzzle.html</a> and the new puzzles will appear</li>
+  </ol>
+  <p class="info"><b>⚠️ IMPORTANT:</b> Open this file from the <b>same domain</b> as the game (e.g. <code>https://chatchavalin.github.io/Agame/sim/import.html</code>). localStorage is per-domain. If you open this file locally (<code>file://</code>) it will write to a DIFFERENT localStorage than the game!</p>
+</div>
+
+<script>
+const KEY = 'amath_puzzle_bank';
+
+function refreshStatus() {
+  const raw = localStorage.getItem(KEY);
+  let count = 0;
+  try { count = raw ? JSON.parse(raw).length : 0; } catch (e) {}
+  const sizeKB = raw ? (raw.length / 1024).toFixed(1) : '0';
+  document.getElementById('status').innerHTML =
+    `<b>${count}</b> puzzles in your bank · <b>${sizeKB} KB</b> used · domain: <code>${location.origin}</code>`;
+}
+
+function setResult(msg, cls) {
+  const el = document.getElementById('result');
+  el.className = cls || '';
+  el.textContent = msg;
+}
+
+function doImport(replace) {
+  const raw = document.getElementById('paste').value.trim();
+  if (!raw) {
+    setResult('Nothing to import — paste JSON first.', 'err');
+    return;
+  }
+  let parsed;
+  try { parsed = JSON.parse(raw); }
+  catch (e) {
+    setResult('❌ Invalid JSON: ' + e.message, 'err');
+    return;
+  }
+  if (!Array.isArray(parsed)) {
+    setResult('❌ JSON must be an array of puzzles.', 'err');
+    return;
+  }
+  // Validate at least minimum shape
+  const required = ['board', 'rack', 'bestPlays', 'scoreYou', 'scoreOpp', 'bagCount'];
+  for (let i = 0; i < parsed.length; i++) {
+    const p = parsed[i];
+    for (const f of required) {
+      if (!(f in p)) {
+        setResult(`❌ Puzzle #${i} is missing required field "${f}". Aborting.`, 'err');
+        return;
+      }
+    }
+  }
+
+  let existing = [];
+  if (!replace) {
+    try {
+      const r = localStorage.getItem(KEY);
+      if (r) existing = JSON.parse(r);
+    } catch (e) {}
+  }
+  // Dedupe by id (same id = same puzzle)
+  const idSet = new Set(existing.map(p => p.id));
+  let added = 0, skipped = 0;
+  for (const p of parsed) {
+    if (idSet.has(p.id)) { skipped++; continue; }
+    existing.push(p);
+    idSet.add(p.id);
+    added++;
+  }
+
+  try {
+    localStorage.setItem(KEY, JSON.stringify(existing));
+    setResult(
+      (replace ? '🔄 REPLACED bank.\n' : '📥 IMPORTED.\n') +
+      `  • ${added} new puzzles added\n` +
+      `  • ${skipped} duplicates skipped (same id)\n` +
+      `  • ${existing.length} total in bank now`,
+      'ok'
+    );
+    document.getElementById('paste').value = '';
+    refreshStatus();
+  } catch (e) {
+    setResult('❌ Save failed (localStorage full?): ' + e.message, 'err');
+  }
+}
+
+function exportBank() {
+  const raw = localStorage.getItem(KEY);
+  if (!raw) {
+    setResult('Bank is empty — nothing to export.', 'err');
+    return;
+  }
+  const blob = new Blob([raw], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'amath_puzzles_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  setResult('💾 Downloaded current bank as JSON.', 'ok');
+}
+
+function clearBank() {
+  if (!confirm('Delete ALL puzzles from this domain? This cannot be undone.')) return;
+  localStorage.removeItem(KEY);
+  refreshStatus();
+  setResult('🗑️ Bank cleared.', 'ok');
+}
+
+refreshStatus();
+</script>
+</body>
+</html>
