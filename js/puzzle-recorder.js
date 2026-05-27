@@ -66,6 +66,46 @@
    * are still in session.tentativePlacements (separate). Either way, we want the
    * board state WITHOUT the player's just-submitted tiles.
    */
+  /**
+   * True iff this play completes a full row or column (15 cells) — YoYo.
+   * Tests by adding the play's placements to a virtual board copy.
+   */
+  function isYoyo(session, play, beforeBoardTiles) {
+    if (!play || !play.placements || play.placements.length === 0) return false;
+    // Build a tile-occupied set from beforeBoardTiles plus play's placements
+    var occ = {};
+    for (var i = 0; i < beforeBoardTiles.length; i++) {
+      var t = beforeBoardTiles[i];
+      occ[t[0] + ',' + t[1]] = true;
+    }
+    play.placements.forEach(function (p) {
+      occ[p.row + ',' + p.col] = true;
+    });
+    // Collect rows/cols touched by the play
+    var rows = {}, cols = {};
+    play.placements.forEach(function (p) { rows[p.row] = true; cols[p.col] = true; });
+    // Check each touched row for full 15
+    for (var rk in rows) {
+      var ok = true;
+      for (var cc = 0; cc < 15; cc++) {
+        if (!occ[rk + ',' + cc]) { ok = false; break; }
+      }
+      if (ok) return true;
+    }
+    for (var ck in cols) {
+      var ok2 = true;
+      for (var rr = 0; rr < 15; rr++) {
+        if (!occ[rr + ',' + ck]) { ok2 = false; break; }
+      }
+      if (ok2) return true;
+    }
+    return false;
+  }
+
+  function isBingo(play) {
+    return play && play.placements && play.placements.length >= 8;
+  }
+
   function snapshotBoardBeforeMove(session, submittedPlacements) {
     var tiles = [];
     var submittedSet = new Set();
@@ -202,15 +242,34 @@
       var diff = bestPlay.score - playerScore;
       if (diff < MIN_SCORE_DIFF) return;  // player did good enough — not a teaching moment
 
-      // Snapshot everything
+      // Snapshot the pre-move board ONCE (we need it for the yoyo check too)
       var placements = session.tentativePlacements || [];
+      var beforeBoardTiles = snapshotBoardBeforeMove(session, placements);
+
+      // ── KEY REQUIREMENT (added v19) ──
+      // At least one of the top-3 best plays must be a BINGO (8+ tiles) or YOYO
+      // (completes a 15-cell row/col). Otherwise this isn't a teaching moment
+      // worth saving — it's just an ordinary points-leak.
+      var hasBigPlay = false;
+      for (var bi = 0; bi < educationResult.plays.length && bi < 3; bi++) {
+        var pl = educationResult.plays[bi];
+        if (isBingo(pl) || isYoyo(session, pl, beforeBoardTiles)) {
+          hasBigPlay = true;
+          break;
+        }
+      }
+      if (!hasBigPlay) return;
+
       var bank = loadBank();
 
-      // Convert top-3 plays
+      // Convert top-3 plays (annotated with bingo/yoyo flags so puzzle UI can tag them)
       var bestPlays = [];
       for (var i = 0; i < educationResult.plays.length && i < 3; i++) {
         var converted = convertPlay(educationResult.plays[i]);
-        if (converted) bestPlays.push(converted);
+        if (!converted) continue;
+        converted.isBingo = isBingo(educationResult.plays[i]);
+        converted.isYoyo = isYoyo(session, educationResult.plays[i], beforeBoardTiles);
+        bestPlays.push(converted);
       }
       if (bestPlays.length === 0) return;
 
@@ -220,7 +279,7 @@
         scoreYou: session.playerScore || 0,
         scoreOpp: session.aiScore || 0,
         bagCount: bagCount,
-        board: snapshotBoardBeforeMove(session, placements),
+        board: beforeBoardTiles,
         rack: snapshotRack(session, placements),
         bagComp: computeBagComp(session, placements),
         playerPlay: {
