@@ -7,7 +7,7 @@
 // This script bumps version stamp every time we deploy. If the SW is stale,
 // it tells the SW to unregister, clears all caches, and reloads.
 (function(){
-  var DEPLOYED_VERSION = 'v21-2026-05-26';
+  var DEPLOYED_VERSION = 'v22-2026-05-26';
   var lastVersion = localStorage.getItem('pz_version');
   if (lastVersion !== DEPLOYED_VERSION) {
     localStorage.setItem('pz_version', DEPLOYED_VERSION);
@@ -165,7 +165,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v21</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v22</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -301,29 +301,45 @@ function buildPuzzle(type){
     return {id:'p'+Math.random().toString(36).slice(2,9), face:face, type:d.type, points:d.points||0, assigned:assigned||null};
   }
 
-  var bank;
-  if(type==='bingo') bank = PUZZLE_BANK.bingo;
-  else if(type==='yoyo') bank = PUZZLE_BANK.yoyo;
-  else bank = PUZZLE_BANK.mixed.concat(PUZZLE_BANK.bingo).concat(PUZZLE_BANK.yoyo);
-
+  // Single mode — pull from .mixed which buildBankFromStorage populated
+  var bank = PUZZLE_BANK.mixed;
+  if (!bank || bank.length === 0) return null;
   var template = bank[puzzleNum % bank.length];
+
   var board = Board.createBoard();
-  template.board.forEach(function(entry){
+  (template.board || []).forEach(function(entry){
     var r=entry[0], c=entry[1], f=entry[2], assigned=entry[3]||null;
     Board.placeTile(board, r, c, mk(f, assigned));
-    board.cells[r][c].premiumUsed = true;  // existing premium already used
+    board.cells[r][c].premiumUsed = true;
   });
   // Create a PROPER Rack object (not a plain array) — required by UI.renderRack
   var Rack = window.AMath.rack;
   var rack = Rack.createRack('player');
-  template.rack.forEach(function(face){ Rack.addTile(rack, mk(face)); });
+  (template.rack || []).forEach(function(face){ Rack.addTile(rack, mk(face)); });
+
+  // Convert captured bestPlays into the puzzle's answer shape.
+  // Recorder stores: { score, tilesUsed, placements:[{row,col,face}], isBingo, isYoyo, createsX9 }
+  var answer = (template.bestPlays || []).map(function (bp) {
+    var tilesUsed = bp.tilesUsed || (bp.placements ? bp.placements.length : 0);
+    return {
+      score: bp.score,
+      placements: bp.placements,
+      bingo: (typeof bp.isBingo === 'boolean') ? bp.isBingo : (tilesUsed >= 8),
+      yoyo: !!bp.isYoyo,
+      tilesUsed: tilesUsed,
+      opensX9: !!bp.createsX9,
+      closesX9: false,
+    };
+  });
 
   return {
     board: board, rack: rack,
-    hint: template.hint, history: template.history,
+    hint: template.hint || 'Captured from your PvA game.',
+    history: template.history || ('Captured ' + new Date(template.capturedAt || 0).toLocaleString()),
     scoreYou: template.scoreYou||0, scoreOpp: template.scoreOpp||0,
     bagComp: template.bagComp||{}, bagCount: template.bagCount||0,
-    answer: null,
+    answer: answer,
+    playerPlay: template.playerPlay || null,
   };
 }
 
