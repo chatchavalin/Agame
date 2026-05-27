@@ -83,14 +83,20 @@
     if (toks.length === 0) return null;
     var out = [];
     var curDigits = '';
-    for (var i = 0; i < toks.length; i++) {
+    // FIX bug 2: allow a leading '-' or '+' as a unary sign on the first number.
+    // (e.g. -28+50=22 has LHS starting with '-'.)
+    var leadingSign = 0;  // 0 = none, +1 = '+', -1 = '-'
+    var start = 0;
+    if (toks.length >= 2 && (toks[0] === '+' || toks[0] === '-') && /^\d+$/.test(toks[1])) {
+      leadingSign = (toks[0] === '-') ? -1 : 1;
+      start = 1;
+    }
+    for (var i = start; i < toks.length; i++) {
       var t = toks[i];
       if (/^\d+$/.test(t)) {
-        // Single-digit (0-9) can combine. Two-digit tiles (10-20) cannot combine.
-        if (t.length === 1 && curDigits.length < 3) {  // cap multi-digit at 3 digits
+        if (t.length === 1 && curDigits.length < 3) {
           curDigits += t;
         } else {
-          // Two-digit tile, or curDigits too long. Flush curDigits if any.
           if (curDigits.length) {
             out.push(parseInt(curDigits, 10));
             curDigits = '';
@@ -106,7 +112,6 @@
       }
     }
     if (curDigits.length) out.push(parseInt(curDigits, 10));
-    // Validate alternation: must start and end with number, op between
     if (out.length === 0) return null;
     if (typeof out[0] !== 'number') return null;
     if (typeof out[out.length - 1] !== 'number') return null;
@@ -115,6 +120,8 @@
       if (expectNumber && typeof out[k] !== 'number') return null;
       if (!expectNumber && typeof out[k] === 'number') return null;
     }
+    // Apply the leading sign to the first number
+    if (leadingSign !== 0) out[0] = out[0] * leadingSign;
     return out;
   }
 
@@ -123,10 +130,12 @@
     if (face === '+/-') return ['+', '-'];
     if (face === '×/÷') return ['×', '÷'];
     if (face === 'BLANK') {
-      // BLANK can be any digit 0-9, two-digit 10-20, or any operator
+      // FIX bug 3: BLANK as operator is very rare in target drills and explodes
+      // cartesian product (26 options × multiple BLANKs ≫ search budget).
+      // Restrict to digits 0-20 for ตอน-4 purposes. If the user actually needs
+      // BLANK-as-operator, we can expand later.
       var opts = [];
       for (var i = 0; i <= 20; i++) opts.push(String(i));
-      opts.push('+', '-', '×', '÷', '=');
       return opts;
     }
     return [face];
@@ -151,7 +160,7 @@
     var isOperatorTarget = (target === '+' || target === '-' || target === '×' || target === '÷' || target === '=');
 
     // Try subset sizes 3,5,7 first (most common), then 8 if needed
-    var sizes = [3, 5, 7];
+    var sizes = [3, 4, 5, 6, 7, 8];  // FIX: was [3,5,7] — missed all even-length equations (huge category)
     // Permutation budget — small enough to be fast
     var MAX_PERMS = 50000;
 
@@ -188,7 +197,7 @@
             } else {
               return result === parseInt(target, 10);
             }
-          }, 5000);
+          }, 30000);  // bumped from 5000 to handle BLANK + multi-choice racks
           if (found) {
             results.push({
               tokens: found,

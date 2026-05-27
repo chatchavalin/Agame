@@ -220,7 +220,7 @@
         aiActualPlayCount: state.aiActualPlayCount,
         aiConsecutiveSwaps: state.aiConsecutiveSwaps || 0,
         lastOpponentAction: state.lastOpponentAction || null,
-        _settings: { aiThinkSeconds: 180 },  // full PvA-quality search
+        _settings: { aiThinkSeconds: 30 },  // 30s/turn — strong, plays still found, games finish
       };
 
       let decision;
@@ -308,7 +308,16 @@
           }
         }
         const r = applyPlacements(state, decision.placements, state.isPlayerTurn);
-        if (!r.ok) break;
+        if (!r.ok) {
+          // AI's play failed validation — skip this turn rather than ending the game,
+          // so we still capture later positions. This was the silent-stall bug:
+          // one bad play and the entire game gave up, ending up with 0 captures.
+          console.warn('[gen] turn ' + turn + ' applyPlacements failed: ' + r.reason);
+          state.consecutiveNonScoringTurns++;
+          state.isPlayerTurn = !state.isPlayerTurn;
+          if (state.consecutiveNonScoringTurns >= 6) break;
+          continue;
+        }
         if (!state.isPlayerTurn) state.aiConsecutiveSwaps = 0;
       } else if (decision.type === 'swap' && decision.tileIds) {
         const rack = state.isPlayerTurn ? state.playerRack : state.aiRack;
