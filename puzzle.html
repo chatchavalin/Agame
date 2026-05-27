@@ -246,6 +246,8 @@ body.theme-dark .player-area .amath-tile-rack {
     border-color: #64748b;
     cursor: default;
     opacity: 0.85;
+    /* Belt-and-suspenders: even if JS bug attaches a listener, browser won't dispatch */
+    pointer-events: none;
   }
   .eq-tile.locked:active { transform: none; cursor: default; }
   .eq-tile.selected:active { cursor: pointer; }
@@ -318,7 +320,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v43</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v44</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -507,33 +509,33 @@ body.theme-dark .player-area .amath-tile-rack {
 </div>
 
 <!-- Load main game JS modules in dependency order (same as index.html) -->
-<script src="js/constants.js?v=v43-2026-05-27"></script>
-<script src="js/utils.js?v=v43-2026-05-27"></script>
-<script src="js/evaluator.js?v=v43-2026-05-27"></script>
-<script src="js/bag.js?v=v43-2026-05-27"></script>
-<script src="js/rack.js?v=v43-2026-05-27"></script>
-<script src="js/board.js?v=v43-2026-05-27"></script>
-<script src="js/tile-tracker.js?v=v43-2026-05-27"></script>
-<script src="js/scoring.js?v=v43-2026-05-27"></script>
-<script src="js/placement.js?v=v43-2026-05-27"></script>
+<script src="js/constants.js?v=v44-2026-05-27"></script>
+<script src="js/utils.js?v=v44-2026-05-27"></script>
+<script src="js/evaluator.js?v=v44-2026-05-27"></script>
+<script src="js/bag.js?v=v44-2026-05-27"></script>
+<script src="js/rack.js?v=v44-2026-05-27"></script>
+<script src="js/board.js?v=v44-2026-05-27"></script>
+<script src="js/tile-tracker.js?v=v44-2026-05-27"></script>
+<script src="js/scoring.js?v=v44-2026-05-27"></script>
+<script src="js/placement.js?v=v44-2026-05-27"></script>
 <!-- AI modules for the in-browser puzzle generator -->
-<script src="js/ai-x9.js?v=v43-2026-05-27"></script>
-<script src="js/ai-x4.js?v=v43-2026-05-27"></script>
-<script src="js/ai-bingo-fast.js?v=v43-2026-05-27"></script>
-<script src="js/ai-bingo-grammar.js?v=v43-2026-05-27"></script>
-<script src="js/ai-yoyo.js?v=v43-2026-05-27"></script>
-<script src="js/ai-patterns-data.js?v=v43-2026-05-27"></script>
-<script src="js/ai-patterns-engine.js?v=v43-2026-05-27"></script>
-<script src="js/ai-swap.js?v=v43-2026-05-27"></script>
-<script src="js/ai-swap-brain2.js?v=v43-2026-05-27"></script>
-<script src="js/ai-player.js?v=v43-2026-05-27"></script>
-<script src="js/puzzle-generator.js?v=v43-2026-05-27"></script>
-<script src="js/book-puzzle-generator.js?v=v43-2026-05-27"></script>
-<script src="js/ton4-solver.js?v=v43-2026-05-27"></script>
-<script src="js/sounds.js?v=v43-2026-05-27"></script>
-<script src="js/settings.js?v=v43-2026-05-27"></script>
-<script src="js/ui.js?v=v43-2026-05-27"></script>
-<script src="js/interactions.js?v=v43-2026-05-27"></script>
+<script src="js/ai-x9.js?v=v44-2026-05-27"></script>
+<script src="js/ai-x4.js?v=v44-2026-05-27"></script>
+<script src="js/ai-bingo-fast.js?v=v44-2026-05-27"></script>
+<script src="js/ai-bingo-grammar.js?v=v44-2026-05-27"></script>
+<script src="js/ai-yoyo.js?v=v44-2026-05-27"></script>
+<script src="js/ai-patterns-data.js?v=v44-2026-05-27"></script>
+<script src="js/ai-patterns-engine.js?v=v44-2026-05-27"></script>
+<script src="js/ai-swap.js?v=v44-2026-05-27"></script>
+<script src="js/ai-swap-brain2.js?v=v44-2026-05-27"></script>
+<script src="js/ai-player.js?v=v44-2026-05-27"></script>
+<script src="js/puzzle-generator.js?v=v44-2026-05-27"></script>
+<script src="js/book-puzzle-generator.js?v=v44-2026-05-27"></script>
+<script src="js/ton4-solver.js?v=v44-2026-05-27"></script>
+<script src="js/sounds.js?v=v44-2026-05-27"></script>
+<script src="js/settings.js?v=v44-2026-05-27"></script>
+<script src="js/ui.js?v=v44-2026-05-27"></script>
+<script src="js/interactions.js?v=v44-2026-05-27"></script>
 
 <script>
 (function(){

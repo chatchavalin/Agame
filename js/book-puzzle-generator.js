@@ -26,7 +26,7 @@
   function loadBookData() {
     // Cached JSON fetched once
     if (window.AMath._bookData) return Promise.resolve(window.AMath._bookData);
-    return fetch('sim/book-data.json?v=20260527')
+    return fetch('sim/book-data.json?v=v44-2026-05-27')
       .then(r => r.json())
       .then(d => { window.AMath._bookData = d; return d; });
   }
