@@ -31,7 +31,7 @@
   'use strict';
 
   var STORAGE_KEY = 'amath_puzzle_bank';
-  var MAX_PUZZLES = 200;
+  // (No cap — bag grows indefinitely; bounded only by localStorage quota.)
   var BAG_THRESHOLD = 25;
   var MIN_SCORE_DIFF = 5;   // only record if you missed by 5+ points
   var MIN_BEST_SCORE = 8;   // skip if even the best play is trivial
@@ -45,14 +45,13 @@
 
   function saveBank(bank) {
     try {
-      // Cap at MAX_PUZZLES — drop oldest (front of array)
-      while (bank.length > MAX_PUZZLES) bank.shift();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(bank));
       return true;
     } catch (e) {
-      // localStorage quota exceeded → drop more aggressively
+      // localStorage quota exceeded — drop the oldest 10% and retry
       try {
-        while (bank.length > MAX_PUZZLES / 2) bank.shift();
+        var dropCount = Math.max(1, Math.floor(bank.length * 0.1));
+        bank.splice(0, dropCount);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(bank));
         return true;
       } catch (e2) { return false; }
@@ -298,8 +297,7 @@
 
       bank.push(puzzle);
       saveBank(bank);
-      console.log('[PuzzleRecorder] Saved puzzle #' + bank.length +
-                  ' (you ' + playerScore + ' vs best ' + bestPlay.score + ', bag ' + bagCount + ')');
+      // Silent capture — no console message, no UI notification.
     } catch (e) {
       console.warn('[PuzzleRecorder] Failed:', e);
     }
@@ -311,12 +309,26 @@
     try { localStorage.removeItem(STORAGE_KEY); return true; } catch (e) { return false; }
   }
 
+  function removeById(id) {
+    try {
+      var bank = loadBank();
+      var idx = -1;
+      for (var i = 0; i < bank.length; i++) {
+        if (bank[i].id === id) { idx = i; break; }
+      }
+      if (idx === -1) return false;
+      bank.splice(idx, 1);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(bank));
+      return true;
+    } catch (e) { return false; }
+  }
+
   window.AMath = window.AMath || {};
   window.AMath.puzzleRecorder = {
     maybeRecord: maybeRecord,
     getBank: getBank,
+    removeById: removeById,
     clearBank: clearBank,
-    MAX: MAX_PUZZLES,
     BAG_THRESHOLD: BAG_THRESHOLD,
   };
 })();

@@ -7,7 +7,7 @@
 // This script bumps version stamp every time we deploy. If the SW is stale,
 // it tells the SW to unregister, clears all caches, and reloads.
 (function(){
-  var DEPLOYED_VERSION = 'v24-2026-05-26';
+  var DEPLOYED_VERSION = 'v25-2026-05-26';
   var lastVersion = localStorage.getItem('pz_version');
   if (lastVersion !== DEPLOYED_VERSION) {
     localStorage.setItem('pz_version', DEPLOYED_VERSION);
@@ -79,6 +79,12 @@
   .pz-best-btn.active-1{border-color:#94a3b8;color:#cbd5e1;}
   .pz-best-btn.active-2{border-color:#a78bfa;color:#c4b5fd;}
   .pz-best-btn:disabled{opacity:.35;cursor:not-allowed;}
+
+  /* Remove button below the Best row */
+  .pz-remove-row{display:flex;justify-content:center;padding:0 12px 8px;width:100%;max-width:520px;margin:0 auto;}
+  .pz-remove-btn{background:none;border:1px dashed #64748b;color:#94a3b8;padding:6px 14px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .pz-remove-btn:hover{border-color:#f87171;color:#f87171;}
+  .pz-remove-btn:active{transform:scale(.97);}
 
   /* Tile Tracker — uses main game's .tile-tracker / .tracker-* classes from styles.css.
      We only override width/positioning to fit the puzzle layout. */
@@ -165,7 +171,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v24</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v25</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -175,7 +181,7 @@ body.theme-dark .player-area .amath-tile-rack {
   <p>Puzzles are captured from your own Player-vs-AI games whenever you miss the best move with fewer than 25 tiles in the bag.</p>
   <div id="bank-status" style="background:var(--bg-panel,#1e293b);border:1px solid var(--border-medium,#334155);border-radius:14px;padding:18px;text-align:center;margin-bottom:12px;">
     <div id="bank-count" style="font-size:28px;font-weight:800;color:#fbbf24;">—</div>
-    <div style="font-size:13px;color:#94a3b8;">puzzles captured (max 200)</div>
+    <div style="font-size:13px;color:#94a3b8;">puzzles captured</div>
   </div>
   <div class="mode-card" onclick="startPuzzle('mixed')" id="start-btn">
     <div class="mode-icon">🧩</div>
@@ -222,6 +228,9 @@ body.theme-dark .player-area .amath-tile-rack {
     <button class="pz-best-btn" id="best-btn-1" onclick="showBestPlay(1)">Best 2</button>
     <button class="pz-best-btn" id="best-btn-2" onclick="showBestPlay(2)">Best 3</button>
   </div>
+  <div class="pz-remove-row">
+    <button class="pz-remove-btn" onclick="removeCurrentPuzzle()">🗑️ Remove this puzzle</button>
+  </div>
 
   <!-- Tile Tracker — uses the SAME module + styling as Player-vs-AI -->
   <div class="pz-tracker-wrap" id="tile-tracker-container"></div>
@@ -257,6 +266,7 @@ body.theme-dark .player-area .amath-tile-rack {
 var C, Board, Placement, Scoring, UI, Interactions;
 var session = null;       // PvA-compatible session state for interactions module
 var currentPuzzle = null;
+var currentPuzzleStorageId = null;
 var puzzleType, puzzleNum=0, streak=0;
 var timerInterval, timerSeconds=0;
 
@@ -304,7 +314,10 @@ function buildPuzzle(type){
   // Single mode — pull from .mixed which buildBankFromStorage populated
   var bank = PUZZLE_BANK.mixed;
   if (!bank || bank.length === 0) return null;
-  var template = bank[puzzleNum % bank.length];
+  var pickIdx = pickRandomPuzzleIndex();
+  if (pickIdx < 0 || pickIdx >= bank.length) pickIdx = 0;
+  var template = bank[pickIdx];
+  currentPuzzleStorageId = template.id || null;  // remember for the Remove button
 
   var board = Board.createBoard();
   (template.board || []).forEach(function(entry){
@@ -644,6 +657,26 @@ window.showHint = function(){
 // ════════════════════════════════════════════════════════════════════
 //  PUZZLE LIFECYCLE
 // ════════════════════════════════════════════════════════════════════
+// Shuffled queue of puzzle indices — refilled when exhausted.
+var shuffleQueue = [];
+
+function refillShuffleQueue() {
+  var n = PUZZLE_BANK.mixed ? PUZZLE_BANK.mixed.length : 0;
+  shuffleQueue = [];
+  for (var i = 0; i < n; i++) shuffleQueue.push(i);
+  // Fisher-Yates shuffle
+  for (var k = shuffleQueue.length - 1; k > 0; k--) {
+    var j = Math.floor(Math.random() * (k + 1));
+    var tmp = shuffleQueue[k]; shuffleQueue[k] = shuffleQueue[j]; shuffleQueue[j] = tmp;
+  }
+}
+
+function pickRandomPuzzleIndex() {
+  if (shuffleQueue.length === 0) refillShuffleQueue();
+  if (shuffleQueue.length === 0) return -1;
+  return shuffleQueue.shift();
+}
+
 window.startPuzzle = function(type){
   init();
   buildBankFromStorage();  // re-load latest captures from localStorage
@@ -651,6 +684,7 @@ window.startPuzzle = function(type){
     alert('No puzzles captured yet.\n\nPlay a Player-vs-AI game first — when the bag has fewer than 25 tiles and you miss the best move, that position will be saved here.');
     return;
   }
+  refillShuffleQueue();  // new session = new shuffle
   puzzleType = 'mixed'; puzzleNum = 0; streak = 0;
   document.getElementById('screen-select').style.display='none';
   document.getElementById('screen-puzzle').style.display='block';
@@ -746,6 +780,31 @@ window.nextPuzzle = function(){
 window.goBack = function(){
   if(timerInterval) clearInterval(timerInterval);
   window.location.href = 'lobby.html';
+};
+
+window.removeCurrentPuzzle = function(){
+  if (!currentPuzzleStorageId) {
+    alert('No active puzzle to remove.');
+    return;
+  }
+  if (!confirm('Remove this puzzle from your collection?\n\nThis cannot be undone.')) return;
+  var ok = window.AMath && window.AMath.puzzleRecorder &&
+           window.AMath.puzzleRecorder.removeById(currentPuzzleStorageId);
+  if (!ok) {
+    alert('Failed to remove puzzle.');
+    return;
+  }
+  // Rebuild bank, reset queue, advance to next puzzle
+  buildBankFromStorage();
+  if (!PUZZLE_BANK.mixed || PUZZLE_BANK.mixed.length === 0) {
+    // No puzzles left — return to select screen
+    document.getElementById('screen-puzzle').style.display = 'none';
+    document.getElementById('screen-select').style.display = 'block';
+    refreshBankStatus();
+    return;
+  }
+  refillShuffleQueue();
+  nextPuzzle();
 };
 
 window.clearBank = function(){
