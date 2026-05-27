@@ -7,7 +7,7 @@
 // This script bumps version stamp every time we deploy. If the SW is stale,
 // it tells the SW to unregister, clears all caches, and reloads.
 (function(){
-  var DEPLOYED_VERSION = 'v19-2026-05-26';
+  var DEPLOYED_VERSION = 'v20-2026-05-26';
   var lastVersion = localStorage.getItem('pz_version');
   if (lastVersion !== DEPLOYED_VERSION) {
     localStorage.setItem('pz_version', DEPLOYED_VERSION);
@@ -80,17 +80,10 @@
   .pz-best-btn.active-2{border-color:#a78bfa;color:#c4b5fd;}
   .pz-best-btn:disabled{opacity:.35;cursor:not-allowed;}
 
-  /* Tile tracker (with bag count in header) below board */
-  .pz-info-strip{width:100%;max-width:520px;margin:6px auto;padding:0 8px;box-sizing:border-box;}
-  .info-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
-  .pz-info-card{background:var(--bg-panel,#1e293b);border-radius:10px;padding:8px 10px;border:1px solid var(--border-medium,#334155);}
-  .pz-info-card h4{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin:0 0 6px;font-weight:700;}
-  .pz-tracker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(28px,1fr));gap:2px;}
-  .ti{display:flex;flex-direction:column;align-items:center;background:var(--bg-page,#0f172a);border-radius:4px;padding:2px 1px;}
-  .ti .tf{font-size:9px;font-weight:800;line-height:1;color:#e2e8f0;}
-  .ti .tc{font-size:8px;color:#94a3b8;line-height:1;}
-  .ti.zero{opacity:.3;}
-  .bag-total{font-size:11px;color:#fbbf24;font-weight:700;}
+  /* Tile Tracker — uses main game's .tile-tracker / .tracker-* classes from styles.css.
+     We only override width/positioning to fit the puzzle layout. */
+  .pz-tracker-wrap{width:100%;max-width:520px;margin:6px auto;padding:0 8px;box-sizing:border-box;}
+  .pz-tracker-wrap .tile-tracker{margin-top:0;}
 
   /* Answer reveal */
   .answer-box{width:100%;max-width:520px;margin:6px auto;background:var(--bg-panel,#1e293b);border-radius:12px;border:1px solid var(--border-medium,#334155);overflow:hidden;}
@@ -172,7 +165,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v19</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v20</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -230,15 +223,8 @@ body.theme-dark .player-area .amath-tile-rack {
     <button class="pz-best-btn" id="best-btn-2" onclick="showBestPlay(2)">Best 3</button>
   </div>
 
-  <div class="pz-info-strip">
-    <div class="pz-info-card" style="flex:1;">
-      <div class="info-card-header">
-        <h4 style="margin:0;">Tile Tracker <span style="color:#475569;font-weight:400;">(unseen)</span></h4>
-        <span class="bag-total" id="bag-total">0 tiles in bag</span>
-      </div>
-      <div class="pz-tracker-grid" id="tile-tracker-grid"></div>
-    </div>
-  </div>
+  <!-- Tile Tracker — uses the SAME module + styling as Player-vs-AI -->
+  <div class="pz-tracker-wrap" id="tile-tracker-container"></div>
 
   <div class="answer-box hidden" id="answer-box">
     <div class="answer-header">
@@ -256,6 +242,7 @@ body.theme-dark .player-area .amath-tile-rack {
 <script src="js/bag.js?v=20260526pz"></script>
 <script src="js/rack.js?v=20260526pz"></script>
 <script src="js/board.js?v=20260526pz"></script>
+<script src="js/tile-tracker.js?v=20260526pz"></script>
 <script src="js/scoring.js?v=20260526pz"></script>
 <script src="js/placement.js?v=20260526pz"></script>
 <script src="js/sounds.js?v=20260526pz"></script>
@@ -344,35 +331,23 @@ function buildPuzzle(type){
 //  TRACKER + BAG (custom, since main game's tile-tracker is hidden)
 // ════════════════════════════════════════════════════════════════════
 function renderTrackerAndBag(){
-  var inv = C.getActiveInventory ? C.getActiveInventory() : C.TILE_INVENTORY;
-  var onBoard = {};
-  for(var r=0;r<15;r++) for(var c=0;c<15;c++){
-    var t = session.board.cells[r][c].tile;
-    if(t) onBoard[t.face] = (onBoard[t.face]||0)+1;
-  }
-  var inRack = {};
-  // playerRack is a Rack object — iterate .tiles
-  (session.playerRack.tiles || []).forEach(function(t){inRack[t.face]=(inRack[t.face]||0)+1;});
-
-  var trackEl = document.getElementById('tile-tracker-grid');
-  trackEl.innerHTML = '';
-  inv.forEach(function(def){
-    var unseen = def.count - (onBoard[def.face]||0) - (inRack[def.face]||0);
-    if(unseen < 0) unseen = 0;
-    var d = document.createElement('div');
-    d.className = 'ti'+(unseen===0?' zero':'');
-    d.innerHTML = '<span class="tf">'+(def.face==='BLANK'?'?':def.face)+'</span><span class="tc">'+unseen+'</span>';
-    trackEl.appendChild(d);
-  });
-
-  // Bag: just compute total from currentPuzzle.bagCount (or sum bagComp)
+  // Use the same tracker module as PvA. It expects a state object with
+  // .board (used to subtract on-board tiles from inventory) and .bag (for the bag-size readout).
+  // The PvA tracker doesn't subtract the player rack — it shows "what's hidden from view",
+  // which is exactly what we want here too.
+  if (!window.AMath || !window.AMath.tileTracker) return;
   var bagTotal = currentPuzzle.bagCount;
   if (bagTotal == null || bagTotal === undefined) {
     var bagComp = currentPuzzle.bagComp||{};
     bagTotal = 0;
     for (var k in bagComp) if (bagComp.hasOwnProperty(k)) bagTotal += bagComp[k];
   }
-  document.getElementById('bag-total').textContent = bagTotal+' tiles in bag';
+  // Synthesize a tile-tracker-compatible state. Bag.bagSize() reads .tiles.length,
+  // so give it a fake array of the right length.
+  var fakeBag = { tiles: new Array(bagTotal) };
+  var state = { board: session.board, bag: fakeBag };
+  var container = document.getElementById('tile-tracker-container');
+  if (container) window.AMath.tileTracker.render(container, state);
 }
 
 // ════════════════════════════════════════════════════════════════════
