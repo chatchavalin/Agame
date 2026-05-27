@@ -7,7 +7,7 @@
 // This script bumps version stamp every time we deploy. If the SW is stale,
 // it tells the SW to unregister, clears all caches, and reloads.
 (function(){
-  var DEPLOYED_VERSION = 'v22-2026-05-26';
+  var DEPLOYED_VERSION = 'v23-2026-05-26';
   var lastVersion = localStorage.getItem('pz_version');
   if (lastVersion !== DEPLOYED_VERSION) {
     localStorage.setItem('pz_version', DEPLOYED_VERSION);
@@ -165,7 +165,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v22</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v23</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -555,9 +555,11 @@ function revealAnswer(){
 }
 
 function showPlay(idx){
+  console.log('[Puzzle] showPlay idx=' + idx);
   var answers = currentPuzzle.answer||[];
-  if(!answers[idx]) return;
+  if(!answers[idx]){ console.warn('[Puzzle] no answer at idx '+idx); return; }
   var a = answers[idx];
+  console.log('[Puzzle] play details:', a);
   var colors=['gold','silver','bronze'];
   // Highlight active Best button
   for(var b=0;b<3;b++){
@@ -568,28 +570,48 @@ function showPlay(idx){
     }
   }
   resetHighlights();
+  // Render NEW tile placements as ghost tiles on the board, plus colored outline
   var hl = ['pz-highlight-gold','pz-highlight-silver','pz-highlight-bronze'];
   var boardEl = document.querySelector('.amath-board');
   if(boardEl){
-    a.placements.forEach(function(p){
-      var cellEl = boardEl.children[p.row*15+p.col];
-      if(cellEl) cellEl.classList.add(hl[idx]);
+    (a.placements||[]).forEach(function(p){
+      var idx2 = p.row*15+p.col;
+      var cellEl = boardEl.children[idx2];
+      if(!cellEl) { console.warn('[Puzzle] no cell at',p.row,p.col); return; }
+      cellEl.classList.add(hl[idx]);
+      // Show the suggested tile if cell is empty (no actual tile on board)
+      if (!cellEl.querySelector('.amath-tile')) {
+        var ghost = document.createElement('div');
+        ghost.className = 'amath-tile pz-ghost-tile';
+        ghost.style.cssText = 'opacity:0.7;background:linear-gradient(145deg,#fef3c7,#fde68a);border:2px solid #f59e0b;color:#1f2937;font-weight:800;display:flex;align-items:center;justify-content:center;width:100%;height:100%;border-radius:4px;font-size:14px;pointer-events:none;';
+        ghost.textContent = (p.face === 'BLANK' ? '?' : p.face);
+        cellEl.appendChild(ghost);
+      }
     });
+  } else {
+    console.warn('[Puzzle] no .amath-board element');
   }
   var tags = '';
   if(a.bingo) tags += '<span class="play-tag tag-bingo">🎰 BINGO +40</span>';
   if(a.yoyo) tags += '<span class="play-tag tag-yoyo">🪀 YOYO</span>';
   if(!a.bingo && !a.yoyo) tags += '<span class="play-tag tag-short">Short</span>';
-  document.getElementById('play-detail').innerHTML =
-    '<div class="play-score '+colors[idx]+'">'+a.score+' pts</div>'+
-    '<div class="play-tags">'+tags+'</div>';
+  var detail = document.getElementById('play-detail');
+  if (detail) {
+    detail.innerHTML =
+      '<div class="play-score '+colors[idx]+'">'+a.score+' pts</div>'+
+      '<div class="play-tags">'+tags+'</div>';
+  } else {
+    console.warn('[Puzzle] no #play-detail element');
+  }
 }
 
 // Click any Best button to reveal that solution. Answers come straight from
 // the captured puzzle (recorded during PvA play) — no solver thinking needed.
 window.showBestPlay = function(idx){
-  if (!currentPuzzle) return;
+  console.log('[Puzzle] showBestPlay called with idx=' + idx);
+  if (!currentPuzzle) { console.warn('[Puzzle] no currentPuzzle'); return; }
   if (!currentPuzzle.answer || !currentPuzzle.answer[idx]) {
+    console.warn('[Puzzle] no answer at idx', idx, 'answer=', currentPuzzle.answer);
     alert('This best play is not available for this captured puzzle.');
     return;
   }
@@ -597,15 +619,25 @@ window.showBestPlay = function(idx){
 };
 
 function actuallyShowBest(idx){
-  document.getElementById('answer-box').classList.remove('hidden');
+  var box = document.getElementById('answer-box');
+  if (!box) { console.warn('[Puzzle] no #answer-box'); return; }
+  box.classList.remove('hidden');
   showPlay(idx);
+  // Scroll the answer box into view (the tile-tracker between it and the rack
+  // can push it off-screen on mobile)
+  setTimeout(function(){
+    box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, 50);
 }
 
 function resetHighlights(){
   var boardEl = document.querySelector('.amath-board');
   if(!boardEl) return;
   for(var i=0;i<boardEl.children.length;i++){
-    boardEl.children[i].classList.remove('pz-highlight-gold','pz-highlight-silver','pz-highlight-bronze');
+    var c = boardEl.children[i];
+    c.classList.remove('pz-highlight-gold','pz-highlight-silver','pz-highlight-bronze');
+    var ghost = c.querySelector('.pz-ghost-tile');
+    if (ghost) ghost.remove();
   }
 }
 
