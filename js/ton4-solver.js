@@ -267,6 +267,67 @@
   }
 
   /**
+   * Find a valid equation using ALL 8 rack tiles + 1 target tile = 9 tokens.
+   * The target is treated as an extra digit/operator tile added to the rack.
+   *
+   * Returns array of up to maxResults matches, each:
+   *   { tokens: [...], size: 9 }
+   */
+  function findFullEquation(rack, target, maxResults) {
+    maxResults = maxResults || 1;
+    var results = [];
+
+    // The 9-tile "full rack" = rack tiles + the target as a 9th tile
+    var fullRack = rack.slice();
+    fullRack.push(String(target));  // target itself becomes a tile
+
+    // Generate all permutations of all 9 tokens
+    var indices = fullRack.map(function (_, i) { return i; });
+    // Permutation budget — 9! = 362880, way over typical browser tolerance.
+    // We cap to a generous but bounded number. Many will share face options
+    // (CHOICE/BLANK), so the cartesian product per permutation multiplies further.
+    var MAX_PERMS = 200000;
+    var perms = 0;
+
+    function tryPerm(perm) {
+      if (perms >= MAX_PERMS) return false;
+      if (results.length >= maxResults) return false;
+      perms++;
+      var optionsList = perm.map(function (idx) { return tileOptions(fullRack[idx]); });
+      if (optionsList.some(function (o) { return o.length === 0; })) return false;
+      var found = cartesianSearch(optionsList, function (tokens) {
+        if (tokens.indexOf('=') === -1) return false;
+        var result = evaluate(tokens);
+        return !isNaN(result);
+      }, 30000);
+      if (found) {
+        results.push({ tokens: found, size: 9 });
+        return true;
+      }
+      return false;
+    }
+
+    // Iteratively generate permutations with Heap's algorithm to avoid
+    // building the full array of 362880 in memory.
+    function heapPermute(k, arr) {
+      if (perms >= MAX_PERMS || results.length >= maxResults) return;
+      if (k === 1) {
+        tryPerm(arr);
+        return;
+      }
+      for (var i = 0; i < k; i++) {
+        heapPermute(k - 1, arr);
+        if (perms >= MAX_PERMS || results.length >= maxResults) return;
+        var swapIdx = (k % 2 === 0) ? i : 0;
+        var tmp = arr[swapIdx]; arr[swapIdx] = arr[k-1]; arr[k-1] = tmp;
+      }
+    }
+
+    heapPermute(indices.length, indices.slice());
+    return results;
+  }
+
+  /**
    * Solve all 26 targets for a given rack. Returns map: target → result or null.
    */
   async function solveAllTargets(rack, onProgress) {
@@ -277,9 +338,9 @@
     for (var i = 0; i < targets.length; i++) {
       var t = targets[i];
       if (onProgress) onProgress(i, targets.length, t);
-      // Yield to UI
       await new Promise(function(r){ setTimeout(r, 0); });
-      var matches = findEquations(rack, t, 1);
+      // FULL EQUATION mode: use all 8 rack tiles + 1 target tile = 9 tokens.
+      var matches = findFullEquation(rack, t, 1);
       results[t] = matches.length > 0 ? matches[0] : null;
     }
     if (onProgress) onProgress(targets.length, targets.length, null);
@@ -289,6 +350,7 @@
   window.AMath = window.AMath || {};
   window.AMath.ton4Solver = {
     findEquations: findEquations,
+    findFullEquation: findFullEquation,
     solveAllTargets: solveAllTargets,
     evaluate: evaluate,
   };
