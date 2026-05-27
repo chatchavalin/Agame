@@ -85,12 +85,18 @@
    * found by the AI (filtered to BINGOs only — 8-tile plays).
    */
   async function solveOneRack(faces) {
+    // For 8-tile racks (ton1): use the main AI solver on an empty board.
+    // Throws if faces.length > 8 since the rack object enforces 8-tile limit.
+    if (faces.length > 8) {
+      console.warn('[book-gen] solveOneRack received >8 tiles; use solveEquationTokens instead');
+      return [];
+    }
     const board = Board.createBoard();
     const rack = makeRack(faces);
 
     const aiState = {
       board: board,
-      bag: { tiles: [] },  // empty bag — opening move
+      bag: { tiles: [] },
       aiRack: rack,
       opponentRack: { tiles: [] },
       aiScore: 0, playerScore: 0,
@@ -100,7 +106,7 @@
       aiActualPlayCount: 0,
       aiConsecutiveSwaps: 0,
       lastOpponentAction: null,
-      _settings: { aiThinkSeconds: 180 },  // full search depth
+      _settings: { aiThinkSeconds: 30 },  // 30s plenty for empty-board bingo
     };
 
     let decision;
@@ -120,10 +126,28 @@
     if (decision && decision.placements) add(decision);
     topPlays.forEach(add);
 
-    // Filter to BINGOs only (8-tile plays) per user requirement
     const bingos = allPlays.filter(p => p.placements.length >= 8);
     bingos.sort((a, b) => (b.score || 0) - (a.score || 0));
     return bingos.slice(0, 3);
+  }
+
+  /**
+   * For ton2/ton3: 9-token equations. Treat tokens as a flat list (no board play).
+   * Calls ton4Solver.findFullEquation under the hood (which is actually a generic
+   * full-tile-list equation solver).
+   */
+  function solveEquationTokens(faces) {
+    if (!window.AMath.ton4Solver || !window.AMath.ton4Solver.findFullEquation) {
+      console.warn('[book-gen] ton4Solver not loaded');
+      return null;
+    }
+    // findFullEquation takes (rack, target) — rack of N tiles + 1 target = N+1.
+    // Our `faces` already contains all N+1 tokens. So pop the LAST and pass it as target.
+    if (faces.length < 4) return null;
+    const rack = faces.slice(0, -1);
+    const target = faces[faces.length - 1];
+    const matches = window.AMath.ton4Solver.findFullEquation(rack, target, 1);
+    return matches.length > 0 ? matches[0] : null;
   }
 
   /**
@@ -171,6 +195,9 @@
     let added = 0;
     const t0 = Date.now();
 
+    // ton1 uses the main AI solver (board play); ton2/ton3 use the equation solver (no board)
+    const isEquationMode = (sectionId === 'ton2' || sectionId === 'ton3');
+
     for (let i = 0; i < allPuzzles.length; i++) {
       if (_cancelled) break;
       await yieldToUI();
@@ -184,32 +211,45 @@
         });
       }
 
-      const bingos = await solveOneRack(source.rack);
-      const bestPlays = bingos.map(playToBest);
-
-      const entry = {
-        id: Date.now() + Math.floor(Math.random() * 1e9),
-        capturedAt: new Date().toISOString(),
-        sectionId: sectionId,
-        patternId: pattern.id,
-        patternLabel: pattern.label,
-        scoreYou: 0, scoreOpp: 0,
-        bagCount: 102 - source.rack.length,  // empty board, no other tiles drawn
-        board: [],  // empty board for book puzzles
-        rack: source.rack.slice(),
-        bagComp: {},  // will be computed when puzzle is opened
-        playerPlay: null,
-        bestPlays: bestPlays,
-        hasBingo: bestPlays.length > 0,
-        bookAnswer: source.bookAnswer || null,
-        hint: bestPlays.length > 0
-          ? ('📘 ' + section.title + ' — ' + pattern.label + (source.bookAnswer ? '. Book answer: ' + source.bookAnswer : ''))
-          : ('📘 ' + section.title + ' — ' + pattern.label + '. NO bingo possible for this rack — you got it by recognizing that.'),
-        _source: 'book-' + sectionId,
-      };
+      let entry;
+      if (isEquationMode) {
+        // 9-token equation: solve using ton4Solver
+        const eq = solveEquationTokens(source.rack);
+        entry = {
+          id: Date.now() + Math.floor(Math.random() * 1e9),
+          capturedAt: new Date().toISOString(),
+          sectionId, patternId: pattern.id, patternLabel: pattern.label,
+          tokens: source.rack.slice(),  // 9 tokens for the puzzle display
+          equation: eq ? eq.tokens : null,
+          bookAnswer: source.bookAnswer || null,
+          hasSolution: !!eq,
+          _source: 'book-' + sectionId,
+        };
+      } else {
+        // Board-play mode (ton1): main AI solver, 8-tile rack
+        const bingos = await solveOneRack(source.rack);
+        const bestPlays = bingos.map(playToBest);
+        entry = {
+          id: Date.now() + Math.floor(Math.random() * 1e9),
+          capturedAt: new Date().toISOString(),
+          sectionId, patternId: pattern.id, patternLabel: pattern.label,
+          scoreYou: 0, scoreOpp: 0,
+          bagCount: 102 - source.rack.length,
+          board: [],
+          rack: source.rack.slice(),
+          bagComp: {},
+          playerPlay: null,
+          bestPlays: bestPlays,
+          hasBingo: bestPlays.length > 0,
+          bookAnswer: source.bookAnswer || null,
+          hint: bestPlays.length > 0
+            ? ('📘 ' + section.title + (source.bookAnswer ? '. Book answer: ' + source.bookAnswer : ''))
+            : ('📘 ' + section.title + '. NO bingo possible for this rack — you got it by recognizing that.'),
+          _source: 'book-' + sectionId,
+        };
+      }
       newBank.push(entry);
       added++;
-      // Save incrementally so cancel/crash is safe
       saveCache(sectionId, newBank);
     }
 
@@ -245,6 +285,7 @@
     loadCache: loadCache,
     generateSection: generateSection,
     solveOneRack: solveOneRack,
+    solveEquationTokens: solveEquationTokens,
     solveTon4Target: solveTon4Target,
     cancel: cancel,
   };
