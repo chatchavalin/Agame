@@ -310,7 +310,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v41</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v42</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -499,33 +499,33 @@ body.theme-dark .player-area .amath-tile-rack {
 </div>
 
 <!-- Load main game JS modules in dependency order (same as index.html) -->
-<script src="js/constants.js?v=v41-2026-05-27"></script>
-<script src="js/utils.js?v=v41-2026-05-27"></script>
-<script src="js/evaluator.js?v=v41-2026-05-27"></script>
-<script src="js/bag.js?v=v41-2026-05-27"></script>
-<script src="js/rack.js?v=v41-2026-05-27"></script>
-<script src="js/board.js?v=v41-2026-05-27"></script>
-<script src="js/tile-tracker.js?v=v41-2026-05-27"></script>
-<script src="js/scoring.js?v=v41-2026-05-27"></script>
-<script src="js/placement.js?v=v41-2026-05-27"></script>
+<script src="js/constants.js?v=v42-2026-05-27"></script>
+<script src="js/utils.js?v=v42-2026-05-27"></script>
+<script src="js/evaluator.js?v=v42-2026-05-27"></script>
+<script src="js/bag.js?v=v42-2026-05-27"></script>
+<script src="js/rack.js?v=v42-2026-05-27"></script>
+<script src="js/board.js?v=v42-2026-05-27"></script>
+<script src="js/tile-tracker.js?v=v42-2026-05-27"></script>
+<script src="js/scoring.js?v=v42-2026-05-27"></script>
+<script src="js/placement.js?v=v42-2026-05-27"></script>
 <!-- AI modules for the in-browser puzzle generator -->
-<script src="js/ai-x9.js?v=v41-2026-05-27"></script>
-<script src="js/ai-x4.js?v=v41-2026-05-27"></script>
-<script src="js/ai-bingo-fast.js?v=v41-2026-05-27"></script>
-<script src="js/ai-bingo-grammar.js?v=v41-2026-05-27"></script>
-<script src="js/ai-yoyo.js?v=v41-2026-05-27"></script>
-<script src="js/ai-patterns-data.js?v=v41-2026-05-27"></script>
-<script src="js/ai-patterns-engine.js?v=v41-2026-05-27"></script>
-<script src="js/ai-swap.js?v=v41-2026-05-27"></script>
-<script src="js/ai-swap-brain2.js?v=v41-2026-05-27"></script>
-<script src="js/ai-player.js?v=v41-2026-05-27"></script>
-<script src="js/puzzle-generator.js?v=v41-2026-05-27"></script>
-<script src="js/book-puzzle-generator.js?v=v41-2026-05-27"></script>
-<script src="js/ton4-solver.js?v=v41-2026-05-27"></script>
-<script src="js/sounds.js?v=v41-2026-05-27"></script>
-<script src="js/settings.js?v=v41-2026-05-27"></script>
-<script src="js/ui.js?v=v41-2026-05-27"></script>
-<script src="js/interactions.js?v=v41-2026-05-27"></script>
+<script src="js/ai-x9.js?v=v42-2026-05-27"></script>
+<script src="js/ai-x4.js?v=v42-2026-05-27"></script>
+<script src="js/ai-bingo-fast.js?v=v42-2026-05-27"></script>
+<script src="js/ai-bingo-grammar.js?v=v42-2026-05-27"></script>
+<script src="js/ai-yoyo.js?v=v42-2026-05-27"></script>
+<script src="js/ai-patterns-data.js?v=v42-2026-05-27"></script>
+<script src="js/ai-patterns-engine.js?v=v42-2026-05-27"></script>
+<script src="js/ai-swap.js?v=v42-2026-05-27"></script>
+<script src="js/ai-swap-brain2.js?v=v42-2026-05-27"></script>
+<script src="js/ai-player.js?v=v42-2026-05-27"></script>
+<script src="js/puzzle-generator.js?v=v42-2026-05-27"></script>
+<script src="js/book-puzzle-generator.js?v=v42-2026-05-27"></script>
+<script src="js/ton4-solver.js?v=v42-2026-05-27"></script>
+<script src="js/sounds.js?v=v42-2026-05-27"></script>
+<script src="js/settings.js?v=v42-2026-05-27"></script>
+<script src="js/ui.js?v=v42-2026-05-27"></script>
+<script src="js/interactions.js?v=v42-2026-05-27"></script>
 
 <script>
 (function(){
@@ -1200,25 +1200,27 @@ function initBookSections() {
     ['ton1','ton2','ton3','ton4'].forEach(function(sid){
       const section = data[sid];
       if (!section) return;
+      const totalProblems = (sid === 'ton4') ? section.targets.length :
+        section.patterns.reduce(function(s,p){ return s + p.puzzles.length; }, 0);
+      // Sets 1-3 are always "ready" because they read directly from book-data.json.
+      // Set 4 (ton4) used to be gated on a separate solver cache; keep that check.
       let cachedCount = 0;
       if (sid !== 'ton4') {
-        try { cachedCount = window.AMath.bookGenerator.loadCache(sid).length; } catch(e){}
+        cachedCount = totalProblems;  // always ready
       } else {
         try { cachedCount = (JSON.parse(localStorage.getItem('amath_book_ton4_cache')||'null') ? 1 : 0); } catch(e){}
       }
-      const totalProblems = (sid === 'ton4') ? section.targets.length :
-        section.patterns.reduce(function(s,p){ return s + p.puzzles.length; }, 0);
       const card = document.createElement('div');
       const isReady = cachedCount > 0;
       card.style.cssText = 'background:#0f172a;border:1px solid ' + (isReady ? '#10b981' : '#334155') + ';border-radius:10px;padding:12px;margin-bottom:8px;';
       const statusLine = (sid === 'ton4')
         ? '<div style="font-size:10px;color:' + (isReady ? '#10b981' : '#94a3b8') + ';">' + (isReady ? '✓ ready' : totalProblems + ' targets — not generated') + '</div>'
-        : '<div style="font-size:10px;color:' + (isReady ? '#10b981' : '#94a3b8') + ';">' + (isReady ? '✓ ' + cachedCount + ' puzzles ready' : cachedCount + ' / ' + totalProblems + ' computed') + '</div>';
+        : '<div style="font-size:10px;color:#10b981;">✓ ' + totalProblems + ' problems</div>';
+      // Sets 1-3 just need Practice (no generate step since we pull from book-data live).
+      // Set 4 opens its dedicated target-drills screen.
       const actionButtons = (sid === 'ton4')
         ? '<button class="book-btn-primary" onclick="openTon4()">▶ Open</button>'
-        : (isReady
-            ? '<button class="book-btn-primary" onclick="practiceBookSection(\'' + sid + '\')">▶ Practice</button><button class="book-btn-secondary" onclick="generateBookSection(\'' + sid + '\')">⟳ Re-gen</button>'
-            : '<button class="book-btn-secondary" onclick="generateBookSection(\'' + sid + '\')">⚙ Generate</button>');
+        : '<button class="book-btn-primary" onclick="practiceBookSection(\'' + sid + '\')">▶ Practice</button>';
       card.innerHTML =
         '<div style="font-size:12px;font-weight:700;color:#e2e8f0;">' + section.title + '</div>' +
         '<div style="font-size:11px;color:#94a3b8;margin:2px 0 6px;line-height:1.4;">' + section.description + '</div>' +
@@ -1279,16 +1281,38 @@ window.generateBookSection = async function(sid) {
   }
 };
 
-window.practiceBookSection = function(sid) {
-  const cache = window.AMath.bookGenerator.loadCache(sid);
-  if (!cache || cache.length === 0) {
-    alert('No cached puzzles for this section — please Generate first.');
+window.practiceBookSection = async function(sid) {
+  // Always read from book-data.json (the source of truth). Previously we
+  // pulled from localStorage cache, which could be stale (e.g. saved when
+  // there were only 5 puzzles per pattern — re-generation never updated it
+  // for users who already had a cache). Building the puzzle list from
+  // book-data on demand guarantees the user sees the current 10 per pattern.
+  if (!window.AMath._bookData && window.AMath.bookGenerator) {
+    await window.AMath.bookGenerator.loadBookData();
+  }
+  const data = window.AMath._bookData;
+  if (!data || !data[sid]) {
+    alert('Book data not loaded yet — try again in a moment.');
     return;
   }
-
-  // ALL book sections (ton1, ton2, ton3) use the equation-style UI.
-  // ton4 has its own dedicated target-drills screen.
-  openEquationPractice(sid, cache);
+  const section = data[sid];
+  const puzzles = [];
+  (section.patterns || []).forEach(function(pat){
+    (pat.puzzles || []).forEach(function(pz){
+      puzzles.push({
+        sectionId: sid,
+        patternId: pat.id,
+        patternLabel: pat.label,
+        tokens: pz.rack.slice(),
+        hasSolution: true,
+      });
+    });
+  });
+  if (puzzles.length === 0) {
+    alert('No puzzles defined for this set.');
+    return;
+  }
+  openEquationPractice(sid, puzzles);
   return;
 
   // (unreachable — board-play path retained for reference if we ever switch back)
