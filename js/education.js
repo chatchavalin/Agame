@@ -715,6 +715,7 @@
 
   window.AMath = window.AMath || {};
   window.AMath.education = {
+    getSearchResult: function () { return searchResult; },
     startBackgroundSearch: startBackgroundSearch,
     stopSearch: stopSearch,
     onVerifyPress: onVerifyPress,

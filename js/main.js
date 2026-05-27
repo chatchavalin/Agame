@@ -1742,6 +1742,16 @@
     // can use them without changing the function signature.
     scoreResult.equations = result.equations;
 
+    // [puzzle-recorder] Capture missed-best-move puzzles during late game.
+    // Must run BEFORE commitPlayerPlay (which stops the education search
+    // and clears the tentativePlacements).
+    try {
+      if (window.AMath.puzzleRecorder && window.AMath.education) {
+        var edu = window.AMath.education.getSearchResult();
+        window.AMath.puzzleRecorder.maybeRecord(session, scoreResult, edu);
+      }
+    } catch (e) { console.warn('puzzle-recorder hook failed:', e); }
+
     commitPlayerPlay(scoreResult);
   }
 

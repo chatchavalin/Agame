@@ -7,7 +7,7 @@
 // This script bumps version stamp every time we deploy. If the SW is stale,
 // it tells the SW to unregister, clears all caches, and reloads.
 (function(){
-  var DEPLOYED_VERSION = 'v17-2026-05-26';
+  var DEPLOYED_VERSION = 'v18-2026-05-26';
   var lastVersion = localStorage.getItem('pz_version');
   if (lastVersion !== DEPLOYED_VERSION) {
     localStorage.setItem('pz_version', DEPLOYED_VERSION);
@@ -172,32 +172,37 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v17</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v18</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
 <!-- SELECT SCREEN -->
 <div id="screen-select">
-  <h2>Choose Mode</h2>
-  <p>Real positions from turn-by-turn game simulation</p>
-  <div class="mode-card" onclick="startPuzzle('mixed')">
-    <div class="mode-icon">🔥</div>
-    <div><h3>Mixed</h3><p>Bingos, YoYos, and high-value plays</p></div>
+  <h2>Missed-Move Trainer</h2>
+  <p>Puzzles are captured from your own Player-vs-AI games whenever you miss the best move with fewer than 25 tiles in the bag.</p>
+  <div id="bank-status" style="background:var(--bg-panel,#1e293b);border:1px solid var(--border-medium,#334155);border-radius:14px;padding:18px;text-align:center;margin-bottom:12px;">
+    <div id="bank-count" style="font-size:28px;font-weight:800;color:#fbbf24;">—</div>
+    <div style="font-size:13px;color:#94a3b8;">puzzles captured (max 200)</div>
   </div>
-  <div class="mode-card" onclick="startPuzzle('bingo')">
-    <div class="mode-icon">🎰</div>
-    <div><h3>Bingo Only</h3><p>Use all 8 tiles. Find the hook</p></div>
+  <div class="mode-card" onclick="startPuzzle('mixed')" id="start-btn">
+    <div class="mode-icon">🧩</div>
+    <div><h3>Start Practicing</h3><p>Replay your missed moves and see the top 3 best plays.</p></div>
   </div>
-  <div class="mode-card" onclick="startPuzzle('yoyo')">
-    <div class="mode-icon">🪀</div>
-    <div><h3>YoYo Only</h3><p>Complete a 15-cell line</p></div>
+  <div id="empty-state" style="display:none;background:var(--bg-panel,#1e293b);border:2px dashed #475569;border-radius:14px;padding:24px 16px;text-align:center;margin-top:12px;">
+    <div style="font-size:32px;margin-bottom:8px;">📭</div>
+    <div style="font-size:14px;color:#cbd5e1;line-height:1.5;">
+      No puzzles yet. Play a Player-vs-AI game — when the bag drops below 25 tiles and you miss the best move, the position is saved here automatically.
+    </div>
+  </div>
+  <div style="text-align:center;margin-top:14px;">
+    <button onclick="clearBank()" style="background:none;border:none;color:#64748b;font-size:11px;text-decoration:underline;cursor:pointer;font-family:inherit;">Clear all captured puzzles</button>
   </div>
 </div>
 
 <!-- PUZZLE SCREEN — uses main-game layout via UI.buildGameLayout() -->
 <div id="screen-puzzle">
   <div class="pz-meta">
-    <span id="puzzle-type-label" class="badge">Mixed</span>
+    <span class="badge">🧩 Trainer</span>
     <span id="puzzle-num" class="pznum">#1</span>
     <span id="streak" class="streak">Streak: 0</span>
     <span id="timer" class="timer">0:00</span>
@@ -277,159 +282,27 @@ function init(){
   Interactions = window.AMath.interactions;
 }
 
-  var PUZZLE_BANK = {
-    bingo: [
-      { scoreYou:76, scoreOpp:107, bagCount:33,
-        board:[
-        [6,1,'12'],
-        [7,0,'12'],[7,1,'BLANK','-'],[7,2,'3'],[7,3,'='],[7,4,'9'],[7,5,'0'],[7,6,'×/÷','÷'],[7,7,'6'],
-        [8,1,'1'],
-        [9,1,'-'],
-        [10,1,'5'],
-        [12,0,'='],[12,1,'7'],[12,2,'2'],
-        [13,0,'11'],[13,1,'='],[13,2,'2'],[13,3,'5'],[13,4,'-'],[13,5,'14']
-        ],
-        rack: ['0','2','3','3','13','+','=','×/÷'],
-        bagComp: {'+':3,'+/-':5,'-':2,'0':3,'1':5,'10':2,'15':1,'16':1,'17':1,'18':1,'19':1,'2':3,'20':1,'3':2,'4':5,'5':2,'6':3,'7':3,'8':4,'9':3,'=':7,'BLANK':3,'×':4,'×/÷':2,'÷':4},
-        history: 'Book 4 ข้อ 3',
-        hint: '📘 Book 4 ข้อ 3: Down 31. Look at the left cluster — multiple short hooks available on existing 11, 13, 14 tiles.'
-      },
-      { scoreYou:118, scoreOpp:94, bagCount:68,
-        board:[
-        [0,6,'6'],
-        [1,4,'9'],[1,5,'='],[1,6,'0'],[1,7,'÷'],[1,8,'19'],[1,9,'×'],[1,10,'8'],[1,11,'+'],[1,12,'9'],
-        [2,6,'3'],
-        [3,6,'='],
-        [4,6,'9'],
-        [5,6,'×'],
-        [6,6,'6'],
-        [7,6,'7']
-        ],
-        rack: ['0','3','4','5','14','16','×','×'],
-        bagComp: {'+':3,'+/-':5,'-':4,'0':3,'1':6,'10':2,'11':1,'12':2,'13':1,'15':1,'17':1,'18':1,'2':6,'20':1,'3':3,'4':4,'5':3,'6':2,'7':3,'8':3,'9':1,'=':9,'BLANK':4,'×/÷':4,'÷':3},
-        history: 'Book 5 ข้อ 5',
-        hint: '📘 Book 5 ข้อ 5: Leading by 24. Maintain pressure with a × multiplication play. Col 6 has many hooks.'
-      },
-      { scoreYou:114, scoreOpp:148, bagCount:22,
-        board:[
-        [4,9,'2'],
-        [5,9,'+'],
-        [6,9,'3'],
-        [7,6,'11'],[7,7,'='],[7,8,'7'],[7,9,'×/÷','×'],[7,10,'4'],[7,11,'-'],[7,12,'1'],[7,13,'BLANK','16'],
-        [8,9,'4'],
-        [9,9,'='],
-        [10,6,'8'],[10,7,'0'],[10,8,'-'],[10,9,'14'],[10,10,'='],[10,11,'6'],[10,12,'6'],
-        [11,12,'+'],
-        [12,12,'7'],
-        [13,12,'='],
-        [14,8,'5'],[14,9,'='],[14,10,'16'],[14,11,'+/-','-'],[14,12,'13'],[14,13,'+'],[14,14,'2']
-        ],
-        rack: ['0','2','3','8','20','+','+/-','×/÷'],
-        bagComp: {'+/-':3,'-':2,'0':3,'1':5,'10':2,'12':2,'15':1,'17':1,'18':1,'19':1,'2':3,'3':3,'4':3,'5':3,'6':2,'7':2,'8':2,'9':4,'=':6,'BLANK':3,'×':4,'×/÷':2,'÷':4},
-        history: 'Book 4 ข้อ 9',
-        hint: '📘 Book 4 ข้อ 9: Down 34. Dense network. Look for short plays hooking existing big tiles (11, 14, 16, 20).'
-      }
-    ],
-    yoyo: [
-      { scoreYou:76, scoreOpp:107, bagCount:33,
-        board:[
-        [6,1,'12'],
-        [7,0,'12'],[7,1,'BLANK','-'],[7,2,'3'],[7,3,'='],[7,4,'9'],[7,5,'0'],[7,6,'×/÷','÷'],[7,7,'6'],
-        [8,1,'1'],
-        [9,1,'-'],
-        [10,1,'5'],
-        [12,0,'='],[12,1,'7'],[12,2,'2'],
-        [13,0,'11'],[13,1,'='],[13,2,'2'],[13,3,'5'],[13,4,'-'],[13,5,'14']
-        ],
-        rack: ['0','2','3','3','13','+','=','×/÷'],
-        bagComp: {'+':3,'+/-':5,'-':2,'0':3,'1':5,'10':2,'15':1,'16':1,'17':1,'18':1,'19':1,'2':3,'20':1,'3':2,'4':5,'5':2,'6':3,'7':3,'8':4,'9':3,'=':7,'BLANK':3,'×':4,'×/÷':2,'÷':4},
-        history: 'Book 4 ข้อ 3',
-        hint: '📘 Book 4 ข้อ 3: Down 31. Look at the left cluster — multiple short hooks available on existing 11, 13, 14 tiles.'
-      },
-      { scoreYou:118, scoreOpp:94, bagCount:68,
-        board:[
-        [0,6,'6'],
-        [1,4,'9'],[1,5,'='],[1,6,'0'],[1,7,'÷'],[1,8,'19'],[1,9,'×'],[1,10,'8'],[1,11,'+'],[1,12,'9'],
-        [2,6,'3'],
-        [3,6,'='],
-        [4,6,'9'],
-        [5,6,'×'],
-        [6,6,'6'],
-        [7,6,'7']
-        ],
-        rack: ['0','3','4','5','14','16','×','×'],
-        bagComp: {'+':3,'+/-':5,'-':4,'0':3,'1':6,'10':2,'11':1,'12':2,'13':1,'15':1,'17':1,'18':1,'2':6,'20':1,'3':3,'4':4,'5':3,'6':2,'7':3,'8':3,'9':1,'=':9,'BLANK':4,'×/÷':4,'÷':3},
-        history: 'Book 5 ข้อ 5',
-        hint: '📘 Book 5 ข้อ 5: Leading by 24. Maintain pressure with a × multiplication play. Col 6 has many hooks.'
-      },
-      { scoreYou:114, scoreOpp:148, bagCount:22,
-        board:[
-        [4,9,'2'],
-        [5,9,'+'],
-        [6,9,'3'],
-        [7,6,'11'],[7,7,'='],[7,8,'7'],[7,9,'×/÷','×'],[7,10,'4'],[7,11,'-'],[7,12,'1'],[7,13,'BLANK','16'],
-        [8,9,'4'],
-        [9,9,'='],
-        [10,6,'8'],[10,7,'0'],[10,8,'-'],[10,9,'14'],[10,10,'='],[10,11,'6'],[10,12,'6'],
-        [11,12,'+'],
-        [12,12,'7'],
-        [13,12,'='],
-        [14,8,'5'],[14,9,'='],[14,10,'16'],[14,11,'+/-','-'],[14,12,'13'],[14,13,'+'],[14,14,'2']
-        ],
-        rack: ['0','2','3','8','20','+','+/-','×/÷'],
-        bagComp: {'+/-':3,'-':2,'0':3,'1':5,'10':2,'12':2,'15':1,'17':1,'18':1,'19':1,'2':3,'3':3,'4':3,'5':3,'6':2,'7':2,'8':2,'9':4,'=':6,'BLANK':3,'×':4,'×/÷':2,'÷':4},
-        history: 'Book 4 ข้อ 9',
-        hint: '📘 Book 4 ข้อ 9: Down 34. Dense network. Look for short plays hooking existing big tiles (11, 14, 16, 20).'
-      },
-      { scoreYou:136, scoreOpp:0, bagCount:46,
-        board:[
-        [7,6,'20'],[7,7,'-'],[7,8,'9'],[7,9,'+/-','+'],[7,10,'16'],[7,11,'='],[7,12,'2'],[7,13,'7']
-        ],
-        rack: ['0','8','11','13','+','-','×/÷','='],
-        bagComp: {'+':3,'+/-':4,'-':2,'0':4,'1':6,'10':2,'12':2,'14':1,'15':1,'17':1,'18':1,'19':1,'2':5,'3':5,'4':5,'5':4,'6':4,'7':3,'8':3,'9':3,'=':9,'BLANK':4,'×':4,'×/÷':3,'÷':4},
-        history: 'Book 4 ข้อ 4',
-        hint: '📘 Book 4 ข้อ 4: Leading 136-0 after one play. Find the next big play to extend the lead.'
-      }
-    ],
-    mixed: [
-      { scoreYou:0, scoreOpp:0, bagCount:54,
-        board:[
-        
-        ],
-        rack: ['2','2','13','15','20','-','-','='],
-        bagComp: {'+':4,'+/-':5,'-':2,'0':5,'1':6,'10':2,'11':1,'12':2,'14':1,'16':1,'17':1,'18':1,'19':1,'2':4,'3':5,'4':5,'5':4,'6':4,'7':4,'8':4,'9':4,'=':10,'BLANK':4,'×':4,'×/÷':4,'÷':4},
-        history: 'Book 4 ข้อ 1',
-        hint: '📘 Book 4 ข้อ 1: Opening move with only minus signs. Find the best play through the 3T center star.'
-      },
-      { scoreYou:0, scoreOpp:0, bagCount:54,
-        board:[
-        
-        ],
-        rack: ['3','3','4','7','8','9','×/÷','='],
-        bagComp: {'+':4,'+/-':5,'-':4,'0':5,'1':6,'10':2,'11':1,'12':2,'13':1,'14':1,'15':1,'16':1,'17':1,'18':1,'19':1,'2':6,'20':1,'3':3,'4':4,'5':4,'6':4,'7':3,'8':3,'9':3,'=':10,'BLANK':4,'×':4,'×/÷':3,'÷':4},
-        history: 'Book 4 ข้อ 2',
-        hint: '📘 Book 4 ข้อ 2: Opening with ×/÷ choice tile. Use multiplication or division through the center.'
-      },
-      { scoreYou:0, scoreOpp:0, bagCount:54,
-        board:[
-        
-        ],
-        rack: ['11','13','17','19','+','+','-','='],
-        bagComp: {'+':2,'+/-':5,'-':3,'0':5,'1':6,'10':2,'12':2,'14':1,'15':1,'16':1,'18':1,'2':6,'20':1,'3':5,'4':5,'5':4,'6':4,'7':4,'8':4,'9':4,'=':10,'BLANK':4,'×':4,'×/÷':4,'÷':4},
-        history: 'Book 5 ข้อ 1',
-        hint: '📘 Book 5 ข้อ 1: Opening with big 2-digit numbers. Look for clean +/- combinations.'
-      },
-      { scoreYou:136, scoreOpp:0, bagCount:46,
-        board:[
-        [7,6,'20'],[7,7,'-'],[7,8,'9'],[7,9,'+/-','+'],[7,10,'16'],[7,11,'='],[7,12,'2'],[7,13,'7']
-        ],
-        rack: ['0','8','11','13','+','-','×/÷','='],
-        bagComp: {'+':3,'+/-':4,'-':2,'0':4,'1':6,'10':2,'12':2,'14':1,'15':1,'17':1,'18':1,'19':1,'2':5,'3':5,'4':5,'5':4,'6':4,'7':3,'8':3,'9':3,'=':9,'BLANK':4,'×':4,'×/÷':3,'÷':4},
-        history: 'Book 4 ข้อ 4',
-        hint: '📘 Book 4 ข้อ 4: Leading 136-0 after one play. Find the next big play to extend the lead.'
-      }
-    ],
-  };
+  // PUZZLE_BANK is now built dynamically from localStorage
+  // (populated by js/puzzle-recorder.js during PvA games).
+  var PUZZLE_BANK = { bingo: [], yoyo: [], mixed: [] };
+
+  function loadPuzzlesFromStorage() {
+    try {
+      var raw = localStorage.getItem('amath_puzzle_bank');
+      if (!raw) return [];
+      return JSON.parse(raw);
+    } catch (e) { return []; }
+  }
+
+  function buildBankFromStorage() {
+    var stored = loadPuzzlesFromStorage();
+    PUZZLE_BANK = { bingo: [], yoyo: [], mixed: [] };
+    stored.forEach(function (p) {
+      PUZZLE_BANK.mixed.push(p);  // single mode = mixed
+    });
+    return stored.length;
+  }
+
 
 // ════════════════════════════════════════════════════════════════════
 //  BUILD A PUZZLE — load template, create session state for main UI
@@ -766,11 +639,14 @@ window.showHint = function(){
 // ════════════════════════════════════════════════════════════════════
 window.startPuzzle = function(type){
   init();
-  puzzleType = type; puzzleNum = 0; streak = 0;
+  buildBankFromStorage();  // re-load latest captures from localStorage
+  if (!PUZZLE_BANK.mixed || PUZZLE_BANK.mixed.length === 0) {
+    alert('No puzzles captured yet.\n\nPlay a Player-vs-AI game first — when the bag has fewer than 25 tiles and you miss the best move, that position will be saved here.');
+    return;
+  }
+  puzzleType = 'mixed'; puzzleNum = 0; streak = 0;
   document.getElementById('screen-select').style.display='none';
   document.getElementById('screen-puzzle').style.display='block';
-  var labels = {mixed:'🔥 Mixed', bingo:'🎰 Bingo Only', yoyo:'🪀 YoYo Only'};
-  document.getElementById('puzzle-type-label').textContent = labels[type]||type;
 
   // Build the main game's DOM layout into our #game-container.
   // This gives us the EXACT same board/rack/tiles as Player-vs-AI mode.
@@ -857,31 +733,38 @@ window.nextPuzzle = function(){
     document.getElementById('timer').textContent = m+':'+(s<10?'0':'')+s;
   }, 1000);
 
-  // Run solver in background
-  currentPuzzle.answer = null;
-  setTimeout(function(){
-    try {
-      var sb = Board.createBoard();
-      session.board.cells.forEach(function(row,r){
-        row.forEach(function(cell,c){
-          if(cell.tile){
-            Board.placeTile(sb, r, c, cell.tile);
-            sb.cells[r][c].premiumUsed = true;
-          }
-        });
-      });
-      currentPuzzle.answer = findBestPlays(sb, session.playerRack.tiles, puzzleType);
-    } catch(e){
-      console.warn('Solver error:', e);
-      currentPuzzle.answer = [];
-    }
-  }, 200);
+  // Answer is already loaded from storage — no solver needed
 };
 
 window.goBack = function(){
   if(timerInterval) clearInterval(timerInterval);
   window.location.href = 'lobby.html';
 };
+
+window.clearBank = function(){
+  if (!confirm('Delete all captured puzzles? This cannot be undone.')) return;
+  try { localStorage.removeItem('amath_puzzle_bank'); } catch (e) {}
+  refreshBankStatus();
+};
+
+function refreshBankStatus(){
+  var stored = loadPuzzlesFromStorage();
+  var countEl = document.getElementById('bank-count');
+  var emptyEl = document.getElementById('empty-state');
+  var startBtn = document.getElementById('start-btn');
+  if (countEl) countEl.textContent = stored.length;
+  if (stored.length === 0) {
+    if (emptyEl) emptyEl.style.display = 'block';
+    if (startBtn) { startBtn.style.opacity = '0.4'; startBtn.style.pointerEvents = 'none'; }
+  } else {
+    if (emptyEl) emptyEl.style.display = 'none';
+    if (startBtn) { startBtn.style.opacity = '1'; startBtn.style.pointerEvents = 'auto'; }
+  }
+}
+
+// Update on page load
+document.addEventListener('DOMContentLoaded', refreshBankStatus);
+setTimeout(refreshBankStatus, 100);  // also after scripts settle
 
 // Theme toggle — cycle through dark / modern / physical
 window.cycleTheme = function(){
