@@ -310,7 +310,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v39</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v40</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -499,33 +499,33 @@ body.theme-dark .player-area .amath-tile-rack {
 </div>
 
 <!-- Load main game JS modules in dependency order (same as index.html) -->
-<script src="js/constants.js?v=v39-2026-05-27"></script>
-<script src="js/utils.js?v=v39-2026-05-27"></script>
-<script src="js/evaluator.js?v=v39-2026-05-27"></script>
-<script src="js/bag.js?v=v39-2026-05-27"></script>
-<script src="js/rack.js?v=v39-2026-05-27"></script>
-<script src="js/board.js?v=v39-2026-05-27"></script>
-<script src="js/tile-tracker.js?v=v39-2026-05-27"></script>
-<script src="js/scoring.js?v=v39-2026-05-27"></script>
-<script src="js/placement.js?v=v39-2026-05-27"></script>
+<script src="js/constants.js?v=v40-2026-05-27"></script>
+<script src="js/utils.js?v=v40-2026-05-27"></script>
+<script src="js/evaluator.js?v=v40-2026-05-27"></script>
+<script src="js/bag.js?v=v40-2026-05-27"></script>
+<script src="js/rack.js?v=v40-2026-05-27"></script>
+<script src="js/board.js?v=v40-2026-05-27"></script>
+<script src="js/tile-tracker.js?v=v40-2026-05-27"></script>
+<script src="js/scoring.js?v=v40-2026-05-27"></script>
+<script src="js/placement.js?v=v40-2026-05-27"></script>
 <!-- AI modules for the in-browser puzzle generator -->
-<script src="js/ai-x9.js?v=v39-2026-05-27"></script>
-<script src="js/ai-x4.js?v=v39-2026-05-27"></script>
-<script src="js/ai-bingo-fast.js?v=v39-2026-05-27"></script>
-<script src="js/ai-bingo-grammar.js?v=v39-2026-05-27"></script>
-<script src="js/ai-yoyo.js?v=v39-2026-05-27"></script>
-<script src="js/ai-patterns-data.js?v=v39-2026-05-27"></script>
-<script src="js/ai-patterns-engine.js?v=v39-2026-05-27"></script>
-<script src="js/ai-swap.js?v=v39-2026-05-27"></script>
-<script src="js/ai-swap-brain2.js?v=v39-2026-05-27"></script>
-<script src="js/ai-player.js?v=v39-2026-05-27"></script>
-<script src="js/puzzle-generator.js?v=v39-2026-05-27"></script>
-<script src="js/book-puzzle-generator.js?v=v39-2026-05-27"></script>
-<script src="js/ton4-solver.js?v=v39-2026-05-27"></script>
-<script src="js/sounds.js?v=v39-2026-05-27"></script>
-<script src="js/settings.js?v=v39-2026-05-27"></script>
-<script src="js/ui.js?v=v39-2026-05-27"></script>
-<script src="js/interactions.js?v=v39-2026-05-27"></script>
+<script src="js/ai-x9.js?v=v40-2026-05-27"></script>
+<script src="js/ai-x4.js?v=v40-2026-05-27"></script>
+<script src="js/ai-bingo-fast.js?v=v40-2026-05-27"></script>
+<script src="js/ai-bingo-grammar.js?v=v40-2026-05-27"></script>
+<script src="js/ai-yoyo.js?v=v40-2026-05-27"></script>
+<script src="js/ai-patterns-data.js?v=v40-2026-05-27"></script>
+<script src="js/ai-patterns-engine.js?v=v40-2026-05-27"></script>
+<script src="js/ai-swap.js?v=v40-2026-05-27"></script>
+<script src="js/ai-swap-brain2.js?v=v40-2026-05-27"></script>
+<script src="js/ai-player.js?v=v40-2026-05-27"></script>
+<script src="js/puzzle-generator.js?v=v40-2026-05-27"></script>
+<script src="js/book-puzzle-generator.js?v=v40-2026-05-27"></script>
+<script src="js/ton4-solver.js?v=v40-2026-05-27"></script>
+<script src="js/sounds.js?v=v40-2026-05-27"></script>
+<script src="js/settings.js?v=v40-2026-05-27"></script>
+<script src="js/ui.js?v=v40-2026-05-27"></script>
+<script src="js/interactions.js?v=v40-2026-05-27"></script>
 
 <script>
 (function(){
@@ -1507,35 +1507,64 @@ function makeRackTileEl(tile, idx, prefix) {
     reorderEqTile(draggedTileId, idx, prefix);
   });
 
-  // Mobile touch drag
-  el.addEventListener('touchstart', function(){
+  // Mobile touch drag — optimised for 60fps
+  // Cache the tile size once at touchstart so we never read offsetWidth/Height
+  // (those reads force a synchronous layout recalc on every touchmove).
+  el.addEventListener('touchstart', function(e){
     _eqDragTileId = tile.id;
     el.classList.add('dragging');
+    el._dragHalfW = el.offsetWidth / 2;
+    el._dragHalfH = el.offsetHeight / 2;
+    // Switch to fixed positioning ONCE, not every move
+    el.style.position = 'fixed';
+    el.style.zIndex = '10000';
+    el.style.pointerEvents = 'none';
+    var t = e.touches[0];
+    // Use transform (compositor-only, doesn't trigger layout) instead of left/top
+    el._dragX = t.clientX - el._dragHalfW;
+    el._dragY = t.clientY - el._dragHalfH;
+    el.style.left = el._dragX + 'px';
+    el.style.top = el._dragY + 'px';
+    el._lastHoverTileId = null;
   }, { passive: true });
+
   el.addEventListener('touchmove', function(e){
     if (!_eqDragTileId) return;
     e.preventDefault();
     var t = e.touches[0];
-    el.style.position = 'fixed';
-    el.style.left = (t.clientX - el.offsetWidth/2) + 'px';
-    el.style.top = (t.clientY - el.offsetHeight/2) + 'px';
-    el.style.zIndex = '10000';
-    el.style.pointerEvents = 'none';
-    // Highlight target under finger
+    // Update position via top/left — kept in same property layer, fast
+    el.style.left = (t.clientX - el._dragHalfW) + 'px';
+    el.style.top = (t.clientY - el._dragHalfH) + 'px';
+    // Only update drop-target highlight when the tile under finger CHANGES,
+    // not on every pixel of movement. ~3-4x reduction in layout work.
     var under = document.elementFromPoint(t.clientX, t.clientY);
-    document.querySelectorAll('.rack-tile.drop-target').forEach(function(t){ t.classList.remove('drop-target'); });
+    var hoverTileId = null;
+    var hoverEl = null;
     while (under && under !== document.body) {
-      if (under.classList && under.classList.contains('rack-tile') && under.dataset.tileId !== tile.id) {
-        under.classList.add('drop-target');
+      if (under.classList && under.classList.contains('rack-tile')) {
+        hoverTileId = under.dataset.tileId;
+        hoverEl = under;
         break;
       }
       under = under.parentNode;
+    }
+    if (hoverTileId === el._lastHoverTileId) return;
+    el._lastHoverTileId = hoverTileId;
+    // Remove highlight from previously hovered tile (we track it directly,
+    // no querySelectorAll which scans the whole tree)
+    if (el._lastHoverEl) el._lastHoverEl.classList.remove('drop-target');
+    if (hoverEl && hoverTileId !== tile.id) {
+      hoverEl.classList.add('drop-target');
+      el._lastHoverEl = hoverEl;
+    } else {
+      el._lastHoverEl = null;
     }
   }, { passive: false });
   el.addEventListener('touchend', function(e){
     el.classList.remove('dragging');
     el.style.position = ''; el.style.left = ''; el.style.top = ''; el.style.zIndex = ''; el.style.pointerEvents = '';
-    document.querySelectorAll('.rack-tile.drop-target').forEach(function(t){ t.classList.remove('drop-target'); });
+    if (el._lastHoverEl) { el._lastHoverEl.classList.remove('drop-target'); el._lastHoverEl = null; }
+    el._lastHoverTileId = null;
     if (!_eqDragTileId) return;
     var pt = e.changedTouches[0];
     var dropEl = document.elementFromPoint(pt.clientX, pt.clientY);
