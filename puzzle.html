@@ -303,7 +303,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v37</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v38</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -316,19 +316,15 @@ body.theme-dark .player-area .amath-tile-rack {
     <p style="margin:0;font-size:11px;color:#94a3b8;">Train your A-Math instincts</p>
   </header>
 
-  <!-- Section A: Missed-Move Trainer -->
-  <section style="margin:8px 12px 0;padding:14px;background:linear-gradient(145deg,#1e293b,#0f172a);border-radius:14px;border:1px solid #334155;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-      <h3 style="margin:0;font-size:13px;color:#fbbf24;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">🎯 Missed-Move Trainer</h3>
-      <span id="captured-count-badge" style="background:#334155;color:#e2e8f0;padding:2px 9px;border-radius:11px;font-size:11px;font-weight:700;">0</span>
-    </div>
-    <p style="margin:0 0 10px;font-size:11px;color:#94a3b8;line-height:1.5;">Puzzles auto-captured from your Player-vs-AI games when you miss a big play.</p>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;">
-      <button onclick="startPuzzle('mixed')" id="captured-practice-btn" style="flex:1;min-width:120px;background:#10b981;color:#fff;border:none;padding:10px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit;">▶ Practice</button>
-      <button onclick="toggleAutoGen()" id="auto-gen-toggle-btn" style="background:#334155;color:#e2e8f0;border:none;padding:10px 14px;border-radius:8px;font-weight:600;font-size:11px;cursor:pointer;font-family:inherit;">⚙️ Auto-generate</button>
-    </div>
-    <!-- Collapsed auto-gen panel -->
-    <div id="auto-gen-panel" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid #334155;">
+  <!-- Practice Sets (includes Set 5 — Board Puzzles, formerly the Missed-Move Trainer) -->
+  <section style="margin:12px 12px 0;padding:14px;background:linear-gradient(145deg,#1e293b,#0f172a);border-radius:14px;border:1px solid #334155;">
+    <h3 style="margin:0 0 4px;font-size:13px;color:#fbbf24;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">📚 Practice Sets</h3>
+    <p style="margin:0 0 10px;font-size:11px;color:#94a3b8;line-height:1.5;">Five sets of training problems. Set 5 (Board Puzzles) auto-captures from your live games.</p>
+    <div id="book-section-cards"><!-- populated by initBookSections() --></div>
+
+    <!-- Auto-generate panel for Set 5 (Board Puzzles); shown when ⚙ button tapped -->
+    <div id="auto-gen-panel" style="display:none;margin-top:10px;padding:10px;background:#0f172a;border-radius:8px;border:1px solid #334155;">
+      <div style="font-size:10px;color:#fbbf24;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Set 5 — Auto-Generate Board Puzzles</div>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
         <label style="font-size:11px;color:#cbd5e1;">Games:</label>
         <select id="gen-count" style="background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit;">
@@ -351,13 +347,6 @@ body.theme-dark .player-area .amath-tile-rack {
         <div id="gen-status" style="font-size:10px;color:#94a3b8;margin-top:4px;text-align:center;"></div>
       </div>
     </div>
-  </section>
-
-  <!-- Section B: Practice Sets -->
-  <section style="margin:12px 12px 0;padding:14px;background:linear-gradient(145deg,#1e293b,#0f172a);border-radius:14px;border:1px solid #334155;">
-    <h3 style="margin:0 0 4px;font-size:13px;color:#fbbf24;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">📚 Practice Sets</h3>
-    <p style="margin:0 0 10px;font-size:11px;color:#94a3b8;line-height:1.5;">Curated equation problems. Each set tests a different skill.</p>
-    <div id="book-section-cards"><!-- populated by initBookSections() --></div>
   </section>
 
   <!-- Footer link -->
@@ -503,33 +492,33 @@ body.theme-dark .player-area .amath-tile-rack {
 </div>
 
 <!-- Load main game JS modules in dependency order (same as index.html) -->
-<script src="js/constants.js?v=v37-2026-05-27"></script>
-<script src="js/utils.js?v=v37-2026-05-27"></script>
-<script src="js/evaluator.js?v=v37-2026-05-27"></script>
-<script src="js/bag.js?v=v37-2026-05-27"></script>
-<script src="js/rack.js?v=v37-2026-05-27"></script>
-<script src="js/board.js?v=v37-2026-05-27"></script>
-<script src="js/tile-tracker.js?v=v37-2026-05-27"></script>
-<script src="js/scoring.js?v=v37-2026-05-27"></script>
-<script src="js/placement.js?v=v37-2026-05-27"></script>
+<script src="js/constants.js?v=v38-2026-05-27"></script>
+<script src="js/utils.js?v=v38-2026-05-27"></script>
+<script src="js/evaluator.js?v=v38-2026-05-27"></script>
+<script src="js/bag.js?v=v38-2026-05-27"></script>
+<script src="js/rack.js?v=v38-2026-05-27"></script>
+<script src="js/board.js?v=v38-2026-05-27"></script>
+<script src="js/tile-tracker.js?v=v38-2026-05-27"></script>
+<script src="js/scoring.js?v=v38-2026-05-27"></script>
+<script src="js/placement.js?v=v38-2026-05-27"></script>
 <!-- AI modules for the in-browser puzzle generator -->
-<script src="js/ai-x9.js?v=v37-2026-05-27"></script>
-<script src="js/ai-x4.js?v=v37-2026-05-27"></script>
-<script src="js/ai-bingo-fast.js?v=v37-2026-05-27"></script>
-<script src="js/ai-bingo-grammar.js?v=v37-2026-05-27"></script>
-<script src="js/ai-yoyo.js?v=v37-2026-05-27"></script>
-<script src="js/ai-patterns-data.js?v=v37-2026-05-27"></script>
-<script src="js/ai-patterns-engine.js?v=v37-2026-05-27"></script>
-<script src="js/ai-swap.js?v=v37-2026-05-27"></script>
-<script src="js/ai-swap-brain2.js?v=v37-2026-05-27"></script>
-<script src="js/ai-player.js?v=v37-2026-05-27"></script>
-<script src="js/puzzle-generator.js?v=v37-2026-05-27"></script>
-<script src="js/book-puzzle-generator.js?v=v37-2026-05-27"></script>
-<script src="js/ton4-solver.js?v=v37-2026-05-27"></script>
-<script src="js/sounds.js?v=v37-2026-05-27"></script>
-<script src="js/settings.js?v=v37-2026-05-27"></script>
-<script src="js/ui.js?v=v37-2026-05-27"></script>
-<script src="js/interactions.js?v=v37-2026-05-27"></script>
+<script src="js/ai-x9.js?v=v38-2026-05-27"></script>
+<script src="js/ai-x4.js?v=v38-2026-05-27"></script>
+<script src="js/ai-bingo-fast.js?v=v38-2026-05-27"></script>
+<script src="js/ai-bingo-grammar.js?v=v38-2026-05-27"></script>
+<script src="js/ai-yoyo.js?v=v38-2026-05-27"></script>
+<script src="js/ai-patterns-data.js?v=v38-2026-05-27"></script>
+<script src="js/ai-patterns-engine.js?v=v38-2026-05-27"></script>
+<script src="js/ai-swap.js?v=v38-2026-05-27"></script>
+<script src="js/ai-swap-brain2.js?v=v38-2026-05-27"></script>
+<script src="js/ai-player.js?v=v38-2026-05-27"></script>
+<script src="js/puzzle-generator.js?v=v38-2026-05-27"></script>
+<script src="js/book-puzzle-generator.js?v=v38-2026-05-27"></script>
+<script src="js/ton4-solver.js?v=v38-2026-05-27"></script>
+<script src="js/sounds.js?v=v38-2026-05-27"></script>
+<script src="js/settings.js?v=v38-2026-05-27"></script>
+<script src="js/ui.js?v=v38-2026-05-27"></script>
+<script src="js/interactions.js?v=v38-2026-05-27"></script>
 
 <script>
 (function(){
@@ -1230,6 +1219,26 @@ function initBookSections() {
         '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">' + actionButtons + '</div>';
       container.appendChild(card);
     });
+
+    // === Set 5 — Board Puzzles (the former Missed-Move Trainer) ===
+    let ton5Count = 0;
+    try {
+      const bank = JSON.parse(localStorage.getItem('amath_puzzle_bank') || '[]');
+      ton5Count = Array.isArray(bank) ? bank.length : 0;
+    } catch(e) {}
+    const ton5Ready = ton5Count > 0;
+    const ton5Card = document.createElement('div');
+    ton5Card.style.cssText = 'background:#0f172a;border:1px solid ' + (ton5Ready ? '#10b981' : '#334155') + ';border-radius:10px;padding:12px;margin-bottom:8px;';
+    const ton5Status = '<div style="font-size:10px;color:' + (ton5Ready ? '#10b981' : '#94a3b8') + ';">' + (ton5Ready ? '✓ ' + ton5Count + ' captured ready' : 'no puzzles captured yet — play PvA games or auto-generate') + '</div>';
+    const ton5Actions = ton5Ready
+      ? '<button class="book-btn-primary" onclick="startPuzzle(\'mixed\')">▶ Practice</button><button class="book-btn-secondary" onclick="toggleAutoGen()">⚙ Auto-gen</button>'
+      : '<button class="book-btn-secondary" onclick="toggleAutoGen()">⚙ Auto-gen</button>';
+    ton5Card.innerHTML =
+      '<div style="font-size:12px;font-weight:700;color:#e2e8f0;">Set 5 — Board Puzzles</div>' +
+      '<div style="font-size:11px;color:#94a3b8;margin:2px 0 6px;line-height:1.4;">Mid-game board positions auto-captured from your Player-vs-AI games (or auto-generated). Find the best move on the real 15×15 board.</div>' +
+      ton5Status +
+      '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">' + ton5Actions + '</div>';
+    container.appendChild(ton5Card);
   });
 }
 
