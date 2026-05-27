@@ -247,7 +247,7 @@
         const bagCount = state.bag.tiles.length;
 
         // CAPTURE PHASE: only on player turns, late game, with bingo/yoyo available
-        if (state.isPlayerTurn && bagCount < 25) {
+        if (state.isPlayerTurn && bagCount < 60) {  // widened from <25 — mid-game positions are also good training material
           const allPlays = [];
           const seen = new Set();
           const addP = (p) => {
@@ -268,15 +268,15 @@
           // Original criteria required a bingo/yoyo. That makes captures very rare
           // because bingos are uncommon late-game. Relax: also accept any high-value play
           // (best.score >= 25) so the player gets puzzles even when no bingo exists.
-          const isHighValue = best && best.score >= 25;
+          const isHighValue = best && best.score >= 15;
 
-          if ((hasBig || isHighValue) && best && best.score >= 8 && allPlays.length >= 2) {
+          if ((hasBig || isHighValue) && best && best.score >= 5 && allPlays.length >= 2) {
             // weak = a lower-scoring alternative (not best)
             const weakIdx = Math.min(allPlays.length - 1, 1 + Math.floor(Math.random() * (allPlays.length - 1)));
             const weak = allPlays[weakIdx];
             if (weak !== best) {
               const diff = best.score - weak.score;
-              if (diff >= 5) {
+              if (diff >= 3) {  // any meaningful skip — loose to fire more captures
                 const bestPlays = top3.map(p => {
                   const c = convertPlay(p);
                   c.isBingo = isBingo(p);
@@ -338,7 +338,7 @@
             // All plays invalid — count as a non-scoring turn.
             state.consecutiveNonScoringTurns++;
             state.isPlayerTurn = !state.isPlayerTurn;
-            if (state.consecutiveNonScoringTurns >= 6) break;
+            if (state.consecutiveNonScoringTurns >= 12) break;
             continue;
           }
         }
@@ -362,10 +362,27 @@
         if (state.isPlayerTurn) state.opponentSwapHistory.push({ type: 'swap', tileCount: swapped.length });
         else state.aiConsecutiveSwaps = (state.aiConsecutiveSwaps || 0) + 1;
         state.consecutiveNonScoringTurns++;
-        if (state.consecutiveNonScoringTurns >= 6) break;
+        if (state.consecutiveNonScoringTurns >= 12) break;
       } else {
+        // AI returned 'pass' (no decision). Try to refresh the rack by swapping
+        // half the tiles. This gives a fresh chance at a bingo next turn rather
+        // than ending the game silently.
+        const rack = state.isPlayerTurn ? state.playerRack : state.aiRack;
+        if (rack && rack.tiles.length >= 4 && state.bag.tiles.length >= 4) {
+          const toSwap = rack.tiles.slice(0, 4);
+          const swapped = [];
+          for (const t of toSwap) {
+            if (t) { swapped.push(t); Rack.removeTile(rack, t.id); }
+          }
+          while (rack.tiles.length < 8) {
+            const t = Bag.drawTile(state.bag);
+            if (!t) break;
+            Rack.addTile(rack, t);
+          }
+          if (swapped.length) Bag.returnTiles(state.bag, swapped);
+        }
         state.consecutiveNonScoringTurns++;
-        if (state.consecutiveNonScoringTurns >= 6) break;
+        if (state.consecutiveNonScoringTurns >= 12) break;
       }
       state.isPlayerTurn = !state.isPlayerTurn;
       if (state.bag.tiles.length === 0 &&
