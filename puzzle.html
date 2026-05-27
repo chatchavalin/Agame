@@ -7,7 +7,7 @@
 // This script bumps version stamp every time we deploy. If the SW is stale,
 // it tells the SW to unregister, clears all caches, and reloads.
 (function(){
-  var DEPLOYED_VERSION = 'v25-2026-05-26';
+  var DEPLOYED_VERSION = 'v26-2026-05-26';
   var lastVersion = localStorage.getItem('pz_version');
   if (lastVersion !== DEPLOYED_VERSION) {
     localStorage.setItem('pz_version', DEPLOYED_VERSION);
@@ -171,7 +171,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v25</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v26</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -193,6 +193,33 @@ body.theme-dark .player-area .amath-tile-rack {
       No puzzles yet. Play a Player-vs-AI game — when the bag drops below 25 tiles and you miss the best move, the position is saved here automatically.
     </div>
   </div>
+  <!-- Auto-generate panel -->
+  <div id="gen-panel" style="background:var(--bg-panel,#1e293b);border:1px solid var(--border-medium,#334155);border-radius:14px;padding:18px;margin-top:12px;">
+    <h4 style="margin:0 0 8px;font-size:13px;color:#fbbf24;text-transform:uppercase;letter-spacing:.05em;">🤖 Auto-Generate Puzzles</h4>
+    <p style="font-size:12px;color:#94a3b8;margin:0 0 12px;line-height:1.5;">Simulate full PvA games at full AI search depth. Each game takes ~3-5 minutes and produces 2-3 puzzles. The browser will be busy during simulation — leave this tab open.</p>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+      <label style="font-size:12px;color:#cbd5e1;">Number of games:</label>
+      <select id="gen-count" style="background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 10px;font-size:13px;font-family:inherit;">
+        <option value="1">1 game (~5 min)</option>
+        <option value="3">3 games (~15 min)</option>
+        <option value="5" selected>5 games (~25 min)</option>
+        <option value="10">10 games (~50 min)</option>
+        <option value="20">20 games (~1.5 hours)</option>
+        <option value="50">50 games (~4 hours)</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="startGeneration()" id="gen-start-btn" style="flex:1;background:#10b981;color:#fff;border:none;padding:10px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">▶ Start Generating</button>
+      <button onclick="cancelGeneration()" id="gen-cancel-btn" style="display:none;background:#dc2626;color:#fff;border:none;padding:10px 16px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">⏹ Cancel</button>
+    </div>
+    <div id="gen-progress" style="display:none;margin-top:12px;">
+      <div style="background:#0f172a;border-radius:6px;height:8px;overflow:hidden;">
+        <div id="gen-bar" style="background:#10b981;height:100%;width:0%;transition:width .3s;"></div>
+      </div>
+      <div id="gen-status" style="font-size:11px;color:#94a3b8;margin-top:6px;text-align:center;"></div>
+    </div>
+  </div>
+
   <div style="text-align:center;margin-top:14px;">
     <button onclick="clearBank()" style="background:none;border:none;color:#64748b;font-size:11px;text-decoration:underline;cursor:pointer;font-family:inherit;">Clear all captured puzzles</button>
   </div>
@@ -254,6 +281,18 @@ body.theme-dark .player-area .amath-tile-rack {
 <script src="js/tile-tracker.js?v=20260526pz"></script>
 <script src="js/scoring.js?v=20260526pz"></script>
 <script src="js/placement.js?v=20260526pz"></script>
+<!-- AI modules for the in-browser puzzle generator -->
+<script src="js/ai-x9.js?v=20260526pz"></script>
+<script src="js/ai-x4.js?v=20260526pz"></script>
+<script src="js/ai-bingo-fast.js?v=20260526pz"></script>
+<script src="js/ai-bingo-grammar.js?v=20260526pz"></script>
+<script src="js/ai-yoyo.js?v=20260526pz"></script>
+<script src="js/ai-patterns-data.js?v=20260526pz"></script>
+<script src="js/ai-patterns-engine.js?v=20260526pz"></script>
+<script src="js/ai-swap.js?v=20260526pz"></script>
+<script src="js/ai-swap-brain2.js?v=20260526pz"></script>
+<script src="js/ai-player.js?v=20260526pz"></script>
+<script src="js/puzzle-generator.js?v=20260526pz"></script>
 <script src="js/sounds.js?v=20260526pz"></script>
 <script src="js/settings.js?v=20260526pz"></script>
 <script src="js/ui.js?v=20260526pz"></script>
@@ -780,6 +819,71 @@ window.nextPuzzle = function(){
 window.goBack = function(){
   if(timerInterval) clearInterval(timerInterval);
   window.location.href = 'lobby.html';
+};
+
+// =================== IN-BROWSER PUZZLE GENERATOR ===================
+window.startGeneration = async function() {
+  if (!window.AMath || !window.AMath.puzzleGenerator) {
+    alert('Puzzle generator not loaded — refresh the page.');
+    return;
+  }
+  const numGames = parseInt(document.getElementById('gen-count').value, 10);
+  if (!numGames || numGames < 1) return;
+
+  // Toggle UI state
+  const startBtn = document.getElementById('gen-start-btn');
+  const cancelBtn = document.getElementById('gen-cancel-btn');
+  const progressEl = document.getElementById('gen-progress');
+  const bar = document.getElementById('gen-bar');
+  const status = document.getElementById('gen-status');
+  startBtn.style.display = 'none';
+  cancelBtn.style.display = 'block';
+  progressEl.style.display = 'block';
+  bar.style.width = '0%';
+  status.textContent = 'Starting...';
+
+  // Warn before unload
+  const beforeUnload = (e) => { e.preventDefault(); e.returnValue = ''; };
+  window.addEventListener('beforeunload', beforeUnload);
+
+  function fmt(ms) {
+    const s = Math.floor(ms / 1000);
+    return Math.floor(s / 60) + 'm ' + (s % 60) + 's';
+  }
+
+  try {
+    const result = await window.AMath.puzzleGenerator.generate(numGames, function(p) {
+      // p: { gameIdx, totalGames, captures, currentTurn, elapsedMs, stage }
+      const pct = Math.min(100, Math.round((p.gameIdx / p.totalGames) * 100));
+      bar.style.width = pct + '%';
+      if (p.stage === 'done') {
+        status.textContent = '✅ Done! Generated ' + (p.added || p.captures) + ' new puzzles in ' + fmt(p.elapsedMs);
+      } else {
+        status.textContent = 'Game ' + (p.gameIdx + 1) + '/' + p.totalGames +
+                            ' · turn ' + p.currentTurn +
+                            ' · ' + p.captures + ' captures so far · ' + fmt(p.elapsedMs);
+      }
+    });
+    alert('🎉 Generation complete!\n\n' +
+          'New puzzles: ' + result.added + '\n' +
+          'Total captured this run: ' + result.totalGenerated +
+          (result.cancelled ? '\n(cancelled early)' : ''));
+  } catch (e) {
+    console.error('[gen] Failed:', e);
+    alert('Generation failed: ' + e.message);
+  } finally {
+    window.removeEventListener('beforeunload', beforeUnload);
+    startBtn.style.display = 'block';
+    cancelBtn.style.display = 'none';
+    refreshBankStatus();  // updates the count card
+  }
+};
+
+window.cancelGeneration = function() {
+  if (window.AMath && window.AMath.puzzleGenerator) {
+    window.AMath.puzzleGenerator.cancel();
+  }
+  document.getElementById('gen-status').textContent = 'Cancelling — finishing current turn...';
 };
 
 window.removeCurrentPuzzle = function(){

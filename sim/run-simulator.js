@@ -12,14 +12,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-// Silence game-internal console.log spam during sim
-const realLog = console.log;
-const realWarn = console.warn;
-// console.log = () => {};   // unmute for diagnosis
-// console.warn = () => {};
-
 const sandbox = {
-  console: { log: (...a) => process.stderr.write('[AI] '+a.join(' ')+'\n'), warn: (...a) => process.stderr.write('[AI WARN] '+a.join(' ')+'\n'), error: (...a) => process.stderr.write('[AI ERR] '+a.join(' ')+'\n') },
+  console: { log: () => {}, warn: () => {}, error: () => {} },
   Date, Math,
   setTimeout, clearTimeout, setInterval, clearInterval,
   setImmediate, queueMicrotask,
@@ -63,23 +57,9 @@ const AMath = sandbox.window.AMath;
 const { constants: C, bag: Bag, rack: Rack, board: Board, scoring: Scoring,
         placement: Placement, aiPlayer: AI } = AMath;
 
-// Speed up AI: 5-second budget instead of 180s. We inject into the same
-// _stateSettings object the ai-player module reads from getTimeBudgetMs().
-// We also force getBotLevel to return null so the bot-level branch is skipped.
-if (AMath.aiPlayer && AMath.aiPlayer._setStateSettings) {
-  AMath.aiPlayer._setStateSettings({ aiThinkSeconds: 5 });
-} else {
-  // Fallback: write into the module-private variable via a global setter if any
-  try {
-    sandbox.window.AMath.settings = sandbox.window.AMath.settings || {
-      get: (k) => (k === 'aiThinkSeconds' ? 5 : null),
-      set: () => {},
-    };
-  } catch (e) {}
-}
-
-// Trim AI search budget so games finish quickly
-
+// AI budget is set per-decideMove call via state._settings.aiThinkSeconds below.
+// We use the full 180s budget — same as a real PvA turn — so the puzzles
+// capture the OBJECTIVE best plays, not corner-cut approximations.
 
 function newGameState() {
   const bag = Bag.createBag();
@@ -105,33 +85,37 @@ function applyPlacements(state, placements, isPlayer) {
   // The AI search clones tiles and sometimes returns placements whose
   // .tile is null (CHOICE tile post-search). Rebind to the real rack tile,
   // copying any 'assigned' value the AI picked.
+  // Build safe placements without mutating live rack tiles. We use a SHADOW
+  // tile (a copy with a fresh assigned value) for validation. Only after
+  // validation succeeds do we commit the .assigned to the real rack tile
+  // and place it on the board.
   const safePlacements = [];
+  const liveTilesToCommit = [];   // [{tile: realRackTile, assigned: 'face'}]
   for (const p of placements) {
     if (!p) continue;
-    let tile = p.tile;
-    if (!tile && p.tileId) {
-      // some paths use tileId only
-      tile = rack.tiles.find(t => t && t.id === p.tileId);
+    let liveTile = p.tile;
+    if (!liveTile && p.tileId) {
+      liveTile = rack.tiles.find(t => t && t.id === p.tileId);
     }
-    if (!tile) {
-      // Fall back: find by face match (last resort)
+    if (!liveTile) {
       const wantFace = p.face;
-      tile = rack.tiles.find(t => t && (t.face === wantFace || t.assigned === wantFace));
+      liveTile = rack.tiles.find(t => t && (t.face === wantFace || t.assigned === wantFace));
     }
-    if (!tile) {
+    if (!liveTile) {
       return { ok: false, reason: `cant resolve tile for placement at (${p.row},${p.col})` };
     }
-    // Preserve any AI-assigned face on this tile
-    if (p.tile && p.tile.assigned && !tile.assigned) tile.assigned = p.tile.assigned;
-    if (p.assigned) tile.assigned = p.assigned;
-    safePlacements.push({ row: p.row, col: p.col, tile: tile });
-  }
-  // Validate the placements list
-  for (const p of safePlacements) {
-    if (!p.tile) return { ok: false, reason: 'null tile in safePlacements' };
+    // Determine assigned face from the placement (without mutating yet)
+    const wantAssigned = (p.tile && p.tile.assigned) || p.assigned || liveTile.assigned || null;
+    // Build a shadow tile for validation (don't share reference with real rack)
+    const shadowTile = {
+      id: liveTile.id, face: liveTile.face, type: liveTile.type,
+      points: liveTile.points, assigned: wantAssigned,
+    };
+    safePlacements.push({ row: p.row, col: p.col, tile: shadowTile });
+    liveTilesToCommit.push({ tile: liveTile, assigned: wantAssigned });
   }
   // validatePlay expects the new tiles to be ON THE BOARD already.
-  // Place them tentatively, validate, roll back on failure.
+  // Place SHADOW tiles, validate, roll back on failure.
   for (const p of safePlacements) {
     Board.placeTile(state.board, p.row, p.col, p.tile);
   }
@@ -140,17 +124,23 @@ function applyPlacements(state, placements, isPlayer) {
     for (const p of safePlacements) Board.removeTile(state.board, p.row, p.col);
     return { ok: false, reason: result.reason };
   }
-  placements = safePlacements;  // use sanitized list for rest of function
-  const scoreRes = Scoring.scorePlay(result.equations, state.board, placements.length);
-  // Tiles already placed by the tentative-validation step above.
-  for (const p of placements) {
-    Board.markPremiumUsed(state.board, p.row, p.col);
+  // Validation passed: commit assigned values onto the real rack tiles
+  // and swap shadow tiles for real ones on the board.
+  for (let i = 0; i < safePlacements.length; i++) {
+    const sp = safePlacements[i];
+    const realTile = liveTilesToCommit[i].tile;
+    realTile.assigned = liveTilesToCommit[i].assigned;
+    Board.removeTile(state.board, sp.row, sp.col);
+    Board.placeTile(state.board, sp.row, sp.col, realTile);
   }
-  for (const p of placements) {
-    if (p.tile && p.tile.id) {
-      const idx = rack.tiles.findIndex(t => t && t.id === p.tile.id);
-      if (idx !== -1) Rack.removeTile(rack, rack.tiles[idx].id);
-    }
+  placements = safePlacements;
+  const scoreRes = Scoring.scorePlay(result.equations, state.board, placements.length);
+  // Mark premiums used and remove placed tiles from rack
+  for (let i = 0; i < placements.length; i++) {
+    const p = placements[i];
+    Board.markPremiumUsed(state.board, p.row, p.col);
+    const realTileId = liveTilesToCommit[i].tile.id;
+    Rack.removeTile(rack, realTileId);
   }
   while (rack.tiles.length < 8) {
     const t = Bag.drawTile(state.bag);
@@ -239,8 +229,6 @@ async function simulateOneGame(captures) {
       lastOpponentAction: state.lastOpponentAction || null,
       _settings: { aiThinkSeconds: 180 },  // FULL search depth — same as live PvA
     };
-    const rackStr = aiState.aiRack.tiles.filter(t=>t).map(t=>t.face).join(',');
-    process.stderr.write(`[sim t${turn}] ${state.isPlayerTurn?'P':'AI'} rack: [${rackStr}] firstMove=${state.isFirstMove}\n`);
     let decision;
     try { decision = await AI.decideMove(aiState); }
     catch (e) { break; }
