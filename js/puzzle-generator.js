@@ -265,8 +265,12 @@
 
           let hasBig = false;
           for (const pl of top3) if (isBingo(pl) || isYoyo(state, pl)) { hasBig = true; break; }
+          // Original criteria required a bingo/yoyo. That makes captures very rare
+          // because bingos are uncommon late-game. Relax: also accept any high-value play
+          // (best.score >= 25) so the player gets puzzles even when no bingo exists.
+          const isHighValue = best && best.score >= 25;
 
-          if (hasBig && best && best.score >= 8 && allPlays.length >= 2) {
+          if ((hasBig || isHighValue) && best && best.score >= 8 && allPlays.length >= 2) {
             // weak = a lower-scoring alternative (not best)
             const weakIdx = Math.min(allPlays.length - 1, 1 + Math.floor(Math.random() * (allPlays.length - 1)));
             const weak = allPlays[weakIdx];
@@ -307,16 +311,36 @@
             }
           }
         }
-        const r = applyPlacements(state, decision.placements, state.isPlayerTurn);
+        let r = applyPlacements(state, decision.placements, state.isPlayerTurn);
         if (!r.ok) {
-          // AI's play failed validation — skip this turn rather than ending the game,
-          // so we still capture later positions. This was the silent-stall bug:
-          // one bad play and the entire game gave up, ending up with 0 captures.
-          console.warn('[gen] turn ' + turn + ' applyPlacements failed: ' + r.reason);
-          state.consecutiveNonScoringTurns++;
-          state.isPlayerTurn = !state.isPlayerTurn;
-          if (state.consecutiveNonScoringTurns >= 6) break;
-          continue;
+          // AI's chosen play failed validation. This sometimes happens — e.g. the AI
+          // proposed a Bingo that creates a 4-digit number which A-Math forbids.
+          // Rather than burn the entire turn, walk down topPlays trying alternates.
+          // Only when ALL of them fail do we treat it as a pass.
+          console.warn('[gen] turn ' + turn + ' primary play failed: ' + r.reason + ' — trying alternates');
+          let foundAlt = false;
+          for (let altIdx = 0; altIdx < topPlays.length; altIdx++) {
+            const alt = topPlays[altIdx];
+            if (!alt || !alt.placements || alt.placements.length === 0) continue;
+            // Skip the one we just tried (same placement signature)
+            const sig = alt.placements.map(x => x.row + ',' + x.col).sort().join('|');
+            const origSig = decision.placements.map(x => x.row + ',' + x.col).sort().join('|');
+            if (sig === origSig) continue;
+            const altRes = applyPlacements(state, alt.placements, state.isPlayerTurn);
+            if (altRes.ok) {
+              r = altRes;
+              decision = { type: 'place', placements: alt.placements, score: alt.score };
+              foundAlt = true;
+              break;
+            }
+          }
+          if (!foundAlt) {
+            // All plays invalid — count as a non-scoring turn.
+            state.consecutiveNonScoringTurns++;
+            state.isPlayerTurn = !state.isPlayerTurn;
+            if (state.consecutiveNonScoringTurns >= 6) break;
+            continue;
+          }
         }
         if (!state.isPlayerTurn) state.aiConsecutiveSwaps = 0;
       } else if (decision.type === 'swap' && decision.tileIds) {
