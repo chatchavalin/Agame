@@ -15,8 +15,8 @@ const vm = require('vm');
 // Silence game-internal console.log spam during sim
 const realLog = console.log;
 const realWarn = console.warn;
-console.log = () => {};
-console.warn = () => {};
+// console.log = () => {};   // unmute for diagnosis
+// console.warn = () => {};
 
 const sandbox = {
   console: { log: (...a) => process.stderr.write('[AI] '+a.join(' ')+'\n'), warn: (...a) => process.stderr.write('[AI WARN] '+a.join(' ')+'\n'), error: (...a) => process.stderr.write('[AI ERR] '+a.join(' ')+'\n') },
@@ -101,17 +101,55 @@ function newGameState() {
 
 function applyPlacements(state, placements, isPlayer) {
   const rack = isPlayer ? state.playerRack : state.aiRack;
-  const result = Placement.validatePlay(state.board, placements, state.isFirstMove);
-  if (!result.ok) return { ok: false, reason: result.reason };
-  const scoreRes = Scoring.scorePlay(result.equations, state.board, placements.length);
+  // Defensively reconstruct each placement.tile from the live rack by id.
+  // The AI search clones tiles and sometimes returns placements whose
+  // .tile is null (CHOICE tile post-search). Rebind to the real rack tile,
+  // copying any 'assigned' value the AI picked.
+  const safePlacements = [];
   for (const p of placements) {
+    if (!p) continue;
+    let tile = p.tile;
+    if (!tile && p.tileId) {
+      // some paths use tileId only
+      tile = rack.tiles.find(t => t && t.id === p.tileId);
+    }
+    if (!tile) {
+      // Fall back: find by face match (last resort)
+      const wantFace = p.face;
+      tile = rack.tiles.find(t => t && (t.face === wantFace || t.assigned === wantFace));
+    }
+    if (!tile) {
+      return { ok: false, reason: `cant resolve tile for placement at (${p.row},${p.col})` };
+    }
+    // Preserve any AI-assigned face on this tile
+    if (p.tile && p.tile.assigned && !tile.assigned) tile.assigned = p.tile.assigned;
+    if (p.assigned) tile.assigned = p.assigned;
+    safePlacements.push({ row: p.row, col: p.col, tile: tile });
+  }
+  // Validate the placements list
+  for (const p of safePlacements) {
+    if (!p.tile) return { ok: false, reason: 'null tile in safePlacements' };
+  }
+  // validatePlay expects the new tiles to be ON THE BOARD already.
+  // Place them tentatively, validate, roll back on failure.
+  for (const p of safePlacements) {
     Board.placeTile(state.board, p.row, p.col, p.tile);
+  }
+  const result = Placement.validatePlay(state.board, safePlacements, state.isFirstMove);
+  if (!result.ok) {
+    for (const p of safePlacements) Board.removeTile(state.board, p.row, p.col);
+    return { ok: false, reason: result.reason };
+  }
+  placements = safePlacements;  // use sanitized list for rest of function
+  const scoreRes = Scoring.scorePlay(result.equations, state.board, placements.length);
+  // Tiles already placed by the tentative-validation step above.
+  for (const p of placements) {
     Board.markPremiumUsed(state.board, p.row, p.col);
   }
   for (const p of placements) {
     if (p.tile && p.tile.id) {
       const idx = rack.tiles.findIndex(t => t && t.id === p.tile.id);
-      if (idx !== -1) Rack.removeTileAtSlot(rack, idx);
+      if (idx !== -1) Rack.removeTile(rack, rack.tiles[idx].id);
     }
   }
   while (rack.tiles.length < 8) {
@@ -205,18 +243,33 @@ async function simulateOneGame(captures) {
     process.stderr.write(`[sim t${turn}] ${state.isPlayerTurn?'P':'AI'} rack: [${rackStr}] firstMove=${state.isFirstMove}\n`);
     let decision;
     try { decision = await AI.decideMove(aiState); }
-    catch (e) {
-      process.stderr.write(`[sim t${turn}] decideMove threw: ${e.message}\n`);
-      break;
-    }
-    if (!decision) {
-      process.stderr.write(`[sim t${turn}] decideMove returned null/falsy\n`);
-      break;
-    }
-    process.stderr.write(`[sim t${turn}] ${state.isPlayerTurn?"P":"AI"} decision: type=${decision.type} placements=${decision.placements ? decision.placements.length : 0} score=${decision.score || 0} bag=${state.bag.tiles.length}\n`);
+    catch (e) { break; }
+    if (!decision) break;
+
     const topPlays = AI.getLastTopPlays ? AI.getLastTopPlays() : [];
 
-    if (decision.type === 'place' && decision.placements) {
+    // If AI chose to swap or pass but a real play exists in its top-plays,
+    // upgrade the decision to a 'play' so the simulated game progresses.
+    try {
+      if ((decision.type === 'swap' || decision.type === 'pass') &&
+          AI.getLastTopPlays) {
+        const tops = AI.getLastTopPlays();
+        // Validate: top play must have all real tile objects
+        if (tops && tops.length > 0 && tops[0].placements && tops[0].placements.length > 0) {
+          const valid = tops[0].placements.every(p => p && p.tile && p.row != null && p.col != null);
+          if (valid) {
+            decision = {
+              type: 'place',
+              placements: tops[0].placements,
+              score: tops[0].score,
+              equations: tops[0].equations,
+            };
+          }
+        }
+      }
+    } catch (e) {}
+
+    if ((decision.type === 'place' || decision.type === 'play') && decision.placements) {
       const bagCount = state.bag.tiles.length;
       if (state.isPlayerTurn && bagCount < 25) {
         // Build top-3 list
@@ -236,7 +289,6 @@ async function simulateOneGame(captures) {
         const best = top3[0];
         let hasBig = false;
         for (const pl of top3) if (isBingo(pl) || isYoyo(state, pl)) { hasBig = true; break; }
-        process.stderr.write(`[sim t${turn}] bag=${bagCount} topPlays=${topPlays.length} allPlays=${allPlays.length} bestScore=${best ? best.score : 'n/a'} hasBig=${hasBig}\n`);
         if (hasBig && best && best.score >= 8 && allPlays.length >= 2) {
           // Weak player = pick a lower-scoring play
           const weak = allPlays[Math.min(allPlays.length - 1, 1 + Math.floor(Math.random() * (allPlays.length - 1)))];
@@ -275,6 +327,37 @@ async function simulateOneGame(captures) {
       }
       const r = applyPlacements(state, decision.placements, state.isPlayerTurn);
       if (!r.ok) break;
+      if (!state.isPlayerTurn) state.aiConsecutiveSwaps = 0;
+    } else if (decision.type === 'swap' && decision.tileIds) {
+      // Real swap: remove those tiles from rack, return to bag, draw new ones
+      const rack = state.isPlayerTurn ? state.playerRack : state.aiRack;
+      const swappedTiles = [];
+      for (const id of decision.tileIds) {
+        const idx = rack.tiles.findIndex(t => t && t.id === id);
+        if (idx !== -1) {
+          swappedTiles.push(rack.tiles[idx]);
+          Rack.removeTile(rack, rack.tiles[idx].id);
+        }
+      }
+      // Draw replacements FIRST so we don't immediately re-draw the same tiles
+      const replacements = [];
+      while (rack.tiles.length < 8) {
+        const t = Bag.drawTile(state.bag);
+        if (!t) break;
+        Rack.addTile(rack, t);
+        replacements.push(t);
+      }
+      // Return swapped tiles to bag
+      if (swappedTiles.length) Bag.returnTiles(state.bag, swappedTiles);
+      // Track swap history (the AI uses opponentSwapHistory)
+      if (state.isPlayerTurn) {
+        // Player swap — opponent's view sees this in opponentSwapHistory
+        state.opponentSwapHistory.push({ type: 'swap', tileCount: swappedTiles.length });
+      } else {
+        state.aiConsecutiveSwaps = (state.aiConsecutiveSwaps || 0) + 1;
+      }
+      state.consecutiveNonScoringTurns++;
+      if (state.consecutiveNonScoringTurns >= 6) break;
     } else {
       state.consecutiveNonScoringTurns++;
       if (state.consecutiveNonScoringTurns >= 6) break;
@@ -293,7 +376,7 @@ const t0 = Date.now();
 (async function main() {
   for (let g = 0; g < numGames; g++) {
     try { await simulateOneGame(captures); } catch (e) {
-      process.stderr.write(`[sim] Game ${g} failed: ${e.message}\n`);
+      process.stderr.write(`[sim] Game ${g} failed: ${e.message}\n${e.stack}\n`);
     }
     if (g % 5 === 4) {
       const dt = ((Date.now() - t0) / 1000).toFixed(1);
