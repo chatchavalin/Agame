@@ -27,6 +27,24 @@
     '6': 5, '7': 6, '8': 7, '9': 8,
   };
 
+  // Operator-keep priority (lower index = more preferred to keep).
+  // Tournament A-Math wisdom: +/- beats -, - beats +; same for ×/÷ > ÷ > ×.
+  // Choice tiles are most flexible (pick role at placement time);
+  // - is more useful than + for driving equations to small RHS values;
+  // ÷ is harder to satisfy than × so divider tiles are more precious.
+  const OPERATOR_KEEP_PRIORITY = {
+    '+/-': 1,   // most flexible additive choice tile — keep first
+    '×/÷': 2,   // most flexible multiplicative choice tile
+    '-':   3,   // raw minus — useful for driving values down
+    '÷':   4,   // raw divide — needs integer result, more constrained
+    '+':   5,   // raw plus — most replaceable additive
+    '×':   6,   // raw times — most replaceable multiplicative
+  };
+
+  function operatorKeepRank(face) {
+    return OPERATOR_KEEP_PRIORITY[face] != null ? OPERATOR_KEEP_PRIORITY[face] : 99;
+  }
+
   // Hard tile faces (never keep in swap strategy)
   const HARD_TILE_FACES = new Set([
     '0', '5', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20',
@@ -172,8 +190,11 @@
       keepIds.add(equalsTiles[i].id);
     }
 
-    // 3. Keep operators — by default 1 unique face; if low op ratio, up to keepOpsTarget unique faces
-    const opTiles = rack.filter(isOperator);
+    // 3. Keep operators — sorted by tournament A-Math priority:
+    //    +/- > ×/÷ > - > ÷ > + > ×  (choice tiles first; - beats +; ÷ beats ×)
+    const opTiles = rack.filter(isOperator).slice().sort(function (a, b) {
+      return operatorKeepRank(a.face) - operatorKeepRank(b.face);
+    });
     const keptOpFaces = new Set();
     for (const op of opTiles) {
       if (keptOpFaces.size >= keepOpsTarget) break;
@@ -182,10 +203,10 @@
       keptOpFaces.add(op.face);
     }
     // Fallback for duplicates: if bag has LOW op ratio AND we couldn't reach target unique count,
-    // allow 1 duplicate to fill the slot
+    // allow 1 duplicate to fill the slot. Pick the duplicate of the HIGHEST-priority face.
     const lowOpsBag = bagInfo.opRatio < 0.15;
     if (lowOpsBag && keptOpFaces.size < keepOpsTarget) {
-      for (const op of opTiles) {
+      for (const op of opTiles) {  // already sorted by priority
         if (keepIds.has(op.id)) continue;
         keepIds.add(op.id);
         break; // only add 1 duplicate

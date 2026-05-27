@@ -33,6 +33,15 @@
     '1': 1, '2': 2, '3': 3, '4': 4,
     '6': 5, '7': 6, '8': 7, '9': 8,
   };
+
+  // Operator-keep priority (lower = keep first). Tournament A-Math wisdom:
+  // +/- > -, ×/÷ > ÷ > × for usefulness.
+  const OPERATOR_KEEP_PRIORITY = {
+    '+/-': 1, '×/÷': 2, '-': 3, '÷': 4, '+': 5, '×': 6,
+  };
+  function operatorKeepRank(face) {
+    return OPERATOR_KEEP_PRIORITY[face] != null ? OPERATOR_KEEP_PRIORITY[face] : 99;
+  }
   const HARD_TILE_FACES = new Set([
     '0', '5',
     '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20',
@@ -261,6 +270,8 @@
     smalls.sort((a, b) =>
       (SMALL_NUMBER_PRIORITY[a.face] || 99) - (SMALL_NUMBER_PRIORITY[b.face] || 99)
     );
+    // Sort operators by keep priority: +/- > ×/÷ > - > ÷ > + > ×
+    operators.sort((a, b) => operatorKeepRank(a.face) - operatorKeepRank(b.face));
     return { blanks, equals, operators, smalls, hards };
   }
 
