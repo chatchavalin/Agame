@@ -18,63 +18,29 @@
 (function () {
   'use strict';
 
-  // Evaluate a list of tokens with A-Math operator precedence (×÷ before +−).
-  // Returns NaN on syntax error or invalid eq (multi-=, division by zero, non-integer).
+  // Validate equation using the SAME rules as Player-vs-AI mode.
+  // Delegates to window.AMath.evaluator.validateEquation — which is the
+  // canonical A-Math validator: rejects unary +, allows unary -, enforces
+  // integer division, single =, no adjacent ops, both sides non-empty, etc.
+  //
+  // Returns the (integer) value of the equation if valid, otherwise NaN.
   function evaluate(tokens) {
     if (!tokens || tokens.length < 3) return NaN;
-    // Must contain exactly one '='
-    var eqIdx = -1;
-    for (var i = 0; i < tokens.length; i++) {
-      if (tokens[i] === '=') {
-        if (eqIdx !== -1) return NaN;  // two '=' → fail
-        eqIdx = i;
-      }
+    var E = window.AMath && window.AMath.evaluator;
+    if (!E || !E.validateEquation) {
+      // Fallback: be conservative — fail rather than use stale rules.
+      return NaN;
     }
-    if (eqIdx === -1 || eqIdx === 0 || eqIdx === tokens.length - 1) return NaN;
-
-    function evalSide(side) {
-      if (side.length === 0) return NaN;
-      // Each side: numbers and operators only
-      // Apply ×÷ first, left to right
-      var arr = side.slice();
-      for (var i = 1; i < arr.length - 1; i += 2) {
-        var op = arr[i];
-        if (op === '×' || op === '÷') {
-          var a = arr[i-1], b = arr[i+1];
-          if (typeof a !== 'number' || typeof b !== 'number') return NaN;
-          var r;
-          if (op === '×') r = a * b;
-          else {
-            if (b === 0) return NaN;
-            r = a / b;
-            if (r !== Math.floor(r)) return NaN;  // non-integer → invalid
-          }
-          arr.splice(i-1, 3, r);
-          i -= 2;
-        }
-      }
-      // Then +-
-      var acc = arr[0];
-      if (typeof acc !== 'number') return NaN;
-      for (var j = 1; j < arr.length - 1; j += 2) {
-        var oj = arr[j], v = arr[j+1];
-        if (typeof v !== 'number') return NaN;
-        if (oj === '+') acc += v;
-        else if (oj === '-') acc -= v;
-        else return NaN;
-      }
-      return acc;
-    }
-
-    var lhsTokens = parseSide(tokens.slice(0, eqIdx));
-    var rhsTokens = parseSide(tokens.slice(eqIdx + 1));
-    if (!lhsTokens || !rhsTokens) return NaN;
-    var lhs = evalSide(lhsTokens);
-    var rhs = evalSide(rhsTokens);
-    if (isNaN(lhs) || isNaN(rhs)) return NaN;
-    if (lhs !== rhs) return NaN;
-    return lhs;
+    var r = E.validateEquation(tokens);
+    if (!r.valid) return NaN;
+    // r.value is a fraction {num, den}. Only integer results are valid in A-Math
+    // (validateEquation already enforces this in the multi-side equality check,
+    // but defend against future changes).
+    if (r.value && r.value.den === 1) return r.value.num;
+    if (typeof r.value === 'number') return r.value;
+    return NaN;
   }
+
 
   // Parse a side: numbers may be multi-digit (adjacent digit tokens combine)
   // Tokens are: digits as strings ('0'..'20'), operators ('+','-','×','÷'), '='
@@ -273,58 +239,10 @@
    * Returns array of up to maxResults matches, each:
    *   { tokens: [...], size: 9 }
    */
+  // Thin wrapper — historically the only entry point. Now delegates to the
+  // unified implementation that also handles the no-target case.
   function findFullEquation(rack, target, maxResults) {
-    maxResults = maxResults || 1;
-    var results = [];
-
-    // The 9-tile "full rack" = rack tiles + the target as a 9th tile
-    var fullRack = rack.slice();
-    fullRack.push(String(target));  // target itself becomes a tile
-
-    // Generate all permutations of all 9 tokens
-    var indices = fullRack.map(function (_, i) { return i; });
-    // Permutation budget — 9! = 362880, way over typical browser tolerance.
-    // We cap to a generous but bounded number. Many will share face options
-    // (CHOICE/BLANK), so the cartesian product per permutation multiplies further.
-    var MAX_PERMS = 200000;
-    var perms = 0;
-
-    function tryPerm(perm) {
-      if (perms >= MAX_PERMS) return false;
-      if (results.length >= maxResults) return false;
-      perms++;
-      var optionsList = perm.map(function (idx) { return tileOptions(fullRack[idx]); });
-      if (optionsList.some(function (o) { return o.length === 0; })) return false;
-      var found = cartesianSearch(optionsList, function (tokens) {
-        if (tokens.indexOf('=') === -1) return false;
-        var result = evaluate(tokens);
-        return !isNaN(result);
-      }, 30000);
-      if (found) {
-        results.push({ tokens: found, size: 9 });
-        return true;
-      }
-      return false;
-    }
-
-    // Iteratively generate permutations with Heap's algorithm to avoid
-    // building the full array of 362880 in memory.
-    function heapPermute(k, arr) {
-      if (perms >= MAX_PERMS || results.length >= maxResults) return;
-      if (k === 1) {
-        tryPerm(arr);
-        return;
-      }
-      for (var i = 0; i < k; i++) {
-        heapPermute(k - 1, arr);
-        if (perms >= MAX_PERMS || results.length >= maxResults) return;
-        var swapIdx = (k % 2 === 0) ? i : 0;
-        var tmp = arr[swapIdx]; arr[swapIdx] = arr[k-1]; arr[k-1] = tmp;
-      }
-    }
-
-    heapPermute(indices.length, indices.slice());
-    return results;
+    return findFullEquationFromRack(rack, target, maxResults);
   }
 
   /**
@@ -348,9 +266,65 @@
   }
 
   window.AMath = window.AMath || {};
+  /**
+   * N-token equation finder. Given a list of tile faces, find an equation that
+   * uses ALL of them. Same engine as findFullEquation but without a target tile.
+   */
+  function findEquationFromTokens(tokens, maxResults) {
+    return findFullEquationFromRack(tokens, null, maxResults);
+  }
+
+  /**
+   * Internal: unified solver. rack = list of N faces. target = optional 9th face
+   * to append, or null if rack alone has all tokens.
+   */
+  function findFullEquationFromRack(rack, target, maxResults) {
+    maxResults = maxResults || 1;
+    var results = [];
+    var fullRack = rack.slice();
+    if (target !== null && target !== undefined) fullRack.push(String(target));
+
+    var indices = fullRack.map(function (_, i) { return i; });
+    var MAX_PERMS = 200000;
+    var perms = 0;
+
+    function tryPerm(perm) {
+      if (perms >= MAX_PERMS) return false;
+      if (results.length >= maxResults) return false;
+      perms++;
+      var optionsList = perm.map(function (idx) { return tileOptions(fullRack[idx]); });
+      if (optionsList.some(function (o) { return o.length === 0; })) return false;
+      var found = cartesianSearch(optionsList, function (tokens) {
+        if (tokens.indexOf('=') === -1) return false;
+        var result = evaluate(tokens);
+        return !isNaN(result);
+      }, 30000);
+      if (found) {
+        results.push({ tokens: found, size: fullRack.length });
+        return true;
+      }
+      return false;
+    }
+
+    function heapPermute(k, arr) {
+      if (perms >= MAX_PERMS || results.length >= maxResults) return;
+      if (k === 1) { tryPerm(arr); return; }
+      for (var i = 0; i < k; i++) {
+        heapPermute(k - 1, arr);
+        if (perms >= MAX_PERMS || results.length >= maxResults) return;
+        var swapIdx = (k % 2 === 0) ? i : 0;
+        var tmp = arr[swapIdx]; arr[swapIdx] = arr[k-1]; arr[k-1] = tmp;
+      }
+    }
+
+    heapPermute(indices.length, indices.slice());
+    return results;
+  }
+
   window.AMath.ton4Solver = {
     findEquations: findEquations,
     findFullEquation: findFullEquation,
+    findEquationFromTokens: findEquationFromTokens,
     solveAllTargets: solveAllTargets,
     evaluate: evaluate,
   };

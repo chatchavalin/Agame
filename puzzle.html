@@ -7,7 +7,7 @@
 // This script bumps version stamp every time we deploy. If the SW is stale,
 // it tells the SW to unregister, clears all caches, and reloads.
 (function(){
-  var DEPLOYED_VERSION = 'v33-2026-05-27';
+  var DEPLOYED_VERSION = 'v34-2026-05-27';
   var lastVersion = localStorage.getItem('pz_version');
   if (lastVersion !== DEPLOYED_VERSION) {
     localStorage.setItem('pz_version', DEPLOYED_VERSION);
@@ -177,7 +177,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v33</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v34</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -331,33 +331,33 @@ body.theme-dark .player-area .amath-tile-rack {
 </div>
 
 <!-- Load main game JS modules in dependency order (same as index.html) -->
-<script src="js/constants.js?v=v33-2026-05-27"></script>
-<script src="js/utils.js?v=v33-2026-05-27"></script>
-<script src="js/evaluator.js?v=v33-2026-05-27"></script>
-<script src="js/bag.js?v=v33-2026-05-27"></script>
-<script src="js/rack.js?v=v33-2026-05-27"></script>
-<script src="js/board.js?v=v33-2026-05-27"></script>
-<script src="js/tile-tracker.js?v=v33-2026-05-27"></script>
-<script src="js/scoring.js?v=v33-2026-05-27"></script>
-<script src="js/placement.js?v=v33-2026-05-27"></script>
+<script src="js/constants.js?v=v34-2026-05-27"></script>
+<script src="js/utils.js?v=v34-2026-05-27"></script>
+<script src="js/evaluator.js?v=v34-2026-05-27"></script>
+<script src="js/bag.js?v=v34-2026-05-27"></script>
+<script src="js/rack.js?v=v34-2026-05-27"></script>
+<script src="js/board.js?v=v34-2026-05-27"></script>
+<script src="js/tile-tracker.js?v=v34-2026-05-27"></script>
+<script src="js/scoring.js?v=v34-2026-05-27"></script>
+<script src="js/placement.js?v=v34-2026-05-27"></script>
 <!-- AI modules for the in-browser puzzle generator -->
-<script src="js/ai-x9.js?v=v33-2026-05-27"></script>
-<script src="js/ai-x4.js?v=v33-2026-05-27"></script>
-<script src="js/ai-bingo-fast.js?v=v33-2026-05-27"></script>
-<script src="js/ai-bingo-grammar.js?v=v33-2026-05-27"></script>
-<script src="js/ai-yoyo.js?v=v33-2026-05-27"></script>
-<script src="js/ai-patterns-data.js?v=v33-2026-05-27"></script>
-<script src="js/ai-patterns-engine.js?v=v33-2026-05-27"></script>
-<script src="js/ai-swap.js?v=v33-2026-05-27"></script>
-<script src="js/ai-swap-brain2.js?v=v33-2026-05-27"></script>
-<script src="js/ai-player.js?v=v33-2026-05-27"></script>
-<script src="js/puzzle-generator.js?v=v33-2026-05-27"></script>
-<script src="js/book-puzzle-generator.js?v=v33-2026-05-27"></script>
-<script src="js/ton4-solver.js?v=v33-2026-05-27"></script>
-<script src="js/sounds.js?v=v33-2026-05-27"></script>
-<script src="js/settings.js?v=v33-2026-05-27"></script>
-<script src="js/ui.js?v=v33-2026-05-27"></script>
-<script src="js/interactions.js?v=v33-2026-05-27"></script>
+<script src="js/ai-x9.js?v=v34-2026-05-27"></script>
+<script src="js/ai-x4.js?v=v34-2026-05-27"></script>
+<script src="js/ai-bingo-fast.js?v=v34-2026-05-27"></script>
+<script src="js/ai-bingo-grammar.js?v=v34-2026-05-27"></script>
+<script src="js/ai-yoyo.js?v=v34-2026-05-27"></script>
+<script src="js/ai-patterns-data.js?v=v34-2026-05-27"></script>
+<script src="js/ai-patterns-engine.js?v=v34-2026-05-27"></script>
+<script src="js/ai-swap.js?v=v34-2026-05-27"></script>
+<script src="js/ai-swap-brain2.js?v=v34-2026-05-27"></script>
+<script src="js/ai-player.js?v=v34-2026-05-27"></script>
+<script src="js/puzzle-generator.js?v=v34-2026-05-27"></script>
+<script src="js/book-puzzle-generator.js?v=v34-2026-05-27"></script>
+<script src="js/ton4-solver.js?v=v34-2026-05-27"></script>
+<script src="js/sounds.js?v=v34-2026-05-27"></script>
+<script src="js/settings.js?v=v34-2026-05-27"></script>
+<script src="js/ui.js?v=v34-2026-05-27"></script>
+<script src="js/interactions.js?v=v34-2026-05-27"></script>
 
 <script>
 (function(){
@@ -1080,13 +1080,13 @@ window.practiceBookSection = function(sid) {
     return;
   }
 
-  // ton2/ton3 are equation-style — open the dedicated equation screen, not the board UI
-  if (sid === 'ton2' || sid === 'ton3') {
-    openEquationPractice(sid, cache);
-    return;
-  }
+  // ALL book sections (ton1, ton2, ton3) use the equation-style UI.
+  // ton4 has its own dedicated target-drills screen.
+  openEquationPractice(sid, cache);
+  return;
 
-  // ton1 = board-play mode. Build session like startPuzzle does (otherwise nextPuzzle throws
+  // (unreachable — board-play path retained for reference if we ever switch back)
+  // ton1 was originally board-play, but per user request now also equation-style. (otherwise nextPuzzle throws
   // 'cannot read property board of null' — the "no question" bug).
   init();
   PUZZLE_BANK = { bingo: [], yoyo: [], mixed: cache.slice() };
@@ -1259,9 +1259,12 @@ window.openEquationPractice = function(sid, cache) {
   var patternIds = Object.keys(_eqPatterns);
   _eqActivePattern = patternIds[0];
   // Set title
-  document.getElementById('eq-title').textContent =
-    sid === 'ton2' ? 'ตอนที่ 2 — บิงโก 9 ตัว (Patterns)' :
-    sid === 'ton3' ? 'ตอนที่ 3 — บิงโก 9 ตัว (Open)' : 'Equation Practice';
+  var titleMap = {
+    'ton1': 'Set 1 — 8-Tile Bingo',
+    'ton2': 'Set 2 — 9-Tile Bingo (Patterns)',
+    'ton3': 'Set 3 — 9-Tile Bingo (Open)'
+  };
+  document.getElementById('eq-title').textContent = titleMap[sid] || 'Equation Practice';
   document.getElementById('screen-select').style.display = 'none';
   document.getElementById('screen-equation').style.display = 'block';
   renderEquationScreen();
@@ -1318,13 +1321,11 @@ window.toggleEqAnswer = function(idx) {
   var ansEl = document.getElementById('eq-answer-' + idx);
   var btn = document.getElementById('eq-toggle-' + idx);
   if (ansEl.style.display === 'none') {
-    var lines = [];
-    if (p.equation && p.equation.length) lines.push('AI: ' + p.equation.join(' '));
-    if (p.bookAnswer) lines.push('Book: ' + p.bookAnswer);
-    if (lines.length === 0) lines.push('(no answer stored)');
-    ansEl.innerHTML = lines.join('<br>');
+    ansEl.textContent = (p.equation && p.equation.length)
+      ? p.equation.join(' ')
+      : '(no equation found)';
     ansEl.style.display = 'block';
-    btn.textContent = '🙈 Hide';
+    btn.textContent = '🙈 Hide answer';
   } else {
     ansEl.style.display = 'none';
     btn.textContent = '🔍 Show answer';

@@ -1,7 +1,7 @@
 {
   "ton1": {
-    "title": "ตอนที่ 1 — โจทย์ บิงโก 8 ตัว",
-    "description": "8-tile bingo problems on empty board",
+    "title": "Set 1 — 8-Tile Bingo",
+    "description": "Form an equation using all 8 rack tiles.",
     "patterns": [
       {
         "id": "ton1-default",
@@ -17,8 +17,7 @@
               "20",
               "+",
               "="
-            ],
-            "bookAnswer": "97+20=117"
+            ]
           },
           {
             "rack": [
@@ -30,8 +29,7 @@
               "8",
               "+",
               "="
-            ],
-            "bookAnswer": "18+42=60"
+            ]
           },
           {
             "rack": [
@@ -43,8 +41,7 @@
               "7",
               "+",
               "="
-            ],
-            "bookAnswer": "27+34=61"
+            ]
           },
           {
             "rack": [
@@ -56,8 +53,7 @@
               "9",
               "+",
               "="
-            ],
-            "bookAnswer": "78+20=98"
+            ]
           },
           {
             "rack": [
@@ -69,16 +65,15 @@
               "9",
               "+",
               "="
-            ],
-            "bookAnswer": "98+7=105"
+            ]
           }
         ]
       }
     ]
   },
   "ton2": {
-    "title": "ตอนที่ 2 — บิงโก 9 ตัว (Patterns)",
-    "description": "9-token bingo with specific result patterns",
+    "title": "Set 2 — 9-Tile Bingo (Patterns)",
+    "description": "9-token equations matching specific result patterns.",
     "patterns": [
       {
         "id": "ton2-p1",
@@ -95,8 +90,7 @@
               "9",
               "+",
               "="
-            ],
-            "bookAnswer": "99+73=172"
+            ]
           },
           {
             "rack": [
@@ -109,8 +103,7 @@
               "8",
               "+",
               "="
-            ],
-            "bookAnswer": "71+57=128"
+            ]
           },
           {
             "rack": [
@@ -123,8 +116,7 @@
               "9",
               "+",
               "="
-            ],
-            "bookAnswer": "93+56=149"
+            ]
           },
           {
             "rack": [
@@ -137,8 +129,7 @@
               "8",
               "+",
               "="
-            ],
-            "bookAnswer": "86+65=151"
+            ]
           },
           {
             "rack": [
@@ -151,8 +142,7 @@
               "9",
               "+",
               "="
-            ],
-            "bookAnswer": "91+21=112"
+            ]
           }
         ]
       },
@@ -171,8 +161,7 @@
               "9",
               "+",
               "="
-            ],
-            "bookAnswer": "198+7=205"
+            ]
           },
           {
             "rack": [
@@ -185,8 +174,7 @@
               "9",
               "+",
               "="
-            ],
-            "bookAnswer": "386+3=389"
+            ]
           },
           {
             "rack": [
@@ -199,8 +187,7 @@
               "12",
               "+",
               "="
-            ],
-            "bookAnswer": "172+12=184"
+            ]
           },
           {
             "rack": [
@@ -213,8 +200,7 @@
               "16",
               "+",
               "="
-            ],
-            "bookAnswer": "481+16=497"
+            ]
           },
           {
             "rack": [
@@ -227,8 +213,7 @@
               "18",
               "+",
               "="
-            ],
-            "bookAnswer": "832+18=850"
+            ]
           }
         ]
       },
@@ -247,8 +232,7 @@
               "7",
               "×",
               "="
-            ],
-            "bookAnswer": "62×12=744"
+            ]
           },
           {
             "rack": [
@@ -261,8 +245,7 @@
               "6",
               "×",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -275,8 +258,7 @@
               "8",
               "×",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -289,8 +271,7 @@
               "8",
               "×",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -303,8 +284,7 @@
               "9",
               "×",
               "="
-            ],
-            "bookAnswer": null
+            ]
           }
         ]
       },
@@ -323,8 +303,7 @@
               "8",
               "×",
               "="
-            ],
-            "bookAnswer": "187×3=561"
+            ]
           },
           {
             "rack": [
@@ -337,8 +316,7 @@
               "9",
               "×",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -351,8 +329,7 @@
               "8",
               "×",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -365,8 +342,7 @@
               "9",
               "×",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -379,8 +355,7 @@
               "8",
               "×",
               "="
-            ],
-            "bookAnswer": null
+            ]
           }
         ]
       },
@@ -399,8 +374,7 @@
               "+",
               "-",
               "="
-            ],
-            "bookAnswer": "-28+50=22"
+            ]
           },
           {
             "rack": [
@@ -412,8 +386,7 @@
               "-",
               "=",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -425,8 +398,7 @@
               "-",
               "=",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -438,8 +410,7 @@
               "-",
               "=",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -451,8 +422,7 @@
               "-",
               "=",
               "="
-            ],
-            "bookAnswer": null
+            ]
           }
         ]
       },
@@ -471,8 +441,7 @@
               "+",
               "-",
               "="
-            ],
-            "bookAnswer": "15-5+20=30"
+            ]
           },
           {
             "rack": [
@@ -485,8 +454,7 @@
               "+",
               "-",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -499,8 +467,7 @@
               "+",
               "-",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -513,8 +480,7 @@
               "+",
               "-",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -527,8 +493,7 @@
               "+",
               "-",
               "="
-            ],
-            "bookAnswer": null
+            ]
           }
         ]
       },
@@ -547,8 +512,7 @@
               "+",
               "×",
               "="
-            ],
-            "bookAnswer": "7×7=38+11"
+            ]
           },
           {
             "rack": [
@@ -561,8 +525,7 @@
               "+",
               "×",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -575,8 +538,7 @@
               "+",
               "×",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -589,8 +551,7 @@
               "+",
               "×",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -603,8 +564,7 @@
               "+",
               "×",
               "="
-            ],
-            "bookAnswer": null
+            ]
           }
         ]
       },
@@ -623,8 +583,7 @@
               "+",
               "×",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -637,8 +596,7 @@
               "+",
               "×",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -651,8 +609,7 @@
               "+",
               "×",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -665,8 +622,7 @@
               "+",
               "×",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -679,8 +635,7 @@
               "+",
               "×",
               "="
-            ],
-            "bookAnswer": null
+            ]
           }
         ]
       },
@@ -699,8 +654,7 @@
               "+",
               "÷",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -713,8 +667,7 @@
               "+",
               "÷",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -727,8 +680,7 @@
               "+",
               "÷",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -741,8 +693,7 @@
               "+",
               "÷",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -755,8 +706,7 @@
               "+",
               "÷",
               "="
-            ],
-            "bookAnswer": null
+            ]
           }
         ]
       },
@@ -775,8 +725,7 @@
               "+",
               "÷",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -789,8 +738,7 @@
               "+",
               "÷",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -803,8 +751,7 @@
               "+",
               "÷",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -817,8 +764,7 @@
               "+",
               "÷",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -831,8 +777,7 @@
               "+",
               "÷",
               "="
-            ],
-            "bookAnswer": null
+            ]
           }
         ]
       },
@@ -851,8 +796,7 @@
               "×",
               "÷",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -865,8 +809,7 @@
               "×",
               "÷",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -879,8 +822,7 @@
               "×",
               "÷",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -893,8 +835,7 @@
               "×",
               "÷",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -907,16 +848,15 @@
               "×",
               "÷",
               "="
-            ],
-            "bookAnswer": null
+            ]
           }
         ]
       }
     ]
   },
   "ton3": {
-    "title": "ตอนที่ 3 — บิงโก 9 ตัว (Open form)",
-    "description": "9-token bingo, mixed operators, no specific result pattern",
+    "title": "Set 3 — 9-Tile Bingo (Open)",
+    "description": "9-token equations with mixed operators, no fixed pattern.",
     "patterns": [
       {
         "id": "ton3-default",
@@ -933,8 +873,7 @@
               "+",
               "-",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -947,8 +886,7 @@
               "+",
               "-",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -961,8 +899,7 @@
               "+",
               "-",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -975,8 +912,7 @@
               "+",
               "-",
               "="
-            ],
-            "bookAnswer": null
+            ]
           },
           {
             "rack": [
@@ -989,16 +925,15 @@
               "+",
               "-",
               "="
-            ],
-            "bookAnswer": null
+            ]
           }
         ]
       }
     ]
   },
   "ton4": {
-    "title": "ตอนที่ 4 — Target drills",
-    "description": "Given a fixed rack, build an equation that evaluates to each target.",
+    "title": "Set 4 — Target Drills",
+    "description": "Build a 9-token equation for each target value.",
     "puzzles": [
       {
         "id": "ton4-1",
