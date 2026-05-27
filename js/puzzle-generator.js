@@ -51,6 +51,16 @@
     }
   }
 
+  // Append a single new puzzle to the bank IMMEDIATELY.
+  // Used during generation so progress is never lost on cancel/refresh/crash.
+  function appendCapture(puzzle) {
+    const bank = loadBank();
+    // Skip if ID already exists (shouldn't happen with Date.now()+random, but defensive)
+    if (bank.some(p => p.id === puzzle.id)) return false;
+    bank.push(puzzle);
+    return saveBank(bank);
+  }
+
   function newGameState() {
     const bag = Bag.createBag();
     const board = Board.createBoard();
@@ -269,7 +279,7 @@
                   c.isYoyo = isYoyo(state, p);
                   return c;
                 });
-                captures.push({
+                const puzzle = {
                   id: Date.now() + Math.floor(Math.random() * 1e9),
                   capturedAt: new Date().toISOString(),
                   scoreYou: state.playerScore,
@@ -285,7 +295,9 @@
                   bestPlays,
                   hint: 'Auto-generated (best ' + best.score + ' vs weak ' + weak.score + ', bag ' + bagCount + ').',
                   _source: 'browser-generator',
-                });
+                };
+                captures.push(puzzle);
+                appendCapture(puzzle);  // ★ persist IMMEDIATELY so progress is safe
                 // Continue with WEAK play so game stays realistic
                 const r = applyPlacements(state, weak.placements, true);
                 if (!r.ok) applyPlacements(state, decision.placements, true);
@@ -341,17 +353,9 @@
         console.warn('[gen] Game ' + g + ' failed:', e);
       }
     }
-    // Merge into existing bank
-    const bank = loadBank();
-    const existingIds = new Set(bank.map(p => p.id));
-    let added = 0;
-    for (const p of newCaptures) {
-      if (existingIds.has(p.id)) continue;
-      bank.push(p);
-      existingIds.add(p.id);
-      added++;
-    }
-    saveBank(bank);
+    // Each puzzle was already saved as it was captured (appendCapture above),
+    // so nothing to merge here. We still count for the final summary.
+    const added = newCaptures.length;
     if (onProgress) {
       onProgress({
         gameIdx: numGames, totalGames: numGames,
