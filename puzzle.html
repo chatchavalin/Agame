@@ -7,7 +7,7 @@
 // This script bumps version stamp every time we deploy. If the SW is stale,
 // it tells the SW to unregister, clears all caches, and reloads.
 (function(){
-  var DEPLOYED_VERSION = 'v27-2026-05-26';
+  var DEPLOYED_VERSION = 'v28-2026-05-27';
   var lastVersion = localStorage.getItem('pz_version');
   if (lastVersion !== DEPLOYED_VERSION) {
     localStorage.setItem('pz_version', DEPLOYED_VERSION);
@@ -79,6 +79,12 @@
   .pz-best-btn.active-1{border-color:#94a3b8;color:#cbd5e1;}
   .pz-best-btn.active-2{border-color:#a78bfa;color:#c4b5fd;}
   .pz-best-btn:disabled{opacity:.35;cursor:not-allowed;}
+
+  /* Book section card buttons */
+  .book-btn-primary{background:#10b981;color:#fff;border:none;padding:8px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
+  .book-btn-primary:hover{background:#34d399;}
+  .book-btn-secondary{background:#475569;color:#e2e8f0;border:none;padding:8px 14px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .book-btn-secondary:hover{background:#64748b;}
 
   /* Remove button below the Best row */
   .pz-remove-row{display:flex;justify-content:center;padding:0 12px 8px;width:100%;max-width:520px;margin:0 auto;}
@@ -171,7 +177,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v27</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v28</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -193,6 +199,15 @@ body.theme-dark .player-area .amath-tile-rack {
       No puzzles yet. Play a Player-vs-AI game — when the bag drops below 25 tiles and you miss the best move, the position is saved here automatically.
     </div>
   </div>
+  <!-- Book-source sections -->
+  <div style="margin-top:14px;">
+    <h4 style="font-size:13px;color:#fbbf24;text-transform:uppercase;letter-spacing:.05em;margin:0 0 8px;">📚 Book Practice Sets</h4>
+    <p style="font-size:12px;color:#94a3b8;margin:0 0 10px;line-height:1.5;">Curated problems from A-Math P6 Book 2. Tap "Generate" to compute the best play for each, then "Practice" to start solving.</p>
+    <div id="book-section-cards">
+      <!-- populated by initBookSections() -->
+    </div>
+  </div>
+
   <!-- Auto-generate panel -->
   <div id="gen-panel" style="background:var(--bg-panel,#1e293b);border:1px solid var(--border-medium,#334155);border-radius:14px;padding:18px;margin-top:12px;">
     <h4 style="margin:0 0 8px;font-size:13px;color:#fbbf24;text-transform:uppercase;letter-spacing:.05em;">🤖 Auto-Generate Puzzles</h4>
@@ -293,6 +308,7 @@ body.theme-dark .player-area .amath-tile-rack {
 <script src="js/ai-swap-brain2.js?v=20260526pz"></script>
 <script src="js/ai-player.js?v=20260526pz"></script>
 <script src="js/puzzle-generator.js?v=20260526pz"></script>
+<script src="js/book-puzzle-generator.js?v=20260527pz"></script>
 <script src="js/sounds.js?v=20260526pz"></script>
 <script src="js/settings.js?v=20260526pz"></script>
 <script src="js/ui.js?v=20260526pz"></script>
@@ -933,8 +949,123 @@ function refreshBankStatus(){
 }
 
 // Update on page load
-document.addEventListener('DOMContentLoaded', refreshBankStatus);
-setTimeout(refreshBankStatus, 100);  // also after scripts settle
+document.addEventListener('DOMContentLoaded', function(){ refreshBankStatus(); initBookSections(); });
+setTimeout(function(){ refreshBankStatus(); initBookSections(); }, 100);
+
+// ============== BOOK PRACTICE SETS ==============
+function initBookSections() {
+  if (!window.AMath || !window.AMath.bookGenerator) return;
+  const container = document.getElementById('book-section-cards');
+  if (!container) return;
+
+  window.AMath.bookGenerator.loadBookData().then(function(data){
+    container.innerHTML = '';
+    ['ton1','ton2','ton3','ton4'].forEach(function(sid){
+      const section = data[sid];
+      if (!section) return;
+      let cachedCount = 0;
+      if (sid !== 'ton4') {
+        try { cachedCount = window.AMath.bookGenerator.loadCache(sid).length; } catch(e){}
+      } else {
+        try { cachedCount = (JSON.parse(localStorage.getItem('amath_book_ton4_cache')||'null') ? 1 : 0); } catch(e){}
+      }
+      const totalProblems = (sid === 'ton4') ? section.targets.length :
+        section.patterns.reduce(function(s,p){ return s + p.puzzles.length; }, 0);
+      const card = document.createElement('div');
+      card.style.cssText = 'background:var(--bg-panel,#1e293b);border:1px solid var(--border-medium,#334155);border-radius:10px;padding:12px;margin-bottom:8px;';
+      const statusLine = (sid === 'ton4')
+        ? '<div style="font-size:11px;color:#94a3b8;">Target drills — ' + totalProblems + ' targets · ' + (cachedCount ? 'cached' : 'not generated yet') + '</div>'
+        : '<div style="font-size:11px;color:#94a3b8;">' + cachedCount + ' / ' + totalProblems + ' computed</div>';
+      card.innerHTML =
+        '<div style="font-size:13px;font-weight:700;color:#e2e8f0;margin-bottom:4px;">' + section.title + '</div>' +
+        '<div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">' + section.description + '</div>' +
+        statusLine +
+        '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">' +
+          (sid === 'ton4'
+            ? '<button class="book-btn-primary" onclick="openTon4()">▶ Open Target Drills</button>'
+            : ('<button class="book-btn-secondary" onclick="generateBookSection(\'' + sid + '\')">⚙ ' + (cachedCount > 0 ? 'Regenerate' : 'Generate') + '</button>' +
+               (cachedCount > 0 ? '<button class="book-btn-primary" onclick="practiceBookSection(\'' + sid + '\')">▶ Practice</button>' : ''))
+          ) +
+        '</div>';
+      container.appendChild(card);
+    });
+  });
+}
+
+window.generateBookSection = async function(sid) {
+  if (!window.AMath || !window.AMath.bookGenerator) return;
+  // Show progress in an overlay
+  const overlay = ensureBookProgressOverlay();
+  overlay.style.display = 'flex';
+  const lbl = document.getElementById('book-progress-label');
+  const bar = document.getElementById('book-progress-bar');
+  const sub = document.getElementById('book-progress-sub');
+  lbl.textContent = 'Starting ' + sid + '...';
+  bar.style.width = '0%';
+  sub.textContent = '';
+
+  function fmt(ms){ const s=Math.floor(ms/1000); return Math.floor(s/60)+'m '+(s%60)+'s'; }
+  const onCancel = function(){ window.AMath.bookGenerator.cancel(); };
+  document.getElementById('book-progress-cancel').onclick = onCancel;
+
+  try {
+    const result = await window.AMath.bookGenerator.generateSection(sid, function(p){
+      const pct = p.total ? Math.round((p.done/p.total)*100) : 0;
+      bar.style.width = pct + '%';
+      lbl.textContent = (p.stage === 'done' ? '✅ Done' : 'Solving') + ' — ' + (p.currentLabel || '');
+      sub.textContent = p.done + '/' + p.total + ' · ' + p.captures + ' captured · ' + fmt(p.elapsedMs);
+    });
+    setTimeout(function(){ overlay.style.display = 'none'; initBookSections(); }, 600);
+  } catch (e) {
+    console.error('[book-gen] failed', e);
+    lbl.textContent = '❌ Failed: ' + e.message;
+  }
+};
+
+window.practiceBookSection = function(sid) {
+  const cache = window.AMath.bookGenerator.loadCache(sid);
+  if (!cache || cache.length === 0) {
+    alert('No cached puzzles for this section — please Generate first.');
+    return;
+  }
+  init();
+  // Inject book puzzles into PUZZLE_BANK for the current session
+  PUZZLE_BANK = { bingo: [], yoyo: [], mixed: cache.slice() };
+  // Reset queue
+  shuffleQueue = [];
+  for (var i = 0; i < cache.length; i++) shuffleQueue.push(i);
+  // Show puzzle screen
+  puzzleType = 'mixed'; puzzleNum = 0; streak = 0;
+  document.getElementById('screen-select').style.display='none';
+  document.getElementById('screen-puzzle').style.display='block';
+  nextPuzzle();
+};
+
+window.openTon4 = function() {
+  alert('ตอน 4 dedicated UI is coming in the next update. The infrastructure is in place — solver and rack are wired up.');
+};
+
+function ensureBookProgressOverlay() {
+  let ov = document.getElementById('book-progress-overlay');
+  if (ov) return ov;
+  ov = document.createElement('div');
+  ov.id = 'book-progress-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.94);display:none;align-items:center;justify-content:center;z-index:9999;padding:20px;';
+  ov.innerHTML =
+    '<div style="background:#1e293b;border-radius:14px;padding:24px;max-width:400px;width:100%;border:1px solid #334155;">' +
+      '<h3 style="margin:0 0 12px;color:#fbbf24;font-size:15px;">📚 Generating Book Puzzles</h3>' +
+      '<div id="book-progress-label" style="font-size:13px;color:#e2e8f0;margin-bottom:8px;">Starting...</div>' +
+      '<div style="background:#0f172a;border-radius:6px;height:10px;overflow:hidden;margin-bottom:6px;">' +
+        '<div id="book-progress-bar" style="background:#10b981;height:100%;width:0%;transition:width .3s;"></div>' +
+      '</div>' +
+      '<div id="book-progress-sub" style="font-size:11px;color:#94a3b8;text-align:center;"></div>' +
+      '<div style="text-align:center;margin-top:14px;">' +
+        '<button id="book-progress-cancel" style="background:#dc2626;color:#fff;border:none;padding:8px 18px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">⏹ Cancel</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(ov);
+  return ov;
+}
 
 // Theme toggle — cycle through dark / modern / physical
 window.cycleTheme = function(){
