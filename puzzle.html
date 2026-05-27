@@ -7,7 +7,7 @@
 // This script bumps version stamp every time we deploy. If the SW is stale,
 // it tells the SW to unregister, clears all caches, and reloads.
 (function(){
-  var DEPLOYED_VERSION = 'v28-2026-05-27';
+  var DEPLOYED_VERSION = 'v29-2026-05-27';
   var lastVersion = localStorage.getItem('pz_version');
   if (lastVersion !== DEPLOYED_VERSION) {
     localStorage.setItem('pz_version', DEPLOYED_VERSION);
@@ -177,7 +177,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v28</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v29</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -286,6 +286,39 @@ body.theme-dark .player-area .amath-tile-rack {
   </div>
 </div>
 
+<!-- TON 4 SCREEN — Target drills with a fixed rack -->
+<div id="screen-ton4" style="display:none;padding:14px 12px;max-width:560px;margin:0 auto;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+    <button onclick="closeTon4()" style="background:#475569;color:#e2e8f0;border:none;padding:6px 12px;border-radius:7px;font-size:12px;cursor:pointer;font-family:inherit;">← Back</button>
+    <span style="font-size:14px;font-weight:700;color:#fbbf24;">ตอนที่ 4 — Target Drills</span>
+    <div style="width:60px;"></div>
+  </div>
+
+  <!-- Rack selector -->
+  <div style="background:var(--bg-panel,#1e293b);border-radius:10px;padding:10px;border:1px solid var(--border-medium,#334155);margin-bottom:10px;">
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">SELECT SET</div>
+    <div id="ton4-set-tabs" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
+  </div>
+
+  <!-- Current rack display -->
+  <div style="background:var(--bg-panel,#1e293b);border-radius:10px;padding:10px;border:1px solid var(--border-medium,#334155);margin-bottom:10px;">
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">YOUR RACK</div>
+    <div id="ton4-rack-display" style="display:flex;gap:5px;justify-content:center;flex-wrap:wrap;"></div>
+  </div>
+
+  <!-- Solve-all button -->
+  <div style="text-align:center;margin-bottom:12px;">
+    <button id="ton4-solve-all" onclick="ton4SolveAll()" style="background:#10b981;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">🔍 Solve All Targets</button>
+    <div id="ton4-solve-progress" style="font-size:11px;color:#94a3b8;margin-top:6px;display:none;"></div>
+  </div>
+
+  <!-- Targets grid -->
+  <div style="background:var(--bg-panel,#1e293b);border-radius:10px;padding:10px;border:1px solid var(--border-medium,#334155);">
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">TARGETS — tap any to reveal the equation</div>
+    <div id="ton4-targets-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;"></div>
+  </div>
+</div>
+
 <!-- Load main game JS modules in dependency order (same as index.html) -->
 <script src="js/constants.js?v=20260526pz"></script>
 <script src="js/utils.js?v=20260526pz"></script>
@@ -309,6 +342,7 @@ body.theme-dark .player-area .amath-tile-rack {
 <script src="js/ai-player.js?v=20260526pz"></script>
 <script src="js/puzzle-generator.js?v=20260526pz"></script>
 <script src="js/book-puzzle-generator.js?v=20260527pz"></script>
+<script src="js/ton4-solver.js?v=20260527pz"></script>
 <script src="js/sounds.js?v=20260526pz"></script>
 <script src="js/settings.js?v=20260526pz"></script>
 <script src="js/ui.js?v=20260526pz"></script>
@@ -1041,8 +1075,122 @@ window.practiceBookSection = function(sid) {
   nextPuzzle();
 };
 
-window.openTon4 = function() {
-  alert('ตอน 4 dedicated UI is coming in the next update. The infrastructure is in place — solver and rack are wired up.');
+var _ton4Data = null;
+var _ton4ActiveSet = 0;
+var _ton4Results = {};  // cached per-set results
+
+window.openTon4 = async function() {
+  if (!window.AMath.bookGenerator) return;
+  const data = await window.AMath.bookGenerator.loadBookData();
+  _ton4Data = data.ton4;
+  if (!_ton4Data || !_ton4Data.puzzles || _ton4Data.puzzles.length === 0) {
+    alert('No ตอน 4 data loaded.');
+    return;
+  }
+  // Try to load cached results
+  try {
+    const cached = localStorage.getItem('amath_book_ton4_cache');
+    if (cached) _ton4Results = JSON.parse(cached);
+  } catch(e) { _ton4Results = {}; }
+  _ton4ActiveSet = 0;
+  document.getElementById('screen-select').style.display = 'none';
+  document.getElementById('screen-ton4').style.display = 'block';
+  renderTon4();
+};
+
+window.closeTon4 = function() {
+  document.getElementById('screen-ton4').style.display = 'none';
+  document.getElementById('screen-select').style.display = 'block';
+  initBookSections();  // refresh counts
+};
+
+window.ton4SelectSet = function(idx) {
+  _ton4ActiveSet = idx;
+  renderTon4();
+};
+
+function renderTon4() {
+  if (!_ton4Data) return;
+  const tabs = document.getElementById('ton4-set-tabs');
+  tabs.innerHTML = '';
+  _ton4Data.puzzles.forEach(function(pz, i) {
+    const btn = document.createElement('button');
+    btn.textContent = pz.label;
+    btn.style.cssText = 'background:' + (i === _ton4ActiveSet ? '#fbbf24' : '#334155') +
+                       ';color:' + (i === _ton4ActiveSet ? '#1f2937' : '#e2e8f0') +
+                       ';border:none;padding:6px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;';
+    btn.onclick = function(){ ton4SelectSet(i); };
+    tabs.appendChild(btn);
+  });
+
+  // Render rack
+  const rackEl = document.getElementById('ton4-rack-display');
+  rackEl.innerHTML = '';
+  const activePz = _ton4Data.puzzles[_ton4ActiveSet];
+  activePz.rack.forEach(function(face) {
+    const tile = document.createElement('div');
+    tile.textContent = face === 'BLANK' ? '?' : face;
+    tile.style.cssText = 'background:linear-gradient(145deg,#fef3c7,#fde68a);color:#1f2937;font-weight:800;font-size:14px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:6px;border:2px solid #d97706;';
+    rackEl.appendChild(tile);
+  });
+
+  // Render targets grid
+  const grid = document.getElementById('ton4-targets-grid');
+  grid.innerHTML = '';
+  const cached = _ton4Results[activePz.id] || {};
+  _ton4Data.targets.forEach(function(target) {
+    const item = document.createElement('div');
+    item.style.cssText = 'background:#0f172a;border-radius:6px;padding:8px;display:flex;align-items:center;gap:8px;min-height:36px;';
+    const targetTag = document.createElement('div');
+    targetTag.textContent = target;
+    targetTag.style.cssText = 'background:#fbbf24;color:#1f2937;font-weight:800;font-size:13px;min-width:32px;text-align:center;padding:4px;border-radius:5px;';
+    item.appendChild(targetTag);
+
+    const answer = document.createElement('div');
+    answer.style.cssText = 'flex:1;font-size:12px;color:#e2e8f0;font-family:monospace;';
+    if (cached[target] === null) {
+      answer.textContent = 'No solution';
+      answer.style.color = '#94a3b8';
+      answer.style.fontStyle = 'italic';
+    } else if (cached[target]) {
+      answer.textContent = cached[target].tokens.join(' ');
+      answer.style.color = '#10b981';
+    } else {
+      answer.textContent = '— (tap Solve All)';
+      answer.style.color = '#64748b';
+    }
+    item.appendChild(answer);
+    grid.appendChild(item);
+  });
+}
+
+window.ton4SolveAll = async function() {
+  if (!window.AMath.ton4Solver) { alert('Solver not loaded.'); return; }
+  if (!_ton4Data) return;
+  const activePz = _ton4Data.puzzles[_ton4ActiveSet];
+  const btn = document.getElementById('ton4-solve-all');
+  const prog = document.getElementById('ton4-solve-progress');
+  btn.disabled = true;
+  btn.style.opacity = '0.6';
+  prog.style.display = 'block';
+  prog.textContent = 'Starting...';
+  try {
+    const results = await window.AMath.ton4Solver.solveAllTargets(activePz.rack, function(done, total, current){
+      prog.textContent = current
+        ? 'Solving ' + done + '/' + total + ' — target: ' + current
+        : '✅ Done';
+    });
+    _ton4Results[activePz.id] = results;
+    // Save to localStorage
+    try { localStorage.setItem('amath_book_ton4_cache', JSON.stringify(_ton4Results)); } catch(e){}
+    renderTon4();
+    prog.textContent = '✅ Solved ' + Object.values(results).filter(function(v){return v;}).length + ' / ' + Object.keys(results).length;
+  } catch (e) {
+    prog.textContent = '❌ Error: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.style.opacity = '1';
+  }
 };
 
 function ensureBookProgressOverlay() {
