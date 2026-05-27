@@ -321,7 +321,63 @@
     return results;
   }
 
+  /**
+   * Check if a token sequence matches a pattern shape.
+   * Pattern syntax (regex):
+   *   D     = single digit (each becomes one 'D' in shape string)
+   *   *     = literal × (multiplication)
+   *   /     = literal ÷ (division)
+   *   '-' prefix at start = unary minus
+   *
+   * Implementation: collapse the tokens into a "shape string" like
+   *   tokens ['9','9','+','7','3','=','1','7','2'] → 'DD+DD=DDD'
+   * Then test against the supplied regex.
+   */
+  function matchPattern(tokens, patternRegex) {
+    if (!patternRegex) return true;
+
+    // Use the same multi-digit combining rule as PvA evaluator:
+    //   - single-digit tiles (0-9) combine with neighbors up to 3 digits
+    //   - 2-digit tiles (10-20) stand alone
+    var groups = [];
+    var curDigits = '';
+    for (var i = 0; i < tokens.length; i++) {
+      var t = tokens[i];
+      if (/^\d+$/.test(t)) {
+        if (t.length === 1 && curDigits.length < 3) {
+          curDigits += t;
+        } else {
+          if (curDigits) { groups.push(curDigits); curDigits = ''; }
+          groups.push(t);
+        }
+      } else {
+        if (curDigits) { groups.push(curDigits); curDigits = ''; }
+        groups.push(t);
+      }
+    }
+    if (curDigits) groups.push(curDigits);
+
+    // Build shape string
+    var shape = '';
+    for (var k = 0; k < groups.length; k++) {
+      var g = groups[k];
+      if (/^\d+$/.test(g)) {
+        shape += 'D'.repeat(g.length);
+      } else if (g === '×') shape += '*';
+      else if (g === '÷') shape += '/';
+      else shape += g;
+    }
+
+    try {
+      return new RegExp(patternRegex).test(shape);
+    } catch (e) {
+      console.warn('[ton4] invalid pattern regex:', patternRegex);
+      return true;  // be permissive on bad regex
+    }
+  }
+
   window.AMath.ton4Solver = {
+    matchPattern: matchPattern,
     findEquations: findEquations,
     findFullEquation: findFullEquation,
     findEquationFromTokens: findEquationFromTokens,

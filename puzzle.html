@@ -171,13 +171,146 @@ body.theme-dark .player-area .amath-tile-rack {
   .pz-scoreboard .sb-vs{font-size:11px;color:#475569;font-weight:700;}
   /* Hide PvA-built score boxes (we use our own scoreboard) */
   .opponent-area .score-box, .player-area .score-box, .player-area .timer-box { display:none !important; }
+
+  /* === Equation Practice Screen === */
+  .eq-card {
+    background: var(--bg-panel, #1e293b);
+    border: 1px solid var(--border-medium, #334155);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  .eq-section-label {
+    font-size: 10px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 6px 0 6px;
+    font-weight: 600;
+  }
+  .eq-tile-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-height: 48px;
+    padding: 8px;
+    border-radius: 8px;
+    background: #0f172a;
+    border: 2px dashed #334155;
+    align-items: center;
+  }
+  .eq-answer-area {
+    border-color: #fbbf24;
+    background: #1a1f2e;
+    margin-bottom: 4px;
+  }
+  .eq-rack-area {
+    border-color: #475569;
+    margin-bottom: 12px;
+  }
+  .eq-tile {
+    width: 38px; height: 38px;
+    background: linear-gradient(145deg, #fef3c7, #fde68a);
+    color: #1f2937;
+    border: 2px solid #d97706;
+    border-radius: 6px;
+    font-weight: 800;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    transition: transform 0.08s;
+  }
+  .eq-tile:active { cursor: grabbing; transform: scale(1.08); }
+  .eq-tile.dragging { opacity: 0.7; }
+  .eq-slot {
+    width: 38px; height: 38px;
+    border: 2px dashed #475569;
+    border-radius: 6px;
+    color: #475569;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .eq-slot.drop-active {
+    border-color: #fbbf24;
+    background: rgba(251, 191, 36, 0.15);
+  }
+  .eq-result {
+    min-height: 24px;
+    margin: 8px 0;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: monospace;
+    text-align: center;
+  }
+  .eq-result.correct {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    border: 1px solid #10b981;
+  }
+  .eq-result.incorrect {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border: 1px solid #ef4444;
+  }
+  .eq-action-row { display: flex; gap: 8px; margin-top: 10px; }
+  .eq-btn-primary {
+    flex: 1;
+    background: #10b981; color: #fff; border: none;
+    padding: 10px; border-radius: 8px;
+    font-size: 13px; font-weight: 700;
+    cursor: pointer; font-family: inherit;
+  }
+  .eq-btn-primary:hover { background: #34d399; }
+  .eq-btn-secondary {
+    background: #475569; color: #e2e8f0; border: none;
+    padding: 10px 16px; border-radius: 8px;
+    font-size: 12px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+  }
+  .eq-btn-secondary:hover { background: #64748b; }
+  .eq-btn-back {
+    background: #475569; color: #e2e8f0; border: none;
+    padding: 6px 12px; border-radius: 7px;
+    font-size: 12px; cursor: pointer; font-family: inherit;
+  }
+  .eq-nav-row { display: flex; gap: 8px; margin-top: 6px; }
+  .eq-btn-nav {
+    flex: 1;
+    background: #1e293b; color: #e2e8f0;
+    border: 1px solid #334155;
+    padding: 8px; border-radius: 7px;
+    font-size: 12px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+  }
+  .eq-btn-nav:hover:not(:disabled) { background: #334155; }
+  .eq-btn-nav:disabled { opacity: 0.4; cursor: not-allowed; }
+  .eq-select {
+    width: 100%;
+    background: #1e293b;
+    color: #e2e8f0;
+    border: 1px solid #334155;
+    border-radius: 7px;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-family: inherit;
+  }
 </style>
 </head>
 <body>
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v34</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v35</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -288,78 +421,131 @@ body.theme-dark .player-area .amath-tile-rack {
   </div>
 </div>
 
-<!-- EQUATION PRACTICE SCREEN — for ton2/ton3 (9-token equations, no board) -->
+<!-- EQUATION PRACTICE SCREEN — for ton1/ton2/ton3 (equation puzzles, no board) -->
 <div id="screen-equation" style="display:none;padding:14px 12px;max-width:560px;margin:0 auto;">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-    <button onclick="closeEquationPractice()" style="background:#475569;color:#e2e8f0;border:none;padding:6px 12px;border-radius:7px;font-size:12px;cursor:pointer;font-family:inherit;">← Back</button>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;">
+    <button onclick="closeEquationPractice()" class="eq-btn-back">← Back</button>
     <span id="eq-title" style="font-size:14px;font-weight:700;color:#fbbf24;text-align:center;flex:1;">Equation Practice</span>
     <div style="width:60px;"></div>
   </div>
-  <div id="eq-pattern-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;"></div>
-  <div id="eq-puzzles-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+
+  <!-- Pattern dropdown (only shown if section has multiple patterns) -->
+  <div id="eq-pattern-row" style="margin-bottom:12px;display:none;">
+    <label style="font-size:11px;color:#94a3b8;text-transform:uppercase;display:block;margin-bottom:4px;">Pattern</label>
+    <select id="eq-pattern-select" class="eq-select"></select>
+  </div>
+
+  <!-- Problem counter + progress -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:11px;color:#94a3b8;">
+    <span id="eq-problem-counter">Problem 1 / 10</span>
+    <span id="eq-score-summary">Solved: 0 / 10</span>
+  </div>
+
+  <!-- Card -->
+  <div class="eq-card">
+    <!-- Answer area (target) -->
+    <div class="eq-section-label">Drag tiles here to build the equation</div>
+    <div id="eq-answer-area" class="eq-tile-row eq-answer-area"></div>
+
+    <!-- Result line (hidden until submit) -->
+    <div id="eq-result" class="eq-result"></div>
+
+    <!-- Rack (source) -->
+    <div class="eq-section-label">Your tiles</div>
+    <div id="eq-rack-area" class="eq-tile-row eq-rack-area"></div>
+
+    <!-- Action buttons -->
+    <div class="eq-action-row">
+      <button onclick="eqReset()" class="eq-btn-secondary">↺ Reset</button>
+      <button onclick="eqSubmit()" id="eq-submit" class="eq-btn-primary">✓ Submit</button>
+    </div>
+  </div>
+
+  <!-- Nav: prev / next problem -->
+  <div class="eq-nav-row">
+    <button onclick="eqGoPrev()" id="eq-prev" class="eq-btn-nav">← Previous</button>
+    <button onclick="eqGoNext()" id="eq-next" class="eq-btn-nav">Next →</button>
+  </div>
 </div>
 
-<!-- TON 4 SCREEN — Target drills with a fixed rack -->
+<!-- SET 4 SCREEN — Target Drills (drag-and-drop) -->
 <div id="screen-ton4" style="display:none;padding:14px 12px;max-width:560px;margin:0 auto;">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-    <button onclick="closeTon4()" style="background:#475569;color:#e2e8f0;border:none;padding:6px 12px;border-radius:7px;font-size:12px;cursor:pointer;font-family:inherit;">← Back</button>
-    <span style="font-size:14px;font-weight:700;color:#fbbf24;">ตอนที่ 4 — Target Drills</span>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;">
+    <button onclick="closeTon4()" class="eq-btn-back">← Back</button>
+    <span style="font-size:14px;font-weight:700;color:#fbbf24;text-align:center;flex:1;">Set 4 — Target Drills</span>
     <div style="width:60px;"></div>
   </div>
 
-  <!-- Rack selector -->
-  <div style="background:var(--bg-panel,#1e293b);border-radius:10px;padding:10px;border:1px solid var(--border-medium,#334155);margin-bottom:10px;">
-    <div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">SELECT SET</div>
-    <div id="ton4-set-tabs" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
+  <!-- Set selector dropdown -->
+  <div style="margin-bottom:8px;">
+    <label style="font-size:11px;color:#94a3b8;text-transform:uppercase;display:block;margin-bottom:4px;">Set</label>
+    <select id="ton4-set-select" class="eq-select"></select>
   </div>
 
-  <!-- Current rack display -->
-  <div style="background:var(--bg-panel,#1e293b);border-radius:10px;padding:10px;border:1px solid var(--border-medium,#334155);margin-bottom:10px;">
-    <div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">YOUR RACK</div>
-    <div id="ton4-rack-display" style="display:flex;gap:5px;justify-content:center;flex-wrap:wrap;"></div>
+  <!-- Target selector dropdown -->
+  <div style="margin-bottom:12px;">
+    <label style="font-size:11px;color:#94a3b8;text-transform:uppercase;display:block;margin-bottom:4px;">Target</label>
+    <select id="ton4-target-select" class="eq-select"></select>
   </div>
 
-  <!-- Solve-all button -->
-  <div style="text-align:center;margin-bottom:12px;">
-    <button id="ton4-solve-all" onclick="ton4SolveAll()" style="background:#10b981;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">🔍 Solve All Targets</button>
-    <div id="ton4-solve-progress" style="font-size:11px;color:#94a3b8;margin-top:6px;display:none;"></div>
+  <!-- Progress -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:11px;color:#94a3b8;">
+    <span id="ton4-problem-counter">Target 1 / 26</span>
+    <span id="ton4-score-summary">Solved: 0 / 26</span>
   </div>
 
-  <!-- Targets grid -->
-  <div style="background:var(--bg-panel,#1e293b);border-radius:10px;padding:10px;border:1px solid var(--border-medium,#334155);">
-    <div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">TARGETS — 9-tile equations using all 8 rack tiles + target tile</div>
-    <div id="ton4-targets-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;"></div>
+  <!-- Card -->
+  <div class="eq-card">
+    <div class="eq-section-label">Drag tiles here to build the equation that equals the target</div>
+    <div id="ton4-answer-area" class="eq-tile-row eq-answer-area"></div>
+    <div id="ton4-result" class="eq-result"></div>
+    <div class="eq-section-label">Your rack + target tile</div>
+    <div id="ton4-rack-area" class="eq-tile-row eq-rack-area"></div>
+    <div class="eq-action-row">
+      <button onclick="ton4Reset()" class="eq-btn-secondary">↺ Reset</button>
+      <button onclick="ton4Submit()" class="eq-btn-primary">✓ Submit</button>
+    </div>
+  </div>
+
+  <div class="eq-nav-row">
+    <button onclick="ton4GoPrev()" id="ton4-prev" class="eq-btn-nav">← Previous target</button>
+    <button onclick="ton4GoNext()" id="ton4-next" class="eq-btn-nav">Next target →</button>
+  </div>
+
+  <!-- Generate-new-rack button -->
+  <div style="margin-top:12px;">
+    <button onclick="ton4GenerateNewRack()" class="eq-btn-secondary" style="width:100%;">🎲 Generate new quiz (random rack for this Set)</button>
   </div>
 </div>
 
 <!-- Load main game JS modules in dependency order (same as index.html) -->
-<script src="js/constants.js?v=v34b-2026-05-27"></script>
-<script src="js/utils.js?v=v34b-2026-05-27"></script>
-<script src="js/evaluator.js?v=v34b-2026-05-27"></script>
-<script src="js/bag.js?v=v34b-2026-05-27"></script>
-<script src="js/rack.js?v=v34b-2026-05-27"></script>
-<script src="js/board.js?v=v34b-2026-05-27"></script>
-<script src="js/tile-tracker.js?v=v34b-2026-05-27"></script>
-<script src="js/scoring.js?v=v34b-2026-05-27"></script>
-<script src="js/placement.js?v=v34b-2026-05-27"></script>
+<script src="js/constants.js?v=v35-2026-05-27"></script>
+<script src="js/utils.js?v=v35-2026-05-27"></script>
+<script src="js/evaluator.js?v=v35-2026-05-27"></script>
+<script src="js/bag.js?v=v35-2026-05-27"></script>
+<script src="js/rack.js?v=v35-2026-05-27"></script>
+<script src="js/board.js?v=v35-2026-05-27"></script>
+<script src="js/tile-tracker.js?v=v35-2026-05-27"></script>
+<script src="js/scoring.js?v=v35-2026-05-27"></script>
+<script src="js/placement.js?v=v35-2026-05-27"></script>
 <!-- AI modules for the in-browser puzzle generator -->
-<script src="js/ai-x9.js?v=v34b-2026-05-27"></script>
-<script src="js/ai-x4.js?v=v34b-2026-05-27"></script>
-<script src="js/ai-bingo-fast.js?v=v34b-2026-05-27"></script>
-<script src="js/ai-bingo-grammar.js?v=v34b-2026-05-27"></script>
-<script src="js/ai-yoyo.js?v=v34b-2026-05-27"></script>
-<script src="js/ai-patterns-data.js?v=v34b-2026-05-27"></script>
-<script src="js/ai-patterns-engine.js?v=v34b-2026-05-27"></script>
-<script src="js/ai-swap.js?v=v34b-2026-05-27"></script>
-<script src="js/ai-swap-brain2.js?v=v34b-2026-05-27"></script>
-<script src="js/ai-player.js?v=v34b-2026-05-27"></script>
-<script src="js/puzzle-generator.js?v=v34b-2026-05-27"></script>
-<script src="js/book-puzzle-generator.js?v=v34b-2026-05-27"></script>
-<script src="js/ton4-solver.js?v=v34b-2026-05-27"></script>
-<script src="js/sounds.js?v=v34b-2026-05-27"></script>
-<script src="js/settings.js?v=v34b-2026-05-27"></script>
-<script src="js/ui.js?v=v34b-2026-05-27"></script>
-<script src="js/interactions.js?v=v34b-2026-05-27"></script>
+<script src="js/ai-x9.js?v=v35-2026-05-27"></script>
+<script src="js/ai-x4.js?v=v35-2026-05-27"></script>
+<script src="js/ai-bingo-fast.js?v=v35-2026-05-27"></script>
+<script src="js/ai-bingo-grammar.js?v=v35-2026-05-27"></script>
+<script src="js/ai-yoyo.js?v=v35-2026-05-27"></script>
+<script src="js/ai-patterns-data.js?v=v35-2026-05-27"></script>
+<script src="js/ai-patterns-engine.js?v=v35-2026-05-27"></script>
+<script src="js/ai-swap.js?v=v35-2026-05-27"></script>
+<script src="js/ai-swap-brain2.js?v=v35-2026-05-27"></script>
+<script src="js/ai-player.js?v=v35-2026-05-27"></script>
+<script src="js/puzzle-generator.js?v=v35-2026-05-27"></script>
+<script src="js/book-puzzle-generator.js?v=v35-2026-05-27"></script>
+<script src="js/ton4-solver.js?v=v35-2026-05-27"></script>
+<script src="js/sounds.js?v=v35-2026-05-27"></script>
+<script src="js/settings.js?v=v35-2026-05-27"></script>
+<script src="js/ui.js?v=v35-2026-05-27"></script>
+<script src="js/interactions.js?v=v35-2026-05-27"></script>
 
 <script>
 (function(){
@@ -1143,151 +1329,61 @@ window.practiceBookSection = function(sid) {
   nextPuzzle();
 };
 
-var _ton4Data = null;
-var _ton4ActiveSet = 0;
-var _ton4Results = {};  // cached per-set results
-
-window.openTon4 = async function() {
-  if (!window.AMath.bookGenerator) return;
-  const data = await window.AMath.bookGenerator.loadBookData();
-  _ton4Data = data.ton4;
-  if (!_ton4Data || !_ton4Data.puzzles || _ton4Data.puzzles.length === 0) {
-    alert('No ตอน 4 data loaded.');
-    return;
-  }
-  // Try to load cached results
-  try {
-    const cached = localStorage.getItem('amath_book_ton4_cache');
-    if (cached) _ton4Results = JSON.parse(cached);
-  } catch(e) { _ton4Results = {}; }
-  _ton4ActiveSet = 0;
-  document.getElementById('screen-select').style.display = 'none';
-  document.getElementById('screen-ton4').style.display = 'block';
-  renderTon4();
-};
-
-window.closeTon4 = function() {
-  document.getElementById('screen-ton4').style.display = 'none';
-  document.getElementById('screen-select').style.display = 'block';
-  initBookSections();  // refresh counts
-};
-
-window.ton4SelectSet = function(idx) {
-  _ton4ActiveSet = idx;
-  renderTon4();
-};
-
-function renderTon4() {
-  if (!_ton4Data) return;
-  const tabs = document.getElementById('ton4-set-tabs');
-  tabs.innerHTML = '';
-  _ton4Data.puzzles.forEach(function(pz, i) {
-    const btn = document.createElement('button');
-    btn.textContent = pz.label;
-    btn.style.cssText = 'background:' + (i === _ton4ActiveSet ? '#fbbf24' : '#334155') +
-                       ';color:' + (i === _ton4ActiveSet ? '#1f2937' : '#e2e8f0') +
-                       ';border:none;padding:6px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;';
-    btn.onclick = function(){ ton4SelectSet(i); };
-    tabs.appendChild(btn);
-  });
-
-  // Render rack
-  const rackEl = document.getElementById('ton4-rack-display');
-  rackEl.innerHTML = '';
-  const activePz = _ton4Data.puzzles[_ton4ActiveSet];
-  activePz.rack.forEach(function(face) {
-    const tile = document.createElement('div');
-    tile.textContent = face === 'BLANK' ? '?' : face;
-    tile.style.cssText = 'background:linear-gradient(145deg,#fef3c7,#fde68a);color:#1f2937;font-weight:800;font-size:14px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:6px;border:2px solid #d97706;';
-    rackEl.appendChild(tile);
-  });
-
-  // Render targets grid
-  const grid = document.getElementById('ton4-targets-grid');
-  grid.innerHTML = '';
-  const cached = _ton4Results[activePz.id] || {};
-  _ton4Data.targets.forEach(function(target) {
-    const item = document.createElement('div');
-    item.style.cssText = 'background:#0f172a;border-radius:6px;padding:8px;display:flex;align-items:center;gap:8px;min-height:36px;';
-    const targetTag = document.createElement('div');
-    targetTag.textContent = target;
-    targetTag.style.cssText = 'background:#fbbf24;color:#1f2937;font-weight:800;font-size:13px;min-width:32px;text-align:center;padding:4px;border-radius:5px;';
-    item.appendChild(targetTag);
-
-    const answer = document.createElement('div');
-    answer.style.cssText = 'flex:1;font-size:12px;color:#e2e8f0;font-family:monospace;';
-    if (cached[target] === null) {
-      answer.textContent = 'No solution';
-      answer.style.color = '#94a3b8';
-      answer.style.fontStyle = 'italic';
-    } else if (cached[target]) {
-      answer.textContent = cached[target].tokens.join(' ');
-      answer.style.color = '#10b981';
-    } else {
-      answer.textContent = '— (tap Solve All)';
-      answer.style.color = '#64748b';
-    }
-    item.appendChild(answer);
-    grid.appendChild(item);
-  });
-}
-
-window.ton4SolveAll = async function() {
-  if (!window.AMath.ton4Solver) { alert('Solver not loaded.'); return; }
-  if (!_ton4Data) return;
-  const activePz = _ton4Data.puzzles[_ton4ActiveSet];
-  const btn = document.getElementById('ton4-solve-all');
-  const prog = document.getElementById('ton4-solve-progress');
-  btn.disabled = true;
-  btn.style.opacity = '0.6';
-  prog.style.display = 'block';
-  prog.textContent = 'Starting...';
-  try {
-    const results = await window.AMath.ton4Solver.solveAllTargets(activePz.rack, function(done, total, current){
-      prog.textContent = current
-        ? 'Solving ' + done + '/' + total + ' — target: ' + current
-        : '✅ Done';
-    });
-    _ton4Results[activePz.id] = results;
-    // Save to localStorage
-    try { localStorage.setItem('amath_book_ton4_cache', JSON.stringify(_ton4Results)); } catch(e){}
-    renderTon4();
-    prog.textContent = '✅ Solved ' + Object.values(results).filter(function(v){return v;}).length + ' / ' + Object.keys(results).length;
-  } catch (e) {
-    prog.textContent = '❌ Error: ' + e.message;
-  } finally {
-    btn.disabled = false;
-    btn.style.opacity = '1';
-  }
-};
-
-// ============== EQUATION PRACTICE (ton2 / ton3) ==============
+// ============== EQUATION PRACTICE (Set 1 / 2 / 3) ==============
 var _eqSectionId = null;
-var _eqCache = [];           // all puzzles for this section
-var _eqPatterns = {};        // patternId → array of puzzles
+var _eqCache = [];
+var _eqPatterns = {};
 var _eqActivePattern = null;
+var _eqActiveIdx = 0;
+var _eqRackTiles = [];
+var _eqAnswerTiles = [];
+var _eqAnswerSize = 9;
+var _eqResults = {};
+var _eqDragCtx = null;
 
-window.openEquationPractice = function(sid, cache) {
+window.openEquationPractice = async function(sid, cache) {
+  if (!window.AMath._bookData && window.AMath.bookGenerator) {
+    await window.AMath.bookGenerator.loadBookData();
+  }
   _eqSectionId = sid;
   _eqCache = cache;
   _eqPatterns = {};
   cache.forEach(function(p){
     var pid = p.patternId || 'default';
-    if (!_eqPatterns[pid]) _eqPatterns[pid] = { label: p.patternLabel || 'default', puzzles: [] };
+    if (!_eqPatterns[pid]) _eqPatterns[pid] = { label: p.patternLabel || 'default', patternRegex: null, puzzles: [] };
     _eqPatterns[pid].puzzles.push(p);
   });
+  if (window.AMath._bookData && window.AMath._bookData[sid] && window.AMath._bookData[sid].patterns) {
+    window.AMath._bookData[sid].patterns.forEach(function(bp){
+      if (_eqPatterns[bp.id]) _eqPatterns[bp.id].patternRegex = bp.patternRegex || null;
+    });
+  }
   var patternIds = Object.keys(_eqPatterns);
   _eqActivePattern = patternIds[0];
-  // Set title
+  _eqActiveIdx = 0;
+  _eqResults = {};
+
   var titleMap = {
     'ton1': 'Set 1 — 8-Tile Bingo',
     'ton2': 'Set 2 — 9-Tile Bingo (Patterns)',
     'ton3': 'Set 3 — 9-Tile Bingo (Open)'
   };
   document.getElementById('eq-title').textContent = titleMap[sid] || 'Equation Practice';
+
+  var sel = document.getElementById('eq-pattern-select');
+  sel.innerHTML = '';
+  patternIds.forEach(function(pid){
+    var opt = document.createElement('option');
+    opt.value = pid;
+    opt.textContent = _eqPatterns[pid].label;
+    sel.appendChild(opt);
+  });
+  sel.onchange = function(){ _eqActivePattern = sel.value; _eqActiveIdx = 0; renderCurrentProblem(); };
+  document.getElementById('eq-pattern-row').style.display = patternIds.length > 1 ? 'block' : 'none';
+
   document.getElementById('screen-select').style.display = 'none';
   document.getElementById('screen-equation').style.display = 'block';
-  renderEquationScreen();
+  renderCurrentProblem();
 };
 
 window.closeEquationPractice = function() {
@@ -1296,60 +1392,727 @@ window.closeEquationPractice = function() {
   initBookSections();
 };
 
-function renderEquationScreen() {
-  // Pattern tabs
-  var tabs = document.getElementById('eq-pattern-tabs');
-  tabs.innerHTML = '';
-  var patternIds = Object.keys(_eqPatterns);
-  if (patternIds.length > 1) {
-    patternIds.forEach(function(pid){
-      var btn = document.createElement('button');
-      btn.textContent = _eqPatterns[pid].label;
-      btn.style.cssText = 'background:' + (pid === _eqActivePattern ? '#fbbf24' : '#334155') +
-                         ';color:' + (pid === _eqActivePattern ? '#1f2937' : '#e2e8f0') +
-                         ';border:none;padding:6px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;';
-      btn.onclick = function(){ _eqActivePattern = pid; renderEquationScreen(); };
-      tabs.appendChild(btn);
-    });
-  }
-  // Puzzles list for active pattern
-  var list = document.getElementById('eq-puzzles-list');
-  list.innerHTML = '';
-  var puzzles = _eqPatterns[_eqActivePattern].puzzles;
-  puzzles.forEach(function(p, idx){
-    var card = document.createElement('div');
-    card.style.cssText = 'background:var(--bg-panel,#1e293b);border:1px solid var(--border-medium,#334155);border-radius:10px;padding:12px;';
-    card.innerHTML =
-      '<div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">PROBLEM ' + (idx+1) + ' — 9-token equation</div>' +
-      '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;">' +
-        p.tokens.map(function(t){
-          var displayFace = (t === 'BLANK') ? '?' : t;
-          return '<div style="background:linear-gradient(145deg,#fef3c7,#fde68a);color:#1f2937;font-weight:800;font-size:13px;min-width:30px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:5px;border:2px solid #d97706;padding:0 4px;">' + displayFace + '</div>';
-        }).join('') +
-      '</div>' +
-      (p.hasSolution
-        ? '<button onclick="toggleEqAnswer(' + idx + ')" id="eq-toggle-' + idx + '" style="background:#10b981;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">🔍 Show answer</button>'
-        : '<div style="color:#f87171;font-size:12px;font-style:italic;">No valid equation possible — recognize this</div>') +
-      '<div id="eq-answer-' + idx + '" style="display:none;margin-top:8px;padding:8px;background:#0f172a;border-radius:6px;color:#10b981;font-family:monospace;font-size:13px;"></div>';
-    list.appendChild(card);
-  });
+function _eqCurrentPuzzle() {
+  var ps = _eqPatterns[_eqActivePattern].puzzles;
+  return ps[_eqActiveIdx];
+}
+function _eqResultKey() {
+  return _eqActivePattern + ':' + _eqActiveIdx;
 }
 
-window.toggleEqAnswer = function(idx) {
-  var puzzles = _eqPatterns[_eqActivePattern].puzzles;
-  var p = puzzles[idx];
-  var ansEl = document.getElementById('eq-answer-' + idx);
-  var btn = document.getElementById('eq-toggle-' + idx);
-  if (ansEl.style.display === 'none') {
-    ansEl.textContent = (p.equation && p.equation.length)
-      ? p.equation.join(' ')
-      : '(no equation found)';
-    ansEl.style.display = 'block';
-    btn.textContent = '🙈 Hide answer';
-  } else {
-    ansEl.style.display = 'none';
-    btn.textContent = '🔍 Show answer';
+function renderCurrentProblem() {
+  var pat = _eqPatterns[_eqActivePattern];
+  var puzzle = _eqCurrentPuzzle();
+  if (!puzzle) return;
+
+  _eqAnswerSize = puzzle.tokens.length;
+  _eqRackTiles = puzzle.tokens.map(function(face, i){
+    return { face: face, id: 't' + i + '_' + Math.random().toString(36).slice(2,7) };
+  });
+  _eqAnswerTiles = new Array(_eqAnswerSize).fill(null);
+
+  var ps = pat.puzzles;
+  document.getElementById('eq-problem-counter').textContent = 'Problem ' + (_eqActiveIdx + 1) + ' / ' + ps.length;
+  var solvedCount = 0;
+  for (var i = 0; i < ps.length; i++) {
+    if (_eqResults[_eqActivePattern + ':' + i] === 'correct') solvedCount++;
   }
+  document.getElementById('eq-score-summary').textContent = 'Solved: ' + solvedCount + ' / ' + ps.length;
+
+  document.getElementById('eq-result').textContent = '';
+  document.getElementById('eq-result').className = 'eq-result';
+
+  var priorRes = _eqResults[_eqResultKey()];
+  if (priorRes === 'correct') {
+    var el = document.getElementById('eq-result');
+    el.textContent = '✓ Already solved';
+    el.className = 'eq-result correct';
+  }
+
+  renderTiles();
+
+  document.getElementById('eq-prev').disabled = (_eqActiveIdx === 0);
+  document.getElementById('eq-next').disabled = (_eqActiveIdx === ps.length - 1);
+}
+
+function renderTiles() {
+  var rackEl = document.getElementById('eq-rack-area');
+  rackEl.innerHTML = '';
+  rackEl.dataset.area = 'rack';
+  _eqRackTiles.forEach(function(tile, i){
+    if (!tile) return;
+    rackEl.appendChild(makeTileEl(tile, 'rack', i));
+  });
+
+  var ansEl = document.getElementById('eq-answer-area');
+  ansEl.innerHTML = '';
+  ansEl.dataset.area = 'answer';
+  for (var i = 0; i < _eqAnswerSize; i++) {
+    var t = _eqAnswerTiles[i];
+    if (t) ansEl.appendChild(makeTileEl(t, 'answer', i));
+    else ansEl.appendChild(makeSlotEl(i));
+  }
+}
+
+function makeTileEl(tile, area, idx) {
+  var el = document.createElement('div');
+  el.className = 'eq-tile';
+  el.textContent = tile.face === 'BLANK' ? '?' : tile.face;
+  el.dataset.tileId = tile.id;
+  el.dataset.fromArea = area;
+  el.dataset.fromIdx = idx;
+  el.draggable = true;
+
+  el.addEventListener('dragstart', function(e){
+    _eqDragCtx = { tile: tile, fromArea: area, fromIdx: idx };
+    el.classList.add('dragging');
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+  });
+  el.addEventListener('dragend', function(){ el.classList.remove('dragging'); _eqDragCtx = null; });
+
+  el.addEventListener('touchstart', function(){
+    _eqDragCtx = { tile: tile, fromArea: area, fromIdx: idx };
+    el.classList.add('dragging');
+  }, { passive: true });
+  el.addEventListener('touchmove', function(e){
+    if (!_eqDragCtx) return;
+    e.preventDefault();
+    var t = e.touches[0];
+    el.style.position = 'fixed';
+    el.style.left = (t.clientX - 18) + 'px';
+    el.style.top = (t.clientY - 18) + 'px';
+    el.style.zIndex = '10000';
+    el.style.pointerEvents = 'none';
+  }, { passive: false });
+  el.addEventListener('touchend', function(e){
+    el.classList.remove('dragging');
+    el.style.position = ''; el.style.left = ''; el.style.top = ''; el.style.zIndex = ''; el.style.pointerEvents = '';
+    if (!_eqDragCtx) return;
+    var t = e.changedTouches[0];
+    var target = document.elementFromPoint(t.clientX, t.clientY);
+    handleDropOnTarget(target);
+    _eqDragCtx = null;
+  });
+
+  el.addEventListener('click', function(){
+    if (!_eqDragCtx) {
+      if (area === 'rack') {
+        for (var i = 0; i < _eqAnswerSize; i++) {
+          if (!_eqAnswerTiles[i]) {
+            _eqAnswerTiles[i] = tile;
+            _eqRackTiles[idx] = null;
+            renderTiles();
+            return;
+          }
+        }
+      } else {
+        for (var j = 0; j < _eqRackTiles.length; j++) {
+          if (!_eqRackTiles[j]) {
+            _eqRackTiles[j] = tile;
+            _eqAnswerTiles[idx] = null;
+            renderTiles();
+            return;
+          }
+        }
+      }
+    }
+  });
+  return el;
+}
+
+function makeSlotEl(idx) {
+  var el = document.createElement('div');
+  el.className = 'eq-slot';
+  el.dataset.slotIdx = idx;
+  el.dataset.area = 'answer-slot';
+  el.textContent = '·';
+
+  el.addEventListener('dragover', function(e){
+    e.preventDefault();
+    el.classList.add('drop-active');
+  });
+  el.addEventListener('dragleave', function(){ el.classList.remove('drop-active'); });
+  el.addEventListener('drop', function(e){
+    e.preventDefault();
+    el.classList.remove('drop-active');
+    if (_eqDragCtx) placeIntoAnswerSlot(idx);
+  });
+  el.addEventListener('click', function(){
+    for (var j = 0; j < _eqRackTiles.length; j++) {
+      if (_eqRackTiles[j]) {
+        _eqAnswerTiles[idx] = _eqRackTiles[j];
+        _eqRackTiles[j] = null;
+        renderTiles();
+        return;
+      }
+    }
+  });
+  return el;
+}
+
+function handleDropOnTarget(target) {
+  if (!_eqDragCtx) return;
+  while (target && target !== document.body) {
+    if (target.dataset && target.dataset.slotIdx !== undefined && target.dataset.area === 'answer-slot') {
+      placeIntoAnswerSlot(parseInt(target.dataset.slotIdx));
+      return;
+    }
+    if (target.dataset && target.dataset.area === 'rack') {
+      placeBackToRack();
+      return;
+    }
+    if (target.dataset && target.dataset.area === 'answer') {
+      for (var i = 0; i < _eqAnswerSize; i++) {
+        if (!_eqAnswerTiles[i]) { placeIntoAnswerSlot(i); return; }
+      }
+      return;
+    }
+    target = target.parentNode;
+  }
+}
+
+function placeIntoAnswerSlot(slotIdx) {
+  if (!_eqDragCtx) return;
+  var t = _eqDragCtx.tile;
+  if (_eqDragCtx.fromArea === 'rack') {
+    _eqRackTiles[_eqDragCtx.fromIdx] = null;
+  } else {
+    if (_eqDragCtx.fromIdx === slotIdx) return;
+    _eqAnswerTiles[_eqDragCtx.fromIdx] = null;
+  }
+  if (_eqAnswerTiles[slotIdx]) {
+    var displaced = _eqAnswerTiles[slotIdx];
+    if (_eqDragCtx.fromArea === 'answer') {
+      _eqAnswerTiles[_eqDragCtx.fromIdx] = displaced;
+    } else {
+      var placed = false;
+      for (var i = 0; i < _eqRackTiles.length; i++) {
+        if (!_eqRackTiles[i]) { _eqRackTiles[i] = displaced; placed = true; break; }
+      }
+      if (!placed) _eqRackTiles.push(displaced);
+    }
+  }
+  _eqAnswerTiles[slotIdx] = t;
+  renderTiles();
+}
+
+function placeBackToRack() {
+  if (!_eqDragCtx || _eqDragCtx.fromArea === 'rack') return;
+  var t = _eqDragCtx.tile;
+  _eqAnswerTiles[_eqDragCtx.fromIdx] = null;
+  var placed = false;
+  for (var i = 0; i < _eqRackTiles.length; i++) {
+    if (!_eqRackTiles[i]) { _eqRackTiles[i] = t; placed = true; break; }
+  }
+  if (!placed) _eqRackTiles.push(t);
+  renderTiles();
+}
+
+window.eqReset = function() {
+  var puzzle = _eqCurrentPuzzle();
+  if (!puzzle) return;
+  _eqRackTiles = puzzle.tokens.map(function(face, i){
+    return { face: face, id: 't' + i + '_' + Math.random().toString(36).slice(2,7) };
+  });
+  _eqAnswerTiles = new Array(_eqAnswerSize).fill(null);
+  document.getElementById('eq-result').textContent = '';
+  document.getElementById('eq-result').className = 'eq-result';
+  renderTiles();
+};
+
+window.eqSubmit = function() {
+  if (_eqAnswerTiles.some(function(t){ return t === null; })) {
+    showResultBanner(false, '✗ Use ALL ' + _eqAnswerSize + ' tiles.');
+    return;
+  }
+  var tokens = _eqAnswerTiles.map(function(t){ return t.face; });
+  var pattern = _eqPatterns[_eqActivePattern].patternRegex || null;
+  var r = tryAllAssignments(tokens, pattern);
+  if (r.valid) {
+    _eqResults[_eqResultKey()] = 'correct';
+    showResultBanner(true, '✓ Correct! ' + r.canonical.join(' '));
+    var ps = _eqPatterns[_eqActivePattern].puzzles;
+    var solvedCount = 0;
+    for (var i = 0; i < ps.length; i++) {
+      if (_eqResults[_eqActivePattern + ':' + i] === 'correct') solvedCount++;
+    }
+    document.getElementById('eq-score-summary').textContent = 'Solved: ' + solvedCount + ' / ' + ps.length;
+  } else {
+    _eqResults[_eqResultKey()] = 'incorrect';
+    showResultBanner(false, '✗ ' + (r.reason || 'Not a valid equation.'));
+  }
+};
+
+function tryAllAssignments(tokens, patternRegex) {
+  var T = window.AMath.ton4Solver;
+  var E = window.AMath.evaluator;
+  if (!T || !E) return { valid: false, reason: 'Evaluator not loaded' };
+  function tileOptions(face) {
+    if (face === '+/-') return ['+', '-'];
+    if (face === '×/÷') return ['×', '÷'];
+    if (face === 'BLANK') {
+      var opts = [];
+      for (var i = 0; i <= 20; i++) opts.push(String(i));
+      return opts;
+    }
+    return [face];
+  }
+  var options = tokens.map(tileOptions);
+  var counters = options.map(function(){ return 0; });
+  var iter = 0, MAX = 30000;
+  var lastValidNoMatch = false;
+  while (iter < MAX) {
+    iter++;
+    var combo = counters.map(function(c, i){ return options[i][c]; });
+    var v = E.validateEquation(combo);
+    if (v.valid) {
+      if (!patternRegex || T.matchPattern(combo, patternRegex)) {
+        return { valid: true, canonical: combo };
+      }
+      lastValidNoMatch = true;
+    }
+    var done = true;
+    for (var i = options.length - 1; i >= 0; i--) {
+      if (counters[i] < options[i].length - 1) {
+        counters[i]++;
+        for (var j = i + 1; j < options.length; j++) counters[j] = 0;
+        done = false;
+        break;
+      }
+    }
+    if (done) break;
+  }
+  if (lastValidNoMatch && patternRegex) {
+    return { valid: false, reason: 'Equation is valid but does not match the required pattern.' };
+  }
+  return { valid: false, reason: 'Not a valid equation.' };
+}
+
+function showResultBanner(isCorrect, msg) {
+  var el = document.getElementById('eq-result');
+  el.textContent = msg;
+  el.className = 'eq-result ' + (isCorrect ? 'correct' : 'incorrect');
+}
+
+window.eqGoPrev = function() {
+  if (_eqActiveIdx > 0) { _eqActiveIdx--; renderCurrentProblem(); }
+};
+window.eqGoNext = function() {
+  var ps = _eqPatterns[_eqActivePattern].puzzles;
+  if (_eqActiveIdx < ps.length - 1) { _eqActiveIdx++; renderCurrentProblem(); }
+};
+
+// ============== SET 4 — TARGET DRILLS (drag-and-drop) ==============
+var _ton4Data = null;
+var _ton4ActiveSet = 0;             // index into _ton4Data.puzzles
+var _ton4ActiveTargetIdx = 0;       // index into the targets list
+var _ton4Racks = {};                // setIdx → current rack (may be regenerated random)
+var _ton4Results = {};              // setIdx + ':' + targetIdx → 'correct' | 'incorrect'
+var _ton4Rack = [];                 // current rack tiles state [{face,id} or null]
+var _ton4Answer = [];               // current answer slots [{face,id} or null]
+var _ton4DragCtx = null;
+
+window.openTon4 = async function() {
+  if (!window.AMath.bookGenerator) return;
+  const data = await window.AMath.bookGenerator.loadBookData();
+  _ton4Data = data.ton4;
+  if (!_ton4Data || !_ton4Data.puzzles || _ton4Data.puzzles.length === 0) {
+    alert('No Set 4 data loaded.');
+    return;
+  }
+  // Try to load saved results
+  try {
+    const cached = localStorage.getItem('amath_book_ton4_state');
+    if (cached) {
+      var st = JSON.parse(cached);
+      _ton4Results = st.results || {};
+      _ton4Racks = st.racks || {};
+    }
+  } catch(e) {}
+
+  _ton4ActiveSet = 0;
+  _ton4ActiveTargetIdx = 0;
+
+  // Populate set dropdown
+  var setSel = document.getElementById('ton4-set-select');
+  setSel.innerHTML = '';
+  _ton4Data.puzzles.forEach(function(pz, i){
+    var opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = pz.label;
+    setSel.appendChild(opt);
+  });
+  setSel.onchange = function(){ _ton4ActiveSet = parseInt(setSel.value); _ton4ActiveTargetIdx = 0; renderTon4Problem(); };
+
+  // Populate target dropdown
+  var tgtSel = document.getElementById('ton4-target-select');
+  tgtSel.innerHTML = '';
+  _ton4Data.targets.forEach(function(t, i){
+    var opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = '= ' + t;
+    tgtSel.appendChild(opt);
+  });
+  tgtSel.onchange = function(){ _ton4ActiveTargetIdx = parseInt(tgtSel.value); renderTon4Problem(); };
+
+  document.getElementById('screen-select').style.display = 'none';
+  document.getElementById('screen-ton4').style.display = 'block';
+  renderTon4Problem();
+};
+
+window.closeTon4 = function() {
+  document.getElementById('screen-ton4').style.display = 'none';
+  document.getElementById('screen-select').style.display = 'block';
+  initBookSections();
+};
+
+function _ton4CurrentRack() {
+  // If we have a regenerated random rack for this set, use it; otherwise the book's
+  if (_ton4Racks[_ton4ActiveSet]) return _ton4Racks[_ton4ActiveSet];
+  return _ton4Data.puzzles[_ton4ActiveSet].rack;
+}
+
+function _ton4SaveState() {
+  try {
+    localStorage.setItem('amath_book_ton4_state', JSON.stringify({
+      results: _ton4Results, racks: _ton4Racks
+    }));
+  } catch (e) {}
+}
+
+function renderTon4Problem() {
+  document.getElementById('ton4-set-select').value = _ton4ActiveSet;
+  document.getElementById('ton4-target-select').value = _ton4ActiveTargetIdx;
+
+  var rack = _ton4CurrentRack();
+  var target = _ton4Data.targets[_ton4ActiveTargetIdx];
+
+  // Full 9-token rack = rack (8) + target tile
+  var allTokens = rack.concat([target]);
+  _ton4Rack = allTokens.map(function(face, i){ return { face: face, id: 't4_' + i + '_' + Math.random().toString(36).slice(2,7) }; });
+  _ton4Answer = new Array(allTokens.length).fill(null);
+
+  // Counter
+  document.getElementById('ton4-problem-counter').textContent =
+    'Target ' + (_ton4ActiveTargetIdx + 1) + ' / ' + _ton4Data.targets.length;
+  var solvedCount = 0;
+  for (var i = 0; i < _ton4Data.targets.length; i++) {
+    if (_ton4Results[_ton4ActiveSet + ':' + i] === 'correct') solvedCount++;
+  }
+  document.getElementById('ton4-score-summary').textContent =
+    'Solved: ' + solvedCount + ' / ' + _ton4Data.targets.length;
+
+  document.getElementById('ton4-result').textContent = '';
+  document.getElementById('ton4-result').className = 'eq-result';
+
+  var priorRes = _ton4Results[_ton4ActiveSet + ':' + _ton4ActiveTargetIdx];
+  if (priorRes) {
+    var el = document.getElementById('ton4-result');
+    el.textContent = priorRes === 'correct' ? '✓ Already solved' : '';
+    el.className = 'eq-result ' + (priorRes === 'correct' ? 'correct' : '');
+  }
+
+  renderTon4Tiles();
+
+  document.getElementById('ton4-prev').disabled = (_ton4ActiveTargetIdx === 0);
+  document.getElementById('ton4-next').disabled = (_ton4ActiveTargetIdx === _ton4Data.targets.length - 1);
+}
+
+function renderTon4Tiles() {
+  var rackEl = document.getElementById('ton4-rack-area');
+  rackEl.innerHTML = '';
+  rackEl.dataset.area = 'ton4-rack';
+  _ton4Rack.forEach(function(tile, i){
+    if (!tile) return;
+    rackEl.appendChild(makeTon4TileEl(tile, 'rack', i));
+  });
+
+  var ansEl = document.getElementById('ton4-answer-area');
+  ansEl.innerHTML = '';
+  ansEl.dataset.area = 'ton4-answer';
+  for (var i = 0; i < _ton4Answer.length; i++) {
+    var t = _ton4Answer[i];
+    if (t) {
+      ansEl.appendChild(makeTon4TileEl(t, 'answer', i));
+    } else {
+      ansEl.appendChild(makeTon4SlotEl(i));
+    }
+  }
+}
+
+function makeTon4TileEl(tile, area, idx) {
+  var el = document.createElement('div');
+  el.className = 'eq-tile';
+  el.textContent = tile.face === 'BLANK' ? '?' : tile.face;
+  el.dataset.tileId = tile.id;
+  el.dataset.fromArea = 't4-' + area;
+  el.dataset.fromIdx = idx;
+  el.draggable = true;
+
+  el.addEventListener('dragstart', function(e){
+    _ton4DragCtx = { tile: tile, fromArea: area, fromIdx: idx };
+    el.classList.add('dragging');
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+  });
+  el.addEventListener('dragend', function(){ el.classList.remove('dragging'); _ton4DragCtx = null; });
+
+  el.addEventListener('touchstart', function(e){
+    _ton4DragCtx = { tile: tile, fromArea: area, fromIdx: idx };
+    el.classList.add('dragging');
+  }, { passive: true });
+  el.addEventListener('touchmove', function(e){
+    if (!_ton4DragCtx) return;
+    e.preventDefault();
+    var t = e.touches[0];
+    el.style.position = 'fixed';
+    el.style.left = (t.clientX - 18) + 'px';
+    el.style.top = (t.clientY - 18) + 'px';
+    el.style.zIndex = '10000';
+    el.style.pointerEvents = 'none';
+  }, { passive: false });
+  el.addEventListener('touchend', function(e){
+    el.classList.remove('dragging');
+    el.style.position = ''; el.style.left = ''; el.style.top = ''; el.style.zIndex = ''; el.style.pointerEvents = '';
+    if (!_ton4DragCtx) return;
+    var t = e.changedTouches[0];
+    var target = document.elementFromPoint(t.clientX, t.clientY);
+    handleTon4DropOnTarget(target);
+    _ton4DragCtx = null;
+  });
+
+  el.addEventListener('click', function(){
+    if (!_ton4DragCtx) {
+      if (area === 'rack') {
+        for (var i = 0; i < _ton4Answer.length; i++) {
+          if (!_ton4Answer[i]) {
+            _ton4Answer[i] = tile;
+            _ton4Rack[idx] = null;
+            renderTon4Tiles();
+            return;
+          }
+        }
+      } else {
+        for (var j = 0; j < _ton4Rack.length; j++) {
+          if (!_ton4Rack[j]) {
+            _ton4Rack[j] = tile;
+            _ton4Answer[idx] = null;
+            renderTon4Tiles();
+            return;
+          }
+        }
+      }
+    }
+  });
+  return el;
+}
+
+function makeTon4SlotEl(idx) {
+  var el = document.createElement('div');
+  el.className = 'eq-slot';
+  el.dataset.slotIdx = idx;
+  el.dataset.area = 't4-answer-slot';
+  el.textContent = '·';
+
+  el.addEventListener('dragover', function(e){ e.preventDefault(); el.classList.add('drop-active'); });
+  el.addEventListener('dragleave', function(){ el.classList.remove('drop-active'); });
+  el.addEventListener('drop', function(e){
+    e.preventDefault();
+    el.classList.remove('drop-active');
+    if (!_ton4DragCtx) return;
+    placeTon4IntoSlot(idx);
+  });
+  el.addEventListener('click', function(){
+    for (var j = 0; j < _ton4Rack.length; j++) {
+      if (_ton4Rack[j]) {
+        _ton4Answer[idx] = _ton4Rack[j];
+        _ton4Rack[j] = null;
+        renderTon4Tiles();
+        return;
+      }
+    }
+  });
+  return el;
+}
+
+function handleTon4DropOnTarget(target) {
+  if (!_ton4DragCtx) return;
+  while (target && target !== document.body) {
+    if (target.dataset && target.dataset.slotIdx !== undefined && (target.dataset.area || '').indexOf('t4') >= 0) {
+      placeTon4IntoSlot(parseInt(target.dataset.slotIdx));
+      return;
+    }
+    if (target.dataset && target.dataset.area === 'ton4-rack') {
+      placeTon4BackToRack();
+      return;
+    }
+    if (target.dataset && target.dataset.area === 'ton4-answer') {
+      for (var i = 0; i < _ton4Answer.length; i++) {
+        if (!_ton4Answer[i]) { placeTon4IntoSlot(i); return; }
+      }
+      return;
+    }
+    target = target.parentNode;
+  }
+}
+
+function placeTon4IntoSlot(slotIdx) {
+  if (!_ton4DragCtx) return;
+  var t = _ton4DragCtx.tile;
+  if (_ton4DragCtx.fromArea === 'rack') {
+    _ton4Rack[_ton4DragCtx.fromIdx] = null;
+  } else {
+    if (_ton4DragCtx.fromIdx === slotIdx) return;
+    _ton4Answer[_ton4DragCtx.fromIdx] = null;
+  }
+  if (_ton4Answer[slotIdx]) {
+    var displaced = _ton4Answer[slotIdx];
+    if (_ton4DragCtx.fromArea === 'answer') {
+      _ton4Answer[_ton4DragCtx.fromIdx] = displaced;
+    } else {
+      var placed = false;
+      for (var i = 0; i < _ton4Rack.length; i++) {
+        if (!_ton4Rack[i]) { _ton4Rack[i] = displaced; placed = true; break; }
+      }
+      if (!placed) _ton4Rack.push(displaced);
+    }
+  }
+  _ton4Answer[slotIdx] = t;
+  renderTon4Tiles();
+}
+
+function placeTon4BackToRack() {
+  if (!_ton4DragCtx || _ton4DragCtx.fromArea === 'rack') return;
+  var t = _ton4DragCtx.tile;
+  _ton4Answer[_ton4DragCtx.fromIdx] = null;
+  var placed = false;
+  for (var i = 0; i < _ton4Rack.length; i++) {
+    if (!_ton4Rack[i]) { _ton4Rack[i] = t; placed = true; break; }
+  }
+  if (!placed) _ton4Rack.push(t);
+  renderTon4Tiles();
+}
+
+window.ton4Reset = function() {
+  var rack = _ton4CurrentRack();
+  var target = _ton4Data.targets[_ton4ActiveTargetIdx];
+  var allTokens = rack.concat([target]);
+  _ton4Rack = allTokens.map(function(face, i){ return { face: face, id: 't4_' + i + '_' + Math.random().toString(36).slice(2,7) }; });
+  _ton4Answer = new Array(allTokens.length).fill(null);
+  document.getElementById('ton4-result').textContent = '';
+  document.getElementById('ton4-result').className = 'eq-result';
+  renderTon4Tiles();
+};
+
+window.ton4Submit = function() {
+  if (_ton4Answer.some(function(t){ return t === null; })) {
+    showTon4Banner(false, 'Use ALL 9 tiles to complete the equation.');
+    return;
+  }
+  var tokens = _ton4Answer.map(function(t){ return t.face; });
+  var target = _ton4Data.targets[_ton4ActiveTargetIdx];
+
+  // Validate: equation must be valid AND evaluate to target (for number targets)
+  // For operator targets, equation must be valid AND include that operator token.
+  var T = window.AMath.ton4Solver;
+  var E = window.AMath.evaluator;
+  if (!T || !E) { showTon4Banner(false, 'Evaluator not loaded'); return; }
+
+  // tile options for choice/blank
+  function tileOptions(face) {
+    if (face === '+/-') return ['+', '-'];
+    if (face === '×/÷') return ['×', '÷'];
+    if (face === 'BLANK') {
+      var opts = [];
+      for (var i = 0; i <= 20; i++) opts.push(String(i));
+      return opts;
+    }
+    return [face];
+  }
+  var options = tokens.map(tileOptions);
+
+  var isOperatorTarget = (target === '+' || target === '-' || target === '×' || target === '÷' || target === '=');
+  var targetNum = parseInt(target, 10);
+
+  var counters = options.map(function(){ return 0; });
+  var iter = 0, MAX = 30000;
+  var lastReason = 'Not a valid equation';
+  while (iter < MAX) {
+    iter++;
+    var combo = counters.map(function(c, i){ return options[i][c]; });
+    var v = E.validateEquation(combo);
+    if (v.valid) {
+      var matches;
+      if (isOperatorTarget) {
+        matches = combo.indexOf(target) !== -1;
+      } else {
+        var val = (v.value && typeof v.value === 'object' && 'num' in v.value) ? (v.value.den === 1 ? v.value.num : NaN) : v.value;
+        matches = val === targetNum;
+      }
+      if (matches) {
+        _ton4Results[_ton4ActiveSet + ':' + _ton4ActiveTargetIdx] = 'correct';
+        _ton4SaveState();
+        showTon4Banner(true, '✓ Correct! ' + combo.join(' '));
+        var solvedCount = 0;
+        for (var k = 0; k < _ton4Data.targets.length; k++) {
+          if (_ton4Results[_ton4ActiveSet + ':' + k] === 'correct') solvedCount++;
+        }
+        document.getElementById('ton4-score-summary').textContent =
+          'Solved: ' + solvedCount + ' / ' + _ton4Data.targets.length;
+        return;
+      }
+    } else {
+      lastReason = v.reason;
+    }
+    var done = true;
+    for (var i = options.length - 1; i >= 0; i--) {
+      if (counters[i] < options[i].length - 1) {
+        counters[i]++;
+        for (var j = i + 1; j < options.length; j++) counters[j] = 0;
+        done = false;
+        break;
+      }
+    }
+    if (done) break;
+  }
+  _ton4Results[_ton4ActiveSet + ':' + _ton4ActiveTargetIdx] = 'incorrect';
+  _ton4SaveState();
+  showTon4Banner(false, isOperatorTarget
+    ? '✗ Equation does not include the target operator ' + target
+    : '✗ Equation does not equal ' + target);
+};
+
+function showTon4Banner(isCorrect, msg) {
+  var el = document.getElementById('ton4-result');
+  el.textContent = msg;
+  el.className = 'eq-result ' + (isCorrect ? 'correct' : 'incorrect');
+}
+
+window.ton4GoPrev = function() {
+  if (_ton4ActiveTargetIdx > 0) { _ton4ActiveTargetIdx--; renderTon4Problem(); }
+};
+window.ton4GoNext = function() {
+  if (_ton4ActiveTargetIdx < _ton4Data.targets.length - 1) { _ton4ActiveTargetIdx++; renderTon4Problem(); }
+};
+
+window.ton4GenerateNewRack = function() {
+  // Pick 5 random digit tiles + +/- + ×/÷ + = → 8 tiles
+  var digitPool = [];
+  for (var d = 0; d <= 9; d++) digitPool.push(String(d));
+  for (var d = 10; d <= 20; d++) digitPool.push(String(d));
+  // Shuffle
+  for (var i = digitPool.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = digitPool[i]; digitPool[i] = digitPool[j]; digitPool[j] = tmp;
+  }
+  var newRack = digitPool.slice(0, 5).concat(['+/-', '×/÷', '=']);
+  _ton4Racks[_ton4ActiveSet] = newRack;
+  // Clear results for this set since the rack changed
+  for (var k = 0; k < _ton4Data.targets.length; k++) {
+    delete _ton4Results[_ton4ActiveSet + ':' + k];
+  }
+  _ton4SaveState();
+  _ton4ActiveTargetIdx = 0;
+  renderTon4Problem();
 };
 
 function ensureBookProgressOverlay() {
