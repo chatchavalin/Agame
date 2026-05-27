@@ -235,6 +235,13 @@ body.theme-dark .player-area .amath-tile-rack {
     background: linear-gradient(145deg, #d1fae5, #a7f3d0);
     transform: scale(1.05);
   }
+  .eq-tile.selected {
+    border-color: #fbbf24;
+    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.5);
+    transform: scale(1.05);
+  }
+  .eq-tile.selected:active { cursor: pointer; }
+
   .eq-result {
     min-height: 24px;
     margin: 8px 0;
@@ -303,7 +310,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v38</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v39</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -492,33 +499,33 @@ body.theme-dark .player-area .amath-tile-rack {
 </div>
 
 <!-- Load main game JS modules in dependency order (same as index.html) -->
-<script src="js/constants.js?v=v38-2026-05-27"></script>
-<script src="js/utils.js?v=v38-2026-05-27"></script>
-<script src="js/evaluator.js?v=v38-2026-05-27"></script>
-<script src="js/bag.js?v=v38-2026-05-27"></script>
-<script src="js/rack.js?v=v38-2026-05-27"></script>
-<script src="js/board.js?v=v38-2026-05-27"></script>
-<script src="js/tile-tracker.js?v=v38-2026-05-27"></script>
-<script src="js/scoring.js?v=v38-2026-05-27"></script>
-<script src="js/placement.js?v=v38-2026-05-27"></script>
+<script src="js/constants.js?v=v39-2026-05-27"></script>
+<script src="js/utils.js?v=v39-2026-05-27"></script>
+<script src="js/evaluator.js?v=v39-2026-05-27"></script>
+<script src="js/bag.js?v=v39-2026-05-27"></script>
+<script src="js/rack.js?v=v39-2026-05-27"></script>
+<script src="js/board.js?v=v39-2026-05-27"></script>
+<script src="js/tile-tracker.js?v=v39-2026-05-27"></script>
+<script src="js/scoring.js?v=v39-2026-05-27"></script>
+<script src="js/placement.js?v=v39-2026-05-27"></script>
 <!-- AI modules for the in-browser puzzle generator -->
-<script src="js/ai-x9.js?v=v38-2026-05-27"></script>
-<script src="js/ai-x4.js?v=v38-2026-05-27"></script>
-<script src="js/ai-bingo-fast.js?v=v38-2026-05-27"></script>
-<script src="js/ai-bingo-grammar.js?v=v38-2026-05-27"></script>
-<script src="js/ai-yoyo.js?v=v38-2026-05-27"></script>
-<script src="js/ai-patterns-data.js?v=v38-2026-05-27"></script>
-<script src="js/ai-patterns-engine.js?v=v38-2026-05-27"></script>
-<script src="js/ai-swap.js?v=v38-2026-05-27"></script>
-<script src="js/ai-swap-brain2.js?v=v38-2026-05-27"></script>
-<script src="js/ai-player.js?v=v38-2026-05-27"></script>
-<script src="js/puzzle-generator.js?v=v38-2026-05-27"></script>
-<script src="js/book-puzzle-generator.js?v=v38-2026-05-27"></script>
-<script src="js/ton4-solver.js?v=v38-2026-05-27"></script>
-<script src="js/sounds.js?v=v38-2026-05-27"></script>
-<script src="js/settings.js?v=v38-2026-05-27"></script>
-<script src="js/ui.js?v=v38-2026-05-27"></script>
-<script src="js/interactions.js?v=v38-2026-05-27"></script>
+<script src="js/ai-x9.js?v=v39-2026-05-27"></script>
+<script src="js/ai-x4.js?v=v39-2026-05-27"></script>
+<script src="js/ai-bingo-fast.js?v=v39-2026-05-27"></script>
+<script src="js/ai-bingo-grammar.js?v=v39-2026-05-27"></script>
+<script src="js/ai-yoyo.js?v=v39-2026-05-27"></script>
+<script src="js/ai-patterns-data.js?v=v39-2026-05-27"></script>
+<script src="js/ai-patterns-engine.js?v=v39-2026-05-27"></script>
+<script src="js/ai-swap.js?v=v39-2026-05-27"></script>
+<script src="js/ai-swap-brain2.js?v=v39-2026-05-27"></script>
+<script src="js/ai-player.js?v=v39-2026-05-27"></script>
+<script src="js/puzzle-generator.js?v=v39-2026-05-27"></script>
+<script src="js/book-puzzle-generator.js?v=v39-2026-05-27"></script>
+<script src="js/ton4-solver.js?v=v39-2026-05-27"></script>
+<script src="js/sounds.js?v=v39-2026-05-27"></script>
+<script src="js/settings.js?v=v39-2026-05-27"></script>
+<script src="js/ui.js?v=v39-2026-05-27"></script>
+<script src="js/interactions.js?v=v39-2026-05-27"></script>
 
 <script>
 (function(){
@@ -1335,6 +1342,7 @@ var _eqOriginalTiles = [];      // canonical order from book-data (for Reset)
 var _eqTiles = [];              // current rack order: [{face, id}]
 var _eqResults = {};            // patternId+idx → 'correct' | 'incorrect'
 var _eqDragTileId = null;       // id of tile being dragged
+var _eqSelectedTileId = null;   // id of tile selected by single tap (click-to-place mode)
 
 window.openEquationPractice = async function(sid, cache) {
   if (!window.AMath._bookData && window.AMath.bookGenerator) {
@@ -1531,19 +1539,74 @@ function makeRackTileEl(tile, idx, prefix) {
     if (!_eqDragTileId) return;
     var pt = e.changedTouches[0];
     var dropEl = document.elementFromPoint(pt.clientX, pt.clientY);
+    var didReorder = false;
     while (dropEl && dropEl !== document.body) {
       if (dropEl.classList && dropEl.classList.contains('rack-tile') && dropEl.dataset.tileId !== tile.id) {
         var toIdx = parseInt(dropEl.dataset.idx, 10);
         var pfx = dropEl.dataset.prefix;
-        if (pfx === prefix) reorderEqTile(tile.id, toIdx, prefix);
+        if (pfx === prefix) {
+          reorderEqTile(tile.id, toIdx, prefix);
+          didReorder = true;
+        }
         break;
       }
       dropEl = dropEl.parentNode;
     }
     _eqDragTileId = null;
+    // If the touch didn't result in a drag-reorder (i.e. it was just a tap),
+    // treat it as a click-to-select / click-to-place event.
+    if (!didReorder && !el._dragMoved) {
+      handleTileClick(tile.id, idx, prefix);
+    }
+    el._dragMoved = false;
+  });
+
+  // Mark that a touch actually moved (used to distinguish tap vs drag)
+  el.addEventListener('touchmove', function(){ el._dragMoved = true; }, { passive: true });
+
+  // Click handler (desktop and mobile fallback). Click-to-select then click-to-place.
+  el.addEventListener('click', function(e){
+    // If a real drag was in progress, the click would fire after dragend.
+    // Use _dragMoved flag to skip in that case.
+    if (el._dragMoved) { el._dragMoved = false; return; }
+    handleTileClick(tile.id, idx, prefix);
   });
 
   return el;
+}
+
+// Click-to-select / click-to-place. First click: highlight a tile. Second click on
+// a different tile: insert-and-shift the selected tile to the second tile's position.
+// Tapping the same tile again deselects it.
+function handleTileClick(tileId, idx, prefix) {
+  if (_eqSelectedTileId === tileId) {
+    // Deselect
+    _eqSelectedTileId = null;
+    refreshTileSelection(prefix);
+    return;
+  }
+  if (_eqSelectedTileId === null) {
+    // First click: select this tile
+    _eqSelectedTileId = tileId;
+    refreshTileSelection(prefix);
+    return;
+  }
+  // Second click on a different tile: reorder selected → here
+  var selectedId = _eqSelectedTileId;
+  _eqSelectedTileId = null;
+  reorderEqTile(selectedId, idx, prefix);
+  refreshTileSelection(prefix);
+}
+
+function refreshTileSelection(prefix) {
+  // Add/remove .selected class on tiles based on _eqSelectedTileId
+  document.querySelectorAll('.rack-tile').forEach(function(el){
+    if (_eqSelectedTileId && el.dataset.tileId === _eqSelectedTileId) {
+      el.classList.add('selected');
+    } else {
+      el.classList.remove('selected');
+    }
+  });
 }
 
 // Insert-and-shift reorder, matching PvA's rack reorder behavior:
@@ -1569,6 +1632,7 @@ function reorderEqTile(draggedTileId, toIdx, prefix) {
 }
 
 window.eqReset = function() {
+  _eqSelectedTileId = null;
   _eqTiles = _eqOriginalTiles.slice();
   document.getElementById('eq-result').textContent = '';
   document.getElementById('eq-result').className = 'eq-result';
