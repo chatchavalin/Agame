@@ -240,6 +240,14 @@ body.theme-dark .player-area .amath-tile-rack {
     box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.5);
     transform: scale(1.05);
   }
+  .eq-tile.locked {
+    background: linear-gradient(145deg, #cbd5e1, #94a3b8);
+    color: #475569;
+    border-color: #64748b;
+    cursor: default;
+    opacity: 0.85;
+  }
+  .eq-tile.locked:active { transform: none; cursor: default; }
   .eq-tile.selected:active { cursor: pointer; }
 
   .eq-result {
@@ -310,7 +318,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v42</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v43</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -499,33 +507,33 @@ body.theme-dark .player-area .amath-tile-rack {
 </div>
 
 <!-- Load main game JS modules in dependency order (same as index.html) -->
-<script src="js/constants.js?v=v42-2026-05-27"></script>
-<script src="js/utils.js?v=v42-2026-05-27"></script>
-<script src="js/evaluator.js?v=v42-2026-05-27"></script>
-<script src="js/bag.js?v=v42-2026-05-27"></script>
-<script src="js/rack.js?v=v42-2026-05-27"></script>
-<script src="js/board.js?v=v42-2026-05-27"></script>
-<script src="js/tile-tracker.js?v=v42-2026-05-27"></script>
-<script src="js/scoring.js?v=v42-2026-05-27"></script>
-<script src="js/placement.js?v=v42-2026-05-27"></script>
+<script src="js/constants.js?v=v43-2026-05-27"></script>
+<script src="js/utils.js?v=v43-2026-05-27"></script>
+<script src="js/evaluator.js?v=v43-2026-05-27"></script>
+<script src="js/bag.js?v=v43-2026-05-27"></script>
+<script src="js/rack.js?v=v43-2026-05-27"></script>
+<script src="js/board.js?v=v43-2026-05-27"></script>
+<script src="js/tile-tracker.js?v=v43-2026-05-27"></script>
+<script src="js/scoring.js?v=v43-2026-05-27"></script>
+<script src="js/placement.js?v=v43-2026-05-27"></script>
 <!-- AI modules for the in-browser puzzle generator -->
-<script src="js/ai-x9.js?v=v42-2026-05-27"></script>
-<script src="js/ai-x4.js?v=v42-2026-05-27"></script>
-<script src="js/ai-bingo-fast.js?v=v42-2026-05-27"></script>
-<script src="js/ai-bingo-grammar.js?v=v42-2026-05-27"></script>
-<script src="js/ai-yoyo.js?v=v42-2026-05-27"></script>
-<script src="js/ai-patterns-data.js?v=v42-2026-05-27"></script>
-<script src="js/ai-patterns-engine.js?v=v42-2026-05-27"></script>
-<script src="js/ai-swap.js?v=v42-2026-05-27"></script>
-<script src="js/ai-swap-brain2.js?v=v42-2026-05-27"></script>
-<script src="js/ai-player.js?v=v42-2026-05-27"></script>
-<script src="js/puzzle-generator.js?v=v42-2026-05-27"></script>
-<script src="js/book-puzzle-generator.js?v=v42-2026-05-27"></script>
-<script src="js/ton4-solver.js?v=v42-2026-05-27"></script>
-<script src="js/sounds.js?v=v42-2026-05-27"></script>
-<script src="js/settings.js?v=v42-2026-05-27"></script>
-<script src="js/ui.js?v=v42-2026-05-27"></script>
-<script src="js/interactions.js?v=v42-2026-05-27"></script>
+<script src="js/ai-x9.js?v=v43-2026-05-27"></script>
+<script src="js/ai-x4.js?v=v43-2026-05-27"></script>
+<script src="js/ai-bingo-fast.js?v=v43-2026-05-27"></script>
+<script src="js/ai-bingo-grammar.js?v=v43-2026-05-27"></script>
+<script src="js/ai-yoyo.js?v=v43-2026-05-27"></script>
+<script src="js/ai-patterns-data.js?v=v43-2026-05-27"></script>
+<script src="js/ai-patterns-engine.js?v=v43-2026-05-27"></script>
+<script src="js/ai-swap.js?v=v43-2026-05-27"></script>
+<script src="js/ai-swap-brain2.js?v=v43-2026-05-27"></script>
+<script src="js/ai-player.js?v=v43-2026-05-27"></script>
+<script src="js/puzzle-generator.js?v=v43-2026-05-27"></script>
+<script src="js/book-puzzle-generator.js?v=v43-2026-05-27"></script>
+<script src="js/ton4-solver.js?v=v43-2026-05-27"></script>
+<script src="js/sounds.js?v=v43-2026-05-27"></script>
+<script src="js/settings.js?v=v43-2026-05-27"></script>
+<script src="js/ui.js?v=v43-2026-05-27"></script>
+<script src="js/interactions.js?v=v43-2026-05-27"></script>
 
 <script>
 (function(){
@@ -1381,7 +1389,10 @@ window.openEquationPractice = async function(sid, cache) {
   });
   if (window.AMath._bookData && window.AMath._bookData[sid] && window.AMath._bookData[sid].patterns) {
     window.AMath._bookData[sid].patterns.forEach(function(bp){
-      if (_eqPatterns[bp.id]) _eqPatterns[bp.id].patternRegex = bp.patternRegex || null;
+      if (_eqPatterns[bp.id]) {
+        _eqPatterns[bp.id].patternRegex = bp.patternRegex || null;
+        _eqPatterns[bp.id].lockedShape = bp.lockedShape || null;
+      }
     });
   }
   var patternIds = Object.keys(_eqPatterns);
@@ -1430,11 +1441,43 @@ function renderCurrentProblem() {
   var puzzle = _eqCurrentPuzzle();
   if (!puzzle) return;
 
-  // Initialize tiles in the order they appear in the puzzle's tokens.
-  // We give each a stable id so drag-and-drop can track them.
-  _eqOriginalTiles = puzzle.tokens.map(function(face, i){
-    return { face: face, id: 't' + i + '_' + Math.random().toString(36).slice(2,7) };
-  });
+  // === Locked-shape handling ===
+  // For Set 2 patterns, the operator and = tiles are LOCKED at fixed positions
+  // (defined by pattern.lockedShape). The player only reorders digit tiles.
+  //
+  // Algorithm:
+  //   1. Build the rack with locked tiles in their fixed positions.
+  //   2. Place digit tiles into the remaining (unlocked) slots, in the order
+  //      they appear in puzzle.tokens (after removing the matching operator/=
+  //      tiles).
+  //   3. Mark each tile as `.locked = true` if it's in a locked slot.
+  var lockedShape = (_eqPatterns[_eqActivePattern] || {}).lockedShape || null;
+
+  if (lockedShape && lockedShape.length === puzzle.tokens.length) {
+    // Build a working list of digit tokens (puzzle.tokens minus the locked ones)
+    var locked = lockedShape.filter(function(x){ return x !== null; });
+    var digits = puzzle.tokens.slice();
+    locked.forEach(function(face){
+      var i = digits.indexOf(face);
+      if (i !== -1) digits.splice(i, 1);
+    });
+    // Now build the rack: at locked positions place the locked face; at null
+    // positions take the next digit from `digits` in order.
+    var di = 0;
+    _eqOriginalTiles = lockedShape.map(function(slot, i){
+      if (slot !== null) {
+        return { face: slot, id: 't' + i + '_lock_' + Math.random().toString(36).slice(2,7), locked: true };
+      } else {
+        var face = digits[di++];
+        return { face: face, id: 't' + i + '_' + Math.random().toString(36).slice(2,7), locked: false };
+      }
+    });
+  } else {
+    // No lockedShape — treat all tiles as draggable (Sets 1, 3 behavior)
+    _eqOriginalTiles = puzzle.tokens.map(function(face, i){
+      return { face: face, id: 't' + i + '_' + Math.random().toString(36).slice(2,7), locked: false };
+    });
+  }
   _eqTiles = _eqOriginalTiles.slice();
 
   // Size the rack tiles to fit one row
@@ -1494,12 +1537,17 @@ function applyRackTileSize(rackId, tileCount) {
 // One-row rack tile. Supports drag-to-reorder.
 function makeRackTileEl(tile, idx, prefix) {
   var el = document.createElement('div');
-  el.className = 'eq-tile rack-tile';
+  el.className = 'eq-tile rack-tile' + (tile.locked ? ' locked' : '');
   el.textContent = tile.face === 'BLANK' ? '?' : tile.face;
   el.dataset.tileId = tile.id;
   el.dataset.idx = idx;
   el.dataset.prefix = prefix;
-  el.draggable = true;
+  el.draggable = !tile.locked;
+
+  // Locked tiles: no drag, no click handlers — they're fixed in place
+  if (tile.locked) {
+    return el;
+  }
 
   // Desktop drag (HTML5)
   el.addEventListener('dragstart', function(e){
@@ -1670,9 +1718,40 @@ function reorderEqTile(draggedTileId, toIdx, prefix) {
   if (prefix === 'eq') {
     var fromIdx = _eqTiles.findIndex(function(t){ return t.id === draggedTileId; });
     if (fromIdx === -1 || fromIdx === toIdx) return;
-    var dragged = _eqTiles.splice(fromIdx, 1)[0];
-    var insertAt = Math.min(toIdx, _eqTiles.length);
-    _eqTiles.splice(insertAt, 0, dragged);
+    var dragged = _eqTiles[fromIdx];
+    if (dragged.locked) return;  // safety: shouldn't happen but just in case
+    // If target slot is locked, find the nearest NON-locked slot in the direction
+    // we're moving (relative to fromIdx).
+    while (toIdx >= 0 && toIdx < _eqTiles.length && _eqTiles[toIdx] && _eqTiles[toIdx].locked) {
+      if (toIdx < fromIdx) toIdx--;
+      else toIdx++;
+    }
+    if (toIdx < 0 || toIdx >= _eqTiles.length) return;
+    if (toIdx === fromIdx) return;
+    // Perform insert-and-shift, but only swap among NON-locked slots — locked
+    // tiles must stay at their indices. To do that safely:
+    //   1. Extract the digit tiles (in current order, with their original indices)
+    //   2. Compute the new order among them
+    //   3. Re-render with locked tiles at their fixed positions
+
+    // Build list of non-locked indices in current rack
+    var unlockedIndices = [];
+    for (var i = 0; i < _eqTiles.length; i++) {
+      if (!_eqTiles[i].locked) unlockedIndices.push(i);
+    }
+    // Find which "unlocked rank" fromIdx and toIdx correspond to
+    var fromRank = unlockedIndices.indexOf(fromIdx);
+    var toRank = unlockedIndices.indexOf(toIdx);
+    if (fromRank === -1 || toRank === -1) return;
+    // Build new digit order by reordering the unlocked tiles
+    var digitTiles = unlockedIndices.map(function(idx){ return _eqTiles[idx]; });
+    var moved = digitTiles.splice(fromRank, 1)[0];
+    digitTiles.splice(toRank, 0, moved);
+    // Write back: locked tiles stay, unlocked slots get the new digit order
+    var di = 0;
+    for (var j = 0; j < _eqTiles.length; j++) {
+      if (!_eqTiles[j].locked) _eqTiles[j] = digitTiles[di++];
+    }
     renderEqRack();
   } else if (prefix === 't4') {
     var fromIdxT = _ton4Tiles.findIndex(function(t){ return t.id === draggedTileId; });

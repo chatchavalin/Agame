@@ -270,6 +270,17 @@
               "="
             ]
           }
+        ],
+        "lockedShape": [
+          null,
+          null,
+          "+",
+          null,
+          null,
+          "=",
+          null,
+          null,
+          null
         ]
       },
       {
@@ -407,6 +418,17 @@
               "="
             ]
           }
+        ],
+        "lockedShape": [
+          null,
+          null,
+          null,
+          "+",
+          null,
+          "=",
+          null,
+          null,
+          null
         ]
       },
       {
@@ -544,6 +566,17 @@
               "="
             ]
           }
+        ],
+        "lockedShape": [
+          null,
+          null,
+          "×",
+          null,
+          null,
+          "=",
+          null,
+          null,
+          null
         ]
       },
       {
@@ -681,6 +714,17 @@
               "="
             ]
           }
+        ],
+        "lockedShape": [
+          null,
+          null,
+          null,
+          "×",
+          null,
+          "=",
+          null,
+          null,
+          null
         ]
       },
       {
@@ -818,6 +862,17 @@
               "="
             ]
           }
+        ],
+        "lockedShape": [
+          "-",
+          null,
+          null,
+          "+",
+          null,
+          null,
+          "=",
+          null,
+          null
         ]
       },
       {
@@ -955,6 +1010,17 @@
               "="
             ]
           }
+        ],
+        "lockedShape": [
+          null,
+          "+",
+          null,
+          "=",
+          null,
+          null,
+          "-",
+          null,
+          null
         ]
       },
       {
@@ -1092,6 +1158,17 @@
               "="
             ]
           }
+        ],
+        "lockedShape": [
+          null,
+          "×",
+          null,
+          "+",
+          null,
+          null,
+          "=",
+          null,
+          null
         ]
       },
       {
@@ -1229,6 +1306,17 @@
               "="
             ]
           }
+        ],
+        "lockedShape": [
+          null,
+          null,
+          "×",
+          null,
+          "+",
+          null,
+          "=",
+          null,
+          null
         ]
       },
       {
@@ -1366,6 +1454,17 @@
               "="
             ]
           }
+        ],
+        "lockedShape": [
+          null,
+          "÷",
+          null,
+          "+",
+          null,
+          null,
+          "=",
+          null,
+          null
         ]
       },
       {
@@ -1503,6 +1602,17 @@
               "="
             ]
           }
+        ],
+        "lockedShape": [
+          null,
+          null,
+          "÷",
+          null,
+          null,
+          "+",
+          null,
+          "=",
+          null
         ]
       },
       {
@@ -1640,6 +1750,17 @@
               "="
             ]
           }
+        ],
+        "lockedShape": [
+          null,
+          null,
+          "÷",
+          null,
+          null,
+          "×",
+          null,
+          "=",
+          null
         ]
       }
     ]
