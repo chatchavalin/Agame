@@ -258,14 +258,17 @@
   // merge per-position by vote. Resolves to an array of face strings (≤8).
   function rackPrompt() {
     return [
-      'This photo includes a player\'s tile RACK / TRAY — a single row of up to 8 game tiles in a holder, SEPARATE from the 15x15 board (usually along the bottom edge, tiles face-up).',
-      'Read ONLY the rack tiles, in order from LEFT to RIGHT. Ignore the 15x15 board grid and everything else.',
-      'Output ONLY JSON: {"rack":[ up to 8 strings ]}. Each string is the tile face: "0".."9","10","11","12","13","14","15","16","20","+","-","=","±" (the +/- tile), "×" or "÷" (the ×/÷ tile), "BLANK". The tiny corner number is the point value — ignore it.',
-      'If there is no visible rack/tray, return {"rack":[]}.'
+      'This photo shows a player\'s tile RACK / TRAY: a single row of up to 8 game tiles sitting in a holder (often a close-up of just the tray; a 15x15 board may or may not also be visible).',
+      'Read ONLY the rack/tray tiles, in order from LEFT to RIGHT. If a 15x15 board is visible, ignore it.',
+      'Each tile has a large face and a tiny corner number (its point value — IGNORE the corner number).',
+      'Output ONLY JSON: {"rack":[ up to 8 strings ]}. Each string is the tile FACE: "0".."9","10","11","12","13","14","15","16","20","+","-","=","±" (the +/- tile), "×" or "÷" (the ×/÷ tile), "BLANK" (a tile with no face printed — its corner value is 0).',
+      'Include every tile in the tray, including a BLANK tile (blue/empty face). Do not skip any slot that holds a tile.',
+      'If you truly see no rack/tray tiles at all, return {"rack":[]}.'
     ].join('\n');
   }
   function mergeRacks(lists) {
-    var need = lists.length <= 1 ? 1 : Math.floor(lists.length / 2) + 1;
+    // Lenient vote: with 3+ reads keep a face agreed by >=2; with 1-2 reads keep the plurality.
+    var need = lists.length >= 3 ? 2 : 1;
     var out = [];
     for (var i = 0; i < 8; i++) {
       var counts = {}, order = [];
@@ -288,12 +291,23 @@
       var temp = PASS_TEMPS[i % PASS_TEMPS.length];
       jobs.push(
         analyze2(image, rackPrompt(), temp).then(function (text) {
-          try { var o = JSON.parse(extractJson(text) || 'null'); return (o && Array.isArray(o.rack)) ? o.rack : null; }
-          catch (e) { return null; }
-        }).catch(function () { return null; })
+          try { var o = JSON.parse(extractJson(text) || 'null'); return { rack: (o && Array.isArray(o.rack)) ? o.rack : [] }; }
+          catch (e) { return { rack: [] }; }
+        }).catch(function (err) { return { err: err }; })
       );
     }
-    return Promise.all(jobs).then(function (res) { return mergeRacks(res.filter(Boolean)); });
+    return Promise.all(jobs).then(function (res) {
+      var lists = [], firstErr = null;
+      for (var k = 0; k < res.length; k++) {
+        if (res[k] && res[k].rack && res[k].rack.length) lists.push(res[k].rack);
+        else if (res[k] && res[k].err && !firstErr) firstErr = res[k].err;
+      }
+      if (!lists.length) {
+        if (firstErr) throw firstErr;   // surface the real AI error instead of "couldn't read"
+        return [];                      // model genuinely returned no tiles
+      }
+      return mergeRacks(lists);
+    });
   }
 
   function applyScan(grid, rack) {
@@ -369,7 +383,7 @@
       if (!file) { reject(new Error('No file')); return; }
       fileToBase64(file, function (base64) {
         if (!base64) { reject(new Error('Could not read that image.')); return; }
-        runRackPasses(base64).then(resolve).catch(reject);
+        runRackPasses(base64).then(resolve).catch(function (err) { reject(new Error(friendlyErr(err))); });
       });
     });
   };
