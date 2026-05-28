@@ -271,14 +271,16 @@
 
   // Run equation-based auto-correction over the current editBoard.
   function runAutoCorrect() {
-    if (!BI.autoCorrect || !window.AMath.evaluator) return null;
+    if (!window.AMath.evaluator) return null;
     var validate = function (faces) {
       var v = window.AMath.evaluator.validateEquation(faces);
       return !!(v && v.valid);
     };
-    var res = BI.autoCorrect(editBoard, validate);
+    var assigns = BI.autoAssign ? BI.autoAssign(editBoard, validate) : [];
+    var res = BI.autoCorrect ? BI.autoCorrect(editBoard, validate) : { fixes: [], problems: [] };
     _problemCells = {};
     res.problems.forEach(function (p) { _problemCells[p[0] + ',' + p[1]] = true; });
+    res.assigns = assigns;
     return res;
   }
 
@@ -319,6 +321,9 @@
       status.style.color = '#34d399';
       var html = '✅ ' + (sourceLabel || 'Imported') + ': ' +
         (merge ? (added + ' new tile(s) added, ' + kept + ' kept') : (res.board.length + ' tile(s) read')) + '.';
+      if (ac && ac.assigns && ac.assigns.length) {
+        html += '<br><span style="color:#38bdf8;">🧩 Auto-set ' + ac.assigns.length + ' choice tile(s) from the equations.</span>';
+      }
       if (ac && ac.fixes.length) {
         html += '<br><span style="color:#38bdf8;">🔧 Auto-fixed ' + ac.fixes.length + ': ' +
           ac.fixes.map(function (f) { return '(' + (f.r + 1) + ',' + (f.c + 1) + ') ' + f.from + '→' + f.to; }).join(', ') + '</span>';

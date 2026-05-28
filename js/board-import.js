@@ -450,6 +450,58 @@
     };
   }
 
+  /**
+   * Resolve unassigned choice (±, ×/÷) and BLANK tiles from equation context:
+   * pick the value that makes the crossing equation(s) valid. Only assigns when
+   * the value is uniquely forced by a fully-resolved equation line.
+   * @returns [{r,c,a}]
+   */
+  function autoAssign(board2d, validate) {
+    function gridNow() {
+      var g = [];
+      for (var r = 0; r < BOARD_SIZE; r++) { var row = []; for (var c = 0; c < BOARD_SIZE; c++) row.push(_resolved(board2d[r][c])); g.push(row); }
+      return g;
+    }
+    var assigns = [], changed = true, guard = 0;
+    while (changed && guard++ < 6) {
+      changed = false;
+      var grid = gridNow();
+      for (var r = 0; r < BOARD_SIZE; r++) for (var c = 0; c < BOARD_SIZE; c++) {
+        var m = board2d[r][c];
+        if (!m || m.assigned) continue;
+        var f = m.face, cands;
+        if (f === '+/-') cands = ['+', '-'];
+        else if (f === '×/÷') cands = ['×', '÷'];
+        else if (f === 'BLANK') cands = ['0','1','2','3','4','5','6','7','8','9','+','-'];
+        else continue;
+        var cr = r, cc = c;
+        var H = _runThrough(grid, r, c, 'h');
+        var V = _runThrough(grid, r, c, 'v');
+        function lineOK(cells, cand) {
+          if (cells.length < 2) return true;
+          var faces = cells.map(function (p) { return (p.r === cr && p.c === cc) ? cand : grid[p.r][p.c]; });
+          if (faces.indexOf('=') === -1) return true;                       // not an equation
+          if (faces.some(function (x) { return x == null; })) return true;  // other unresolved → can't judge
+          return validate(faces);
+        }
+        function constrains(cand) {
+          return [H, V].some(function (cells) {
+            if (cells.length < 2) return false;
+            var faces = cells.map(function (p) { return (p.r === cr && p.c === cc) ? cand : grid[p.r][p.c]; });
+            return faces.indexOf('=') >= 0 && !faces.some(function (x) { return x == null; });
+          });
+        }
+        var ok = cands.filter(function (cand) { return lineOK(H, cand) && lineOK(V, cand); });
+        if (ok.length === 1 && constrains(ok[0])) {
+          m.assigned = ok[0];
+          assigns.push({ r: r, c: c, a: ok[0] });
+          changed = true;
+        }
+      }
+    }
+    return assigns;
+  }
+
   var api = {
     RACK_SIZE: RACK_SIZE,
     BOARD_SIZE: BOARD_SIZE,
@@ -462,6 +514,7 @@
     computeBag: computeBag,
     buildGameState: buildGameState,
     autoCorrect: autoCorrect,
+    autoAssign: autoAssign,
   };
 
   if (typeof module !== 'undefined' && module.exports) {
