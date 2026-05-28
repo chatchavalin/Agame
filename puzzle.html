@@ -7,7 +7,7 @@
 // This script bumps version stamp every time we deploy. If the SW is stale,
 // it tells the SW to unregister, clears all caches, and reloads.
 (function(){
-  var DEPLOYED_VERSION = 'v34-2026-05-27';
+  var DEPLOYED_VERSION = 'v56-bookref-2026-05-28';
   var lastVersion = localStorage.getItem('pz_version');
   if (lastVersion !== DEPLOYED_VERSION) {
     localStorage.setItem('pz_version', DEPLOYED_VERSION);
@@ -635,6 +635,10 @@ body.theme-dark .player-area .amath-tile-rack {
     <label style="font-size:11px;color:#94a3b8;text-transform:uppercase;display:block;margin-bottom:4px;">Pattern</label>
     <select id="eq-pattern-select" class="eq-select"></select>
   </div>
+
+  <!-- Book-page reference (ตอน · ชุด · ข้อ) — tells the player exactly where
+       this problem lives in the physical A-Math book, for cross-reference. -->
+  <div id="eq-bookref" style="text-align:center;font-size:12.5px;font-weight:700;color:#fbbf24;margin-bottom:8px;display:none;"></div>
 
   <!-- Problem counter + progress -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:11px;color:#94a3b8;">
@@ -2019,6 +2023,30 @@ function _eqResultKey() {
   return _eqActivePattern + ':' + _eqActiveIdx;
 }
 
+/**
+ * Build the physical-book reference label for the current problem.
+ *   ตอน  = section  (ton1 → 1, ton2 → 2, …)
+ *   ชุด   = pattern's 1-based position within the section
+ *   ข้อ   = puzzle's 1-based index within the pattern
+ * Sections with a single (default) pattern omit ชุด since it carries no info.
+ * Assumes patterns are stored in the same order they appear in the book.
+ * Returns '' if a reference can't be derived (so callers can hide the label).
+ */
+function bookRefLabel(sid, patternId, idx) {
+  if (!sid) return '';
+  var m = /^ton(\d+)$/.exec(sid);
+  if (!m) return '';
+  var ton = m[1];
+  var khor = (idx || 0) + 1;
+  var patternIds = Object.keys(_eqPatterns || {});
+  if (patternIds.length <= 1) {
+    return '📖 ตอน ' + ton + ' · ข้อ ' + khor;
+  }
+  var pos = patternIds.indexOf(patternId);
+  var chud = pos >= 0 ? (pos + 1) : 1;
+  return '📖 ตอน ' + ton + ' · ชุด ' + chud + ' · ข้อ ' + khor;
+}
+
 function renderCurrentProblem() {
   var puzzle = _eqCurrentPuzzle();
   if (!puzzle) return;
@@ -2068,6 +2096,14 @@ function renderCurrentProblem() {
   // Counter / score summary
   var ps = _eqPatterns[_eqActivePattern].puzzles;
   document.getElementById('eq-problem-counter').textContent = 'Problem ' + (_eqActiveIdx + 1) + ' / ' + ps.length;
+
+  // Book-page reference label (ตอน · ชุด · ข้อ)
+  var refEl = document.getElementById('eq-bookref');
+  if (refEl) {
+    var ref = bookRefLabel(_eqSectionId, _eqActivePattern, _eqActiveIdx);
+    if (ref) { refEl.textContent = ref; refEl.style.display = 'block'; }
+    else { refEl.style.display = 'none'; }
+  }
   var solvedCount = 0;
   for (var i = 0; i < ps.length; i++) {
     if (_eqResults[_eqActivePattern + ':' + i] === 'correct') solvedCount++;
