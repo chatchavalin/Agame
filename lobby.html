@@ -117,32 +117,6 @@
       </div>
     </div>
 
-    <!-- Badges row -->
-    <div class="badges-section" style="margin:14px 0;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <h3 style="margin:0;font-size:15px;color:#e2e8f0;">🏆 Badges</h3>
-        <button onclick="AMathLobby.openBadges()"
-                style="background:none;border:1px solid #475569;color:#94a3b8;padding:4px 10px;
-                       border-radius:6px;font-size:12px;cursor:pointer;">View all</button>
-      </div>
-      <div id="badges-preview" style="display:flex;gap:6px;flex-wrap:wrap;min-height:32px;">
-        <span style="color:#64748b;font-size:12px;">No badges yet — play a game!</span>
-      </div>
-    </div>
-
-    <!-- Active online rooms (resume in-progress games) -->
-    <div id="active-rooms-section" style="margin:14px 0;display:none;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <h3 style="margin:0;font-size:15px;color:#e2e8f0;">🔄 Resume Online</h3>
-        <button onclick="AMathLobby.loadActiveRooms()"
-                style="background:none;border:1px solid #475569;color:#94a3b8;
-                       padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;">
-          Refresh
-        </button>
-      </div>
-      <div id="active-rooms-list" style="display:flex;flex-direction:column;gap:6px;"></div>
-    </div>
-
     <!-- Play Buttons -->
     <div class="play-section">
       <button class="btn-play" onclick="AMathLobby.playAI()">
@@ -176,6 +150,32 @@
       <div id="leaderboard-list" class="lb-list">
         <div class="lb-loading">Loading...</div>
       </div>
+    </div>
+
+    <!-- Badges row -->
+    <div class="badges-section" style="margin:14px 0;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <h3 style="margin:0;font-size:15px;color:#e2e8f0;">🏆 Badges</h3>
+        <button onclick="AMathLobby.openBadges()"
+                style="background:none;border:1px solid #475569;color:#94a3b8;padding:4px 10px;
+                       border-radius:6px;font-size:12px;cursor:pointer;">View all</button>
+      </div>
+      <div id="badges-preview" style="display:flex;gap:6px;flex-wrap:wrap;min-height:32px;">
+        <span style="color:#64748b;font-size:12px;">No badges yet — play a game!</span>
+      </div>
+    </div>
+
+    <!-- Active online rooms (resume in-progress games) -->
+    <div id="active-rooms-section" style="margin:14px 0;display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <h3 style="margin:0;font-size:15px;color:#e2e8f0;">🔄 Resume Online</h3>
+        <button onclick="AMathLobby.loadActiveRooms()"
+                style="background:none;border:1px solid #475569;color:#94a3b8;
+                       padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;">
+          Refresh
+        </button>
+      </div>
+      <div id="active-rooms-list" style="display:flex;flex-direction:column;gap:6px;"></div>
     </div>
 
     <!-- My Games -->
