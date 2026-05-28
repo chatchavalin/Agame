@@ -58,19 +58,22 @@
   // ---- prompt: read the board into our exact board-code vocabulary ----------
   function buildPrompt() {
     return [
-      'You are reading a photo of an A-Math / MathSmith board game. The board is a 15x15 grid.',
-      'Identify every tile placed on the board and output ONLY a JSON object (no prose, no markdown fences) of this exact form:',
+      'You are reading a photo of an A-Math / MathSmith board game to digitize it. The play area is a 15x15 grid of square cells. Most cells are EMPTY.',
+      'Output ONLY a JSON object (no prose, no markdown fences) of this exact form:',
       '{"v":1,"board":[{"r":<row 0-14 from top>,"c":<col 0-14 from left>,"f":"<face>"}],"rack":[]}',
-      'Rules:',
-      '- r=0 is the TOP row; c=0 is the LEFT column.',
-      '- Include ONLY cells that contain a tile. Omit every empty cell.',
-      '- "f" MUST be exactly one of: "0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","20","+","-","+/-","×/÷","=","BLANK".',
-      '- A tile showing ± is "+/-". A tile showing a combined ×÷ symbol is "×/÷". For these, if you can tell which single operation it is used as in the equation, also add "a" set to "+","-","×" or "÷"; if unsure, omit "a".',
-      '- A blank tile (no printed value, often marked GAMESMITH or empty) is "BLANK"; if it clearly represents a value in the equation, add "a" with that value.',
-      '- Read ONLY the large central number/symbol on each tile. IGNORE the small subscript point number in the corner.',
-      '- Tiles 17, 18, 19 do NOT exist. Numbers 10-16 and 20 are SINGLE two-digit tiles.',
-      '- Do NOT include the player racks. Always set "rack" to [].',
-      'Return the JSON object only.'
+      '',
+      'CRITICAL RULES — follow exactly:',
+      '1. ONE tile per cell maximum. Never output two entries for the same (r,c).',
+      '2. The small number in the CORNER of a tile is its POINT VALUE, not a tile. IGNORE it completely. Read only the LARGE symbol in the middle of the tile.',
+      '3. Two-digit tiles (10, 11, 12, 13, 14, 15, 16, 20) are SINGLE tiles occupying ONE cell. NEVER split them into two single-digit tiles. If a cell shows "20", output one {"f":"20"} — not a "2" and a "0".',
+      '4. Read ONLY tiles sitting inside the 15x15 grid. IGNORE everything else in the photo: the plastic frame, the player racks/trays, the dice, score sheets, and any printed tile-frequency tables or text on paper.',
+      '5. "f" MUST be exactly one of: "0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","20","+","-","+/-","×/÷","=","BLANK". (Tiles 17,18,19 do NOT exist.)',
+      '6. A ± tile is "+/-"; a combined ×÷ tile is "×/÷". If you can tell which operation it is used as, add "a":"+"/"-"/"×"/"÷"; else omit "a". A blank tile is "BLANK".',
+      '',
+      'TILE SUPPLY (the whole game has only these many of each — you can NOT see more than this on the board, so if you are about to exceed a count you have misread something):',
+      '0×4, 1×4, 2×4, 3×4, 4×4, 5×3, 6×3, 7×2, 8×3, 9×2, 10×1, 11×1, 12×1, 13×1, 14×1, 15×1, 16×1, 20×1, +×4, -×4, +/-×5, ×/÷×4, =×8, BLANK×4.',
+      '',
+      'Tiles are placed along straight lines forming equations (e.g. "2 ÷ 8 5 = 9 1"). Use that to sanity-check your reading. Set "rack" to []. Return the JSON object only.'
     ].join('\n');
   }
 
