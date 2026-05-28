@@ -243,7 +243,7 @@ body {
 .btn-play:active { transform: scale(0.97); }
 .btn-play .play-icon { font-size: 28px; }
 .btn-play-2p {
-  background: #1e293b; color: #64748b;
+  background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff;
 }
 .btn-play-2p:disabled { opacity: 0.6; cursor: not-allowed; }
 
