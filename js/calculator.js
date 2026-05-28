@@ -359,14 +359,21 @@
     window.AMath.scanRackFromFile(file).then(function (faces) {
       if (!faces || !faces.length) { st.textContent = '⚠️ Couldn’t read a rack — keep the tray in frame, tiles face-up. You can tap tiles in instead.'; return; }
       rack = [];
-      faces.slice(0, MAX).forEach(function (f) {
-        if (f == null || f === '') return;
+      var unresolved = 0;
+      // Trim trailing empties so we don't pad the rack with blanks at the end,
+      // but keep INTERNAL gaps as editable BLANK placeholders so tile positions
+      // aren't silently shifted when one slot failed the read/vote.
+      var trimmed = faces.slice(0, MAX);
+      while (trimmed.length && (trimmed[trimmed.length - 1] == null || String(trimmed[trimmed.length - 1]).trim() === '')) trimmed.pop();
+      trimmed.forEach(function (f) {
+        if (f == null || String(f).trim() === '') { rack.push('BLANK'); unresolved++; return; }
         f = String(f).trim();
         if (f === '±') f = '+/-'; else if (f === '×' || f === '÷') f = '×/÷'; else if (f === '▢' || f === '?') f = 'BLANK';
         rack.push(f);
       });
       renderRack();
-      st.textContent = '✅ Read ' + rack.length + ' tile(s). Check them, then Find.';
+      st.textContent = '✅ Read ' + rack.length + ' tile(s)' +
+        (unresolved ? ' — ' + unresolved + ' slot(s) unclear (shown as ?). Tap to fix.' : '. Check them, then Find.');
     }).catch(function (e) { st.textContent = '❌ ' + (e && e.message || 'Could not read the photo.'); });
   }
 
