@@ -93,14 +93,6 @@
     </div>
 
     <div class="panel">
-      <label style="display:flex; align-items:center; gap:10px; margin:0 0 14px; font-size:14px;">
-        <span style="font-weight:700;">Tile set:</span>
-        <select id="tileset-select" style="flex:1; min-width:0;">
-          <option value="prathom">Prathom — Elementary (70 tiles)</option>
-          <option value="mathayom">Mathayom — Secondary (100 tiles)</option>
-        </select>
-      </label>
-
       <h2>Your tiles</h2>
       <div id="board-strip-wrap" style="display:none;">
         <p class="hint" style="margin-top:0;">Board row 0 — tap a square, then tap a tile below to lock it on the board. Tap a locked square to clear it.</p>
@@ -133,6 +125,16 @@
         <button class="btn btn-primary" id="btn-find">Find</button>
       </div>
       <div id="results"></div>
+    </div>
+
+    <div class="panel">
+      <label style="display:flex; align-items:center; gap:10px; margin:0; font-size:14px;">
+        <span style="font-weight:700;">Tile set:</span>
+        <select id="tileset-select" style="flex:1; min-width:0;">
+          <option value="prathom">Prathom — Elementary (70 tiles)</option>
+          <option value="mathayom">Mathayom — Secondary (100 tiles)</option>
+        </select>
+      </label>
     </div>
   </div>
 
