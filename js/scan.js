@@ -263,25 +263,33 @@
     document.body.appendChild(ov);
   }
 
-  // ---- import: paste board code ---------------------------------------------
-  function loadCode() {
-    var ta = document.getElementById('code-input');
+  // ---- import: from a board-code string (used by paste box AND camera) -----
+  function applyImportText(text, sourceLabel) {
     var status = document.getElementById('import-status');
-    if (!ta) return;
-    var res = BI.parseBoardCode(ta.value, inv());
+    var res = BI.parseBoardCode(text, inv());
     if (!res.ok) {
-      status.style.color = '#f87171';
-      status.innerHTML = '❌ ' + res.errors.join('<br>');
-      return;
+      if (status) { status.style.color = '#f87171'; status.innerHTML = '❌ ' + res.errors.join('<br>'); }
+      return false;
     }
     blankModel();
     res.board.forEach(function (e) { editBoard[e.r][e.c] = { face: e.f, assigned: e.a || null }; });
     res.rack.forEach(function (e, i) { editRack[i] = { face: e.f, assigned: e.a || null }; });
-    status.style.color = '#34d399';
-    status.innerHTML = '✅ Imported ' + res.board.length + ' board tiles, ' + res.rack.length + ' rack tiles.' +
-      (res.warnings.length ? '<br>⚠️ ' + res.warnings.join('<br>⚠️ ') : '');
+    if (status) {
+      status.style.color = '#34d399';
+      status.innerHTML = '✅ ' + (sourceLabel || 'Imported') + ': ' + res.board.length + ' board tiles, ' +
+        res.rack.length + ' rack tiles.' +
+        (res.warnings.length ? '<br>⚠️ ' + res.warnings.join('<br>⚠️ ') : '');
+    }
+    if (mode !== 'edit') backToEdit();
     renderEditor();
-    document.getElementById('review-section').scrollIntoView({ behavior: 'smooth' });
+    var rs = document.getElementById('review-section');
+    if (rs) rs.scrollIntoView({ behavior: 'smooth' });
+    return true;
+  }
+
+  function loadCode() {
+    var ta = document.getElementById('code-input');
+    if (ta) applyImportText(ta.value, 'Imported code');
   }
 
   // ---- solo play mode -------------------------------------------------------
@@ -457,4 +465,8 @@
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
+
+  // Public hook for the camera/Gemini module to feed a board-code string.
+  window.AMath = window.AMath || {};
+  window.AMath.scanApply = applyImportText;
 })();

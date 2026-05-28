@@ -1,11 +1,12 @@
 // Bump CACHE_NAME whenever ANY asset changes to force update.
-const CACHE_NAME = 'amath-v71-scanimport';
+const CACHE_NAME = 'amath-v72-camera';
 const ASSETS = [
   '/Agame/',
   '/Agame/lobby.html',
   '/Agame/lobby.css',
   '/Agame/scan.html',
   '/Agame/js/scan.js',
+  '/Agame/js/scan-camera.js',
   '/Agame/js/board-import.js',
 ];
 

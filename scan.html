@@ -73,6 +73,21 @@
         <button class="btn btn-ghost" id="btn-clear-all">Clear board</button>
       </div>
       <div id="import-status"></div>
+
+      <div style="border-top:1px solid #334155; margin-top:16px; padding-top:14px;">
+        <h2 style="margin-top:0;">Or scan a photo (Gemini)</h2>
+        <p class="hint">Paste a free Google Gemini API key (get one at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="color:#fbbf24;">aistudio.google.com/apikey</a>). It's stored only on this device and sent straight to Google. Take a flat, well-lit, straight-on photo for best results.</p>
+        <div class="btn-row">
+          <input id="gemini-key" type="password" autocomplete="off" placeholder="Gemini API key"
+            style="flex:1; min-width:150px; box-sizing:border-box; background:#0f172a; color:#e2e8f0; border:1px solid #334155; border-radius:10px; padding:9px; font-size:12px;">
+          <button class="btn btn-ghost" id="btn-save-key">Save key</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-amber" id="btn-photo">📷 Take / choose photo</button>
+          <input id="photo-input" type="file" accept="image/*" style="display:none;">
+        </div>
+        <div id="camera-status"></div>
+      </div>
     </div>
 
     <!-- REVIEW / PLAY -->
@@ -121,6 +136,7 @@
   <script src="js/settings.js?v=v54-2026-05-27"></script>
   <script src="js/ui.js?v=v61-saveexit"></script>
   <script src="js/board-import.js?v=v71-import"></script>
-  <script src="js/scan.js?v=v71-import"></script>
+  <script src="js/scan.js?v=v72-camera"></script>
+  <script src="js/scan-camera.js?v=v72-camera"></script>
 </body>
 </html>
