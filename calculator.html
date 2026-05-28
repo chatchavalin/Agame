@@ -25,7 +25,7 @@
   select { background:#0f172a; color:#e2e8f0; border:1px solid #475569; border-radius:10px;
     padding:9px; font-size:14px; font-family:inherit; }
 
-  #rack-wrap { display:flex; gap:5px; justify-content:center; flex-wrap:nowrap; margin:12px 0; }
+  #rack-wrap { display:flex; gap:5px; justify-content:center; flex-wrap:wrap; margin:12px 0; }
 
   /* A-Math game tile — matches the cream/amber identity from the main game */
   .gtile { position:relative; display:inline-flex; align-items:center; justify-content:center;
@@ -38,7 +38,7 @@
   .gtile.blank { border-style:dashed; background:#fffbeb; color:#b45309; }
   .gtile.blank .qmark { position:absolute; left:3px; top:1px; font-size:9px; color:#d97706; font-weight:800; }
 
-  .rack-slot { flex:1 1 0; min-width:0; max-width:46px; aspect-ratio:1; cursor:pointer; }
+  .rack-slot { flex:0 0 auto; width:42px; height:42px; cursor:pointer; }
   .rack-slot.empty { border:2px dashed #475569; border-radius:9px; background:#0f172a;
     display:flex; align-items:center; justify-content:center; color:#475569; font-size:22px; font-weight:700; }
   .rack-slot .gtile { width:100%; height:100%; font-size:22px; }
@@ -97,6 +97,8 @@
         <button class="btn btn-ghost" id="btn-clear">Clear</button>
         <button class="btn btn-amber" id="calc-photo">📷 Photo</button>
         <input id="calc-photo-input" type="file" accept="image/*" style="display:none;">
+        <button class="btn btn-amber" id="calc-camera">📸 Camera</button>
+        <input id="calc-camera-input" type="file" accept="image/*" capture="environment" style="display:none;">
       </div>
       <div id="cam-status" class="hint"></div>
 
@@ -110,6 +112,7 @@
         <select id="mode-select">
           <option value="9">9-tile bingo — 8 tiles + 1 hook</option>
           <option value="8">8-tile bingo — your 8 tiles alone</option>
+          <option value="all">Use ALL my tiles — any number</option>
         </select>
         <button class="btn btn-primary" id="btn-find">Find</button>
       </div>
@@ -124,6 +127,6 @@
   <script src="js/bingo-solver.js?v=v95-tiles"></script>
   <script src="js/scan-ai.js?v=v86-temp" type="module"></script>
   <script src="js/scan-camera.js?v=v91-calc"></script>
-  <script src="js/calculator.js?v=v102-photofix"></script>
+  <script src="js/calculator.js?v=v103-camera-all"></script>
 </body>
 </html>

@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  var MAX = 8;
+  var MAX = 20;   // standard rack is 8; "use all" mode allows more
   var rack = [];   // ordered face strings, length 0..MAX
 
   function byId(id) { return document.getElementById(id); }
@@ -57,7 +57,8 @@
   function renderRack() {
     var wrap = byId('rack-wrap'); wrap.innerHTML = '';
     var m = pointsMap();
-    for (var i = 0; i < MAX; i++) {
+    var slots = Math.max(rack.length, 8);   // pad to a normal 8-rack, but grow if more
+    for (var i = 0; i < slots; i++) {
       (function (idx) {
         var cell = document.createElement('div'); cell.className = 'rack-slot';
         var f = rack[idx];
@@ -113,17 +114,18 @@
 
   function currentTiles() { return rack.slice(); }
 
-  // ----- 8-tile -----
-  function run8() {
+  // ----- use all tiles (8-tile bingo, or any number) -----
+  function runAll() {
     var tiles = currentTiles(), res = byId('results');
     if (tiles.length < 2) { res.innerHTML = '<p class="muted">Add some tiles first.</p>'; return; }
-    res.innerHTML = '<p class="muted">Searching…</p>';
+    res.innerHTML = '<p class="muted">Searching…' + (tiles.length > 10 ? ' (many tiles — this can take a few seconds)' : '') + '</p>';
     setTimeout(function () {
       var m = pointsMap(), base = rackScore(tiles, m);
       var sols = window.AMath.bingoSolver.solve(tiles, validate, { maxSolutions: 6 });
       res.innerHTML = '';
+      var label = (tiles.length === 8) ? '8-tile bingo' : ('Equation using all ' + tiles.length + ' tiles');
       var h = document.createElement('div');
-      h.innerHTML = '<h2 style="font-size:15px;margin:0 0 8px;">8-tile bingo &nbsp;<span class="score-badge">' + base + ' pts</span></h2>';
+      h.innerHTML = '<h2 style="font-size:15px;margin:0 0 8px;">' + label + ' &nbsp;<span class="score-badge">' + base + ' pts</span></h2>';
       res.appendChild(h);
       if (sols.length) {
         var p = document.createElement('p'); p.className = 'muted';
@@ -132,7 +134,9 @@
         sols.forEach(function (s) { res.appendChild(eqLine(s)); });
       } else {
         var no = document.createElement('p'); no.className = 'muted';
-        no.textContent = '❌ No bingo using all ' + tiles.length + ' tiles. Try 9-tile (adds one hook).';
+        no.textContent = (sols.capped)
+          ? '⏱️ Couldn’t finish searching all arrangements of ' + tiles.length + ' tiles — no equation found so far. Try fewer tiles.'
+          : '❌ No equation uses all ' + tiles.length + ' tiles. Try 9-tile mode (adds one hook), or change a tile.';
         res.appendChild(no);
       }
     }, 30);
@@ -174,7 +178,7 @@
     }, 30);
   }
 
-  function runFind() { (byId('mode-select').value === '8' ? run8 : run9)(); }
+  function runFind() { (byId('mode-select').value === '9' ? run9 : runAll)(); }
 
   // ----- photo of rack -----
   function onPhoto(file) {
@@ -204,9 +208,14 @@
     byId('btn-back').addEventListener('click', function () { rack.pop(); renderRack(); });
     byId('btn-clear').addEventListener('click', function () { rack = []; renderRack(); byId('cam-status').textContent = ''; });
 
-    var photoBtn = byId('calc-photo'), photoInput = byId('calc-photo-input');
-    photoBtn.addEventListener('click', function () { photoInput.click(); });
-    photoInput.addEventListener('change', function (e) { var f = e.target.files && e.target.files[0]; onPhoto(f); e.target.value = ''; });
+    function wirePhoto(btnId, inputId) {
+      var btn = byId(btnId), input = byId(inputId);
+      if (!btn || !input) return;
+      btn.addEventListener('click', function () { input.click(); });
+      input.addEventListener('change', function (e) { var f = e.target.files && e.target.files[0]; onPhoto(f); e.target.value = ''; });
+    }
+    wirePhoto('calc-photo', 'calc-photo-input');   // gallery / files
+    wirePhoto('calc-camera', 'calc-camera-input'); // live camera
 
     var tsel = byId('tileset-select');
     try { if (window.AMath && window.AMath.settings && window.AMath.settings.get) tsel.value = window.AMath.settings.get('tileSet') || 'prathom'; } catch (e) {}
