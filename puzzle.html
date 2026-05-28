@@ -292,6 +292,12 @@ body.theme-dark .player-area .amath-tile-rack {
     border-color: rgba(239, 68, 68, 0.5);
     animation: pulse 0.8s infinite;
   }
+  .eq-timer.paused {
+    color: #94a3b8;
+    background: rgba(148, 163, 184, 0.15);
+    border-color: rgba(148, 163, 184, 0.4);
+    animation: none;
+  }
   @keyframes pulse {
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.08); }
@@ -376,7 +382,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v53</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v54</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -385,7 +391,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
   <!-- Header -->
   <header style="padding:14px 16px 8px;text-align:center;">
-    <h2 style="margin:0 0 4px;font-size:18px;color:#fbbf24;font-weight:800;letter-spacing:0.5px;">🧩 Puzzle Mode<span style="font-size:9px;font-weight:400;vertical-align:super;margin-left:4px;color:#94a3b8;">v53</span></h2>
+    <h2 style="margin:0 0 4px;font-size:18px;color:#fbbf24;font-weight:800;letter-spacing:0.5px;">🧩 Puzzle Mode<span style="font-size:9px;font-weight:400;vertical-align:super;margin-left:4px;color:#94a3b8;">v54</span></h2>
     <p style="margin:0;font-size:11px;color:#94a3b8;">Train your A-Math instincts</p>
   </header>
 
@@ -711,34 +717,34 @@ body.theme-dark .player-area .amath-tile-rack {
 </div>
 
 <!-- Load main game JS modules in dependency order (same as index.html) -->
-<script src="js/constants.js?v=v53-2026-05-27"></script>
-<script src="js/utils.js?v=v53-2026-05-27"></script>
-<script src="js/evaluator.js?v=v53-2026-05-27"></script>
-<script src="js/bag.js?v=v53-2026-05-27"></script>
-<script src="js/rack.js?v=v53-2026-05-27"></script>
-<script src="js/board.js?v=v53-2026-05-27"></script>
-<script src="js/tile-tracker.js?v=v53-2026-05-27"></script>
-<script src="js/scoring.js?v=v53-2026-05-27"></script>
-<script src="js/placement.js?v=v53-2026-05-27"></script>
+<script src="js/constants.js?v=v54-2026-05-27"></script>
+<script src="js/utils.js?v=v54-2026-05-27"></script>
+<script src="js/evaluator.js?v=v54-2026-05-27"></script>
+<script src="js/bag.js?v=v54-2026-05-27"></script>
+<script src="js/rack.js?v=v54-2026-05-27"></script>
+<script src="js/board.js?v=v54-2026-05-27"></script>
+<script src="js/tile-tracker.js?v=v54-2026-05-27"></script>
+<script src="js/scoring.js?v=v54-2026-05-27"></script>
+<script src="js/placement.js?v=v54-2026-05-27"></script>
 <!-- AI modules for the in-browser puzzle generator -->
-<script src="js/ai-x9.js?v=v53-2026-05-27"></script>
-<script src="js/ai-x4.js?v=v53-2026-05-27"></script>
-<script src="js/ai-bingo-fast.js?v=v53-2026-05-27"></script>
-<script src="js/ai-bingo-grammar.js?v=v53-2026-05-27"></script>
-<script src="js/ai-yoyo.js?v=v53-2026-05-27"></script>
-<script src="js/ai-patterns-data.js?v=v53-2026-05-27"></script>
-<script src="js/ai-patterns-engine.js?v=v53-2026-05-27"></script>
-<script src="js/ai-swap.js?v=v53-2026-05-27"></script>
-<script src="js/ai-swap-brain2.js?v=v53-2026-05-27"></script>
-<script src="js/ai-player.js?v=v53-2026-05-27"></script>
-<script src="js/puzzle-generator.js?v=v53-2026-05-27"></script>
-<script src="js/book-puzzle-generator.js?v=v53-2026-05-27"></script>
-<script src="js/ton4-solver.js?v=v53-2026-05-27"></script>
-<script src="js/sounds.js?v=v53-2026-05-27"></script>
-<script src="js/progress.js?v=v53-2026-05-27"></script>
-<script src="js/settings.js?v=v53-2026-05-27"></script>
-<script src="js/ui.js?v=v53-2026-05-27"></script>
-<script src="js/interactions.js?v=v53-2026-05-27"></script>
+<script src="js/ai-x9.js?v=v54-2026-05-27"></script>
+<script src="js/ai-x4.js?v=v54-2026-05-27"></script>
+<script src="js/ai-bingo-fast.js?v=v54-2026-05-27"></script>
+<script src="js/ai-bingo-grammar.js?v=v54-2026-05-27"></script>
+<script src="js/ai-yoyo.js?v=v54-2026-05-27"></script>
+<script src="js/ai-patterns-data.js?v=v54-2026-05-27"></script>
+<script src="js/ai-patterns-engine.js?v=v54-2026-05-27"></script>
+<script src="js/ai-swap.js?v=v54-2026-05-27"></script>
+<script src="js/ai-swap-brain2.js?v=v54-2026-05-27"></script>
+<script src="js/ai-player.js?v=v54-2026-05-27"></script>
+<script src="js/puzzle-generator.js?v=v54-2026-05-27"></script>
+<script src="js/book-puzzle-generator.js?v=v54-2026-05-27"></script>
+<script src="js/ton4-solver.js?v=v54-2026-05-27"></script>
+<script src="js/sounds.js?v=v54-2026-05-27"></script>
+<script src="js/progress.js?v=v54-2026-05-27"></script>
+<script src="js/settings.js?v=v54-2026-05-27"></script>
+<script src="js/ui.js?v=v54-2026-05-27"></script>
+<script src="js/interactions.js?v=v54-2026-05-27"></script>
 
 <script>
 (function(){
@@ -1865,18 +1871,28 @@ var _eqDragTileId = null;       // id of tile being dragged
 var _eqSelectedTileId = null;   // id of tile selected by single tap (click-to-place mode)
 
 // === Per-puzzle timer === (soft — turns red, doesn't auto-fail per Q2 spec)
+// Tap the timer chip to pause/resume.
 var _puzzleTimer = null;        // setInterval id
 var _puzzleTimerSecs = 0;       // elapsed seconds
 var _puzzleTimerLimit = 30;     // limit in seconds (default 30)
 var _puzzleTimerTargetEl = null; // element to update (#eq-timer or #ton4-timer)
+var _puzzleTimerPaused = false;  // pause state
 
 function startPuzzleTimer(elementId, limit) {
   stopPuzzleTimer();
   _puzzleTimerLimit = (typeof limit === 'number' && limit > 0) ? limit : 30;
   _puzzleTimerSecs = 0;
+  _puzzleTimerPaused = false;
   _puzzleTimerTargetEl = document.getElementById(elementId);
+  // Attach a one-time click-to-pause handler (idempotent — replace each render)
+  if (_puzzleTimerTargetEl) {
+    _puzzleTimerTargetEl.onclick = togglePuzzleTimerPause;
+    _puzzleTimerTargetEl.style.cursor = 'pointer';
+    _puzzleTimerTargetEl.title = 'Tap to pause/resume';
+  }
   updatePuzzleTimer();
   _puzzleTimer = setInterval(function(){
+    if (_puzzleTimerPaused) return;  // frozen while paused
     _puzzleTimerSecs++;
     updatePuzzleTimer();
   }, 1000);
@@ -1887,6 +1903,14 @@ function stopPuzzleTimer() {
     clearInterval(_puzzleTimer);
     _puzzleTimer = null;
   }
+  _puzzleTimerPaused = false;
+}
+
+function togglePuzzleTimerPause() {
+  if (!_puzzleTimer) return;  // no active timer
+  _puzzleTimerPaused = !_puzzleTimerPaused;
+  _sfxClick();
+  updatePuzzleTimer();
 }
 
 function updatePuzzleTimer() {
@@ -1894,6 +1918,23 @@ function updatePuzzleTimer() {
   var remaining = Math.max(0, _puzzleTimerLimit - _puzzleTimerSecs);
   var mins = Math.floor(remaining / 60);
   var secs = remaining % 60;
+
+  if (_puzzleTimerPaused) {
+    // Show a pause indicator + the frozen time
+    var frozenText;
+    if (remaining === 0) {
+      var ot = _puzzleTimerSecs - _puzzleTimerLimit;
+      frozenText = '+' + Math.floor(ot/60) + ':' + String(ot%60).padStart(2,'0');
+    } else {
+      frozenText = mins + ':' + String(secs).padStart(2,'0');
+    }
+    _puzzleTimerTargetEl.textContent = '⏸ ' + frozenText;
+    _puzzleTimerTargetEl.classList.remove('warning', 'danger');
+    _puzzleTimerTargetEl.classList.add('paused');
+    return;
+  }
+
+  _puzzleTimerTargetEl.classList.remove('paused');
   // If we've exceeded the limit, show elapsed past in red
   if (remaining === 0) {
     var overtime = _puzzleTimerSecs - _puzzleTimerLimit;
