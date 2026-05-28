@@ -58,25 +58,24 @@
   // ---- prompt: read the board into our exact board-code vocabulary ----------
   function buildPrompt() {
     return [
-      'You are reading a photo of an A-Math / MathSmith board game to digitize it. The play area is a 15x15 grid of square cells. Most cells are EMPTY.',
-      'Output ONLY a JSON object (no prose, no markdown fences) of this exact form:',
-      '{"v":1,"board":[{"r":<row 0-14 from top>,"c":<col 0-14 from left>,"f":"<face>"}],"rack":[]}',
+      'You are digitizing a photo of an A-Math / MathSmith board (a 15x15 grid of squares). Read which tile, if any, sits on each square.',
       '',
-      'CRITICAL RULES — follow exactly:',
-      '1. ONE tile per cell maximum. Never output two entries for the same (r,c).',
-      '2. The small number in the CORNER of a tile is its POINT VALUE, not a tile. IGNORE it completely. Read only the LARGE symbol in the middle of the tile.',
-      '3. Two-digit tiles (10, 11, 12, 13, 14, 15, 16, 20) are SINGLE tiles occupying ONE cell. NEVER split them into two single-digit tiles. If a cell shows "20", output one {"f":"20"} — not a "2" and a "0".',
-      '4. Read ONLY tiles sitting inside the 15x15 grid. IGNORE everything else: the plastic frame, player racks/trays, dice, score sheets, and printed tile-frequency tables.',
-      '4b. IGNORE the coordinate labels around the edges — column letters a–o and row numbers 1–15. They are NOT tiles.',
-      '4c. IGNORE the premium-square markings printed inside empty squares: "2X", "3X", "2T", "3T", "2E", "3E", "DOUBLE", "TRIPLE", "EQUATION", "PIECE". These are square bonuses, NOT tiles. In particular an "X" inside a bonus label (like "2X"/"3X") is NOT a ×/÷ tile. A real tile sits on top of a square and shows a number or operator with a small point-value subscript.',
-      '5. "f" MUST be exactly one of: "0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","20","+","-","+/-","×/÷","=","BLANK". (Tiles 17,18,19 do NOT exist.)',
-      '6. A ± tile is "+/-"; a combined ×÷ tile is "×/÷". If you can tell which operation it is used as, add "a":"+"/"-"/"×"/"÷"; else omit "a". A blank tile is "BLANK".',
-      '6b. IMPORTANT: there is no standalone × or ÷ tile. If a cell shows a multiply "×", output {"f":"×/÷","a":"×"}. If it shows a divide "÷", output {"f":"×/÷","a":"÷"}.',
+      'Output ONLY a JSON object (no prose, no markdown) of EXACTLY this form:',
+      '{"v":2,"grid":[ <row0>, <row1>, ... <row14> ]}',
+      'where each row is an array of EXACTLY 15 strings (left to right), and there are EXACTLY 15 rows (top to bottom).',
+      'Each string is "" for an empty square, or the tile face for an occupied square.',
       '',
-      'TILE SUPPLY (the whole game has only these many of each — you can NOT see more than this on the board, so if you are about to exceed a count you have misread something):',
-      '0×4, 1×4, 2×4, 3×4, 4×4, 5×3, 6×3, 7×2, 8×3, 9×2, 10×1, 11×1, 12×1, 13×1, 14×1, 15×1, 16×1, 20×1, +×4, -×4, +/-×5, ×/÷×4, =×8, BLANK×4.',
+      'This fixed grid matters: every square maps to one slot, so you must NOT invent extra tiles. Most squares are empty ("").',
       '',
-      'Tiles are placed along straight lines forming equations (e.g. "2 ÷ 8 5 = 9 1"). Use that to sanity-check your reading. Set "rack" to []. Return the JSON object only.'
+      'How to read a tile:',
+      '- A tile shows ONE large symbol in the center — output only that. The tiny number in the lower-right CORNER is the point value; it is NOT a tile and must be ignored. Example: a tile with a large "8" and a small "2" in the corner is "8" (never "2", never two tiles).',
+      '- Two-digit tiles (10,11,12,13,14,15,16,20) are ONE tile in ONE square. Never split "20" into "2" and "0".',
+      '- Allowed faces: "0".."9","10","11","12","13","14","15","16","20","+","-","=","±" (the +/- tile), "×" or "÷" (the ×/÷ tile used as multiply/divide), "BLANK". Tiles 17,18,19 do not exist.',
+      '',
+      'Do NOT read non-tiles: ignore the coordinate letters/numbers around the edges, and ignore square-bonus labels on empty squares ("DOUBLE","TRIPLE","EQUATION","PIECE","2X","3X","GAMESMITH"). An "X" in a bonus label is not a tile.',
+      '',
+      'Sanity check before answering: the whole game has at most 4 of most number tiles (fewer of 5-9 and of two-digit tiles), 8 "=", 4 "+", 4 "-", 5 "±", 4 "×/÷". If your grid contains far more of something than could exist, you have misread subscripts as tiles — re-read and correct.',
+      'Return the JSON object only.'
     ].join('\n');
   }
 

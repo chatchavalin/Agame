@@ -23,7 +23,7 @@
 
   var RACK_SIZE = 8;
   var BOARD_SIZE = 15;
-  var CURRENT_CODE_VERSION = 1;
+  var CURRENT_CODE_VERSION = 2;
 
   // Faces a BLANK / choice tile is allowed to be "assigned" to, for validation.
   var ASSIGNABLE = (function () {
@@ -118,6 +118,24 @@
     }
     if (obj.v != null && obj.v > CURRENT_CODE_VERSION) {
       warnings.push('Code version ' + obj.v + ' is newer than supported (' + CURRENT_CODE_VERSION + ').');
+    }
+
+    // Accept a fixed 15x15 "grid" form (rows of 15 strings, "" = empty) and
+    // flatten it to board entries. This structural form prevents the model
+    // from emitting phantom tiles (e.g. reading a subscript as an extra tile),
+    // since every output slot maps to a real board square.
+    if (Array.isArray(obj.grid)) {
+      var gb = [];
+      obj.grid.forEach(function (row, r) {
+        if (!Array.isArray(row)) return;
+        row.forEach(function (cell, c) {
+          if (cell == null) return;
+          var s = String(cell).trim();
+          if (s === '' || s === '.' || s === '-.' ) return;  // empty markers
+          gb.push({ r: r, c: c, f: s });
+        });
+      });
+      obj = { v: obj.v, board: gb, rack: obj.rack, turn: obj.turn, scores: obj.scores };
     }
 
     // --- board cells ---
