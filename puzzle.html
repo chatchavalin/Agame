@@ -7,7 +7,7 @@
 // This script bumps version stamp every time we deploy. If the SW is stale,
 // it tells the SW to unregister, clears all caches, and reloads.
 (function(){
-  var DEPLOYED_VERSION = 'v57-landscape-2026-05-28';
+  var DEPLOYED_VERSION = 'v58-fixpuzzles-2026-05-28';
   var lastVersion = localStorage.getItem('pz_version');
   if (lastVersion !== DEPLOYED_VERSION) {
     localStorage.setItem('pz_version', DEPLOYED_VERSION);
@@ -742,7 +742,7 @@ body.theme-dark .player-area .amath-tile-rack {
 <script src="js/ai-swap-brain2.js?v=v54-2026-05-27"></script>
 <script src="js/ai-player.js?v=v54-2026-05-27"></script>
 <script src="js/puzzle-generator.js?v=v54-2026-05-27"></script>
-<script src="js/book-puzzle-generator.js?v=v54-2026-05-27"></script>
+<script src="js/book-puzzle-generator.js?v=v58-fixpuzzles"></script>
 <script src="js/ton4-solver.js?v=v54-2026-05-27"></script>
 <script src="js/sounds.js?v=v55-tilesound"></script>
 <script src="js/progress.js?v=v54-2026-05-27"></script>
