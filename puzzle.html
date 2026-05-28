@@ -348,7 +348,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v49</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v50</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -357,7 +357,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
   <!-- Header -->
   <header style="padding:14px 16px 8px;text-align:center;">
-    <h2 style="margin:0 0 4px;font-size:18px;color:#fbbf24;font-weight:800;letter-spacing:0.5px;">🧩 Puzzle Mode<span style="font-size:9px;font-weight:400;vertical-align:super;margin-left:4px;color:#94a3b8;">v49</span></h2>
+    <h2 style="margin:0 0 4px;font-size:18px;color:#fbbf24;font-weight:800;letter-spacing:0.5px;">🧩 Puzzle Mode<span style="font-size:9px;font-weight:400;vertical-align:super;margin-left:4px;color:#94a3b8;">v50</span></h2>
     <p style="margin:0;font-size:11px;color:#94a3b8;">Train your A-Math instincts</p>
   </header>
 
@@ -371,6 +371,11 @@ body.theme-dark .player-area .amath-tile-rack {
     <div style="text-align:center;flex:1;">
       <div id="stats-accuracy" style="font-size:18px;font-weight:800;color:#fbbf24;">—</div>
       <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">Accuracy</div>
+    </div>
+    <div style="width:1px;height:32px;background:#334155;"></div>
+    <div style="text-align:center;flex:1;">
+      <div id="stats-elo" style="font-size:18px;font-weight:800;color:#a855f7;">1200</div>
+      <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">Rating</div>
     </div>
     <div style="width:1px;height:32px;background:#334155;"></div>
     <div style="text-align:center;flex:1;">
@@ -651,34 +656,34 @@ body.theme-dark .player-area .amath-tile-rack {
 </div>
 
 <!-- Load main game JS modules in dependency order (same as index.html) -->
-<script src="js/constants.js?v=v49-2026-05-27"></script>
-<script src="js/utils.js?v=v49-2026-05-27"></script>
-<script src="js/evaluator.js?v=v49-2026-05-27"></script>
-<script src="js/bag.js?v=v49-2026-05-27"></script>
-<script src="js/rack.js?v=v49-2026-05-27"></script>
-<script src="js/board.js?v=v49-2026-05-27"></script>
-<script src="js/tile-tracker.js?v=v49-2026-05-27"></script>
-<script src="js/scoring.js?v=v49-2026-05-27"></script>
-<script src="js/placement.js?v=v49-2026-05-27"></script>
+<script src="js/constants.js?v=v50-2026-05-27"></script>
+<script src="js/utils.js?v=v50-2026-05-27"></script>
+<script src="js/evaluator.js?v=v50-2026-05-27"></script>
+<script src="js/bag.js?v=v50-2026-05-27"></script>
+<script src="js/rack.js?v=v50-2026-05-27"></script>
+<script src="js/board.js?v=v50-2026-05-27"></script>
+<script src="js/tile-tracker.js?v=v50-2026-05-27"></script>
+<script src="js/scoring.js?v=v50-2026-05-27"></script>
+<script src="js/placement.js?v=v50-2026-05-27"></script>
 <!-- AI modules for the in-browser puzzle generator -->
-<script src="js/ai-x9.js?v=v49-2026-05-27"></script>
-<script src="js/ai-x4.js?v=v49-2026-05-27"></script>
-<script src="js/ai-bingo-fast.js?v=v49-2026-05-27"></script>
-<script src="js/ai-bingo-grammar.js?v=v49-2026-05-27"></script>
-<script src="js/ai-yoyo.js?v=v49-2026-05-27"></script>
-<script src="js/ai-patterns-data.js?v=v49-2026-05-27"></script>
-<script src="js/ai-patterns-engine.js?v=v49-2026-05-27"></script>
-<script src="js/ai-swap.js?v=v49-2026-05-27"></script>
-<script src="js/ai-swap-brain2.js?v=v49-2026-05-27"></script>
-<script src="js/ai-player.js?v=v49-2026-05-27"></script>
-<script src="js/puzzle-generator.js?v=v49-2026-05-27"></script>
-<script src="js/book-puzzle-generator.js?v=v49-2026-05-27"></script>
-<script src="js/ton4-solver.js?v=v49-2026-05-27"></script>
-<script src="js/sounds.js?v=v49-2026-05-27"></script>
-<script src="js/progress.js?v=v49-2026-05-27"></script>
-<script src="js/settings.js?v=v49-2026-05-27"></script>
-<script src="js/ui.js?v=v49-2026-05-27"></script>
-<script src="js/interactions.js?v=v49-2026-05-27"></script>
+<script src="js/ai-x9.js?v=v50-2026-05-27"></script>
+<script src="js/ai-x4.js?v=v50-2026-05-27"></script>
+<script src="js/ai-bingo-fast.js?v=v50-2026-05-27"></script>
+<script src="js/ai-bingo-grammar.js?v=v50-2026-05-27"></script>
+<script src="js/ai-yoyo.js?v=v50-2026-05-27"></script>
+<script src="js/ai-patterns-data.js?v=v50-2026-05-27"></script>
+<script src="js/ai-patterns-engine.js?v=v50-2026-05-27"></script>
+<script src="js/ai-swap.js?v=v50-2026-05-27"></script>
+<script src="js/ai-swap-brain2.js?v=v50-2026-05-27"></script>
+<script src="js/ai-player.js?v=v50-2026-05-27"></script>
+<script src="js/puzzle-generator.js?v=v50-2026-05-27"></script>
+<script src="js/book-puzzle-generator.js?v=v50-2026-05-27"></script>
+<script src="js/ton4-solver.js?v=v50-2026-05-27"></script>
+<script src="js/sounds.js?v=v50-2026-05-27"></script>
+<script src="js/progress.js?v=v50-2026-05-27"></script>
+<script src="js/settings.js?v=v50-2026-05-27"></script>
+<script src="js/ui.js?v=v50-2026-05-27"></script>
+<script src="js/interactions.js?v=v50-2026-05-27"></script>
 
 <script>
 (function(){
@@ -1457,8 +1462,10 @@ function refreshStatsRow() {
   const solvedEl = document.getElementById('stats-solved');
   const accEl = document.getElementById('stats-accuracy');
   const streakEl = document.getElementById('stats-streak');
+  const eloEl = document.getElementById('stats-elo');
   if (solvedEl) solvedEl.textContent = stats.solved;
   if (accEl) accEl.textContent = stats.attempts > 0 ? stats.accuracy + '%' : '—';
+  if (eloEl && window.AMath.elo) eloEl.textContent = window.AMath.elo.getOverall();
   if (streakEl) {
     if (streak === 0) {
       streakEl.textContent = '·';
@@ -2106,11 +2113,12 @@ window.eqSubmit = function() {
   }
   if (r.valid) {
     _eqResults[_eqResultKey()] = 'correct';
-    var solveTime = _puzzleTimerSecs;  // captured for later ELO/PB tracking
+    var solveTime = _puzzleTimerSecs;
     _sfxWin();
     stopPuzzleTimer();
-    showResultBanner(true, '✓ Correct! ' + r.canonical.join(' ') + ' (' + solveTime + 's)');
-    // Persist solved state
+    var eloDelta = 0;
+    if (window.AMath.elo) eloDelta = window.AMath.elo.applyWin(_eqSectionId, _eqActivePattern, solveTime);
+    showResultBanner(true, '✓ Correct! ' + r.canonical.join(' ') + ' (' + solveTime + 's' + (eloDelta ? ', +' + eloDelta + ' rating' : '') + ')');
     if (window.AMath.progress) {
       window.AMath.progress.markSolved(_eqSectionId, _eqActivePattern, _eqActiveIdx);
     }
@@ -2123,7 +2131,9 @@ window.eqSubmit = function() {
   } else {
     _eqResults[_eqResultKey()] = 'incorrect';
     _sfxFail();
-    showResultBanner(false, '✗ ' + (r.reason || 'Not a valid equation.'));
+    var lossDelta = 0;
+    if (window.AMath.elo) lossDelta = window.AMath.elo.applyLoss(_eqSectionId, _eqActivePattern);
+    showResultBanner(false, '✗ ' + (r.reason || 'Not a valid equation.') + (lossDelta ? ' (' + lossDelta + ' rating)' : ''));
   }
 };
 
@@ -2462,11 +2472,14 @@ window.speedSubmit = function() {
     _speedStats.times.push(solveTime);
     if (_speedStats.best === null || solveTime < _speedStats.best) _speedStats.best = solveTime;
     _sfxWin();
-    showSpeedBanner(true, '✓ ' + solveTime + 's');
+    var sEloDelta = 0;
+    if (window.AMath.elo) sEloDelta = window.AMath.elo.applyWin(_speedSectionId, _speedPatternId, solveTime);
+    showSpeedBanner(true, '✓ ' + solveTime + 's' + (sEloDelta ? ' +' + sEloDelta : ''));
     updateSpeedStats();
     setTimeout(drawNextSpeedPuzzle, 600);
   } else {
     _sfxFail();
+    if (window.AMath.elo) window.AMath.elo.applyLoss(_speedSectionId, _speedPatternId);
     showSpeedBanner(false, '✗ ' + (r.reason || 'Invalid'));
     updateSpeedStats();
   }
@@ -2718,7 +2731,9 @@ window.ton4Submit = function() {
         _sfxWin();
         var t4SolveTime = _puzzleTimerSecs;
         stopPuzzleTimer();
-        showTon4Banner(true, '✓ Correct! ' + combo.join(' ') + ' (' + t4SolveTime + 's)');
+        var t4EloDelta = 0;
+        if (window.AMath.elo) t4EloDelta = window.AMath.elo.applyWin('ton4', 'set' + _ton4ActiveSet, t4SolveTime);
+        showTon4Banner(true, '✓ Correct! ' + combo.join(' ') + ' (' + t4SolveTime + 's' + (t4EloDelta ? ', +' + t4EloDelta : '') + ')');
         var solvedCount = 0;
         for (var k = 0; k < _ton4Data.targets.length; k++) {
           if (_ton4Results[_ton4ActiveSet + ':' + k] === 'correct') solvedCount++;
@@ -2744,6 +2759,7 @@ window.ton4Submit = function() {
   if (window.AMath.progress) {
     window.AMath.progress.recordAttempt('ton4', 'set' + _ton4ActiveSet, _ton4ActiveTargetIdx);
   }
+  if (window.AMath.elo) window.AMath.elo.applyLoss('ton4', 'set' + _ton4ActiveSet);
   _sfxFail();
   showTon4Banner(false, isOperatorTarget
     ? '✗ Equation does not include the target operator ' + target
