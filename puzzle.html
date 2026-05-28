@@ -7,7 +7,7 @@
 // This script bumps version stamp every time we deploy. If the SW is stale,
 // it tells the SW to unregister, clears all caches, and reloads.
 (function(){
-  var DEPLOYED_VERSION = 'v56-bookref-2026-05-28';
+  var DEPLOYED_VERSION = 'v57-landscape-2026-05-28';
   var lastVersion = localStorage.getItem('pz_version');
   if (lastVersion !== DEPLOYED_VERSION) {
     localStorage.setItem('pz_version', DEPLOYED_VERSION);
@@ -34,7 +34,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#fbbf24">
 <!-- Same stylesheet as main game -->
-<link rel="stylesheet" href="styles.css?v=20260526pz">
+<link rel="stylesheet" href="styles.css?v=v57-landscape">
 <style>
   /* PUZZLE-SPECIFIC layout chrome (header, meta strip, controls).
      The board, racks, and tiles all use main game styles untouched. */
