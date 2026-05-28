@@ -1,0 +1,9 @@
+{
+  "name": "amath-game",
+  "version": "1.0.0",
+  "description": "A-Math (MathSmith) web board game — regression tests for the core rule engine.",
+  "private": true,
+  "scripts": {
+    "test": "node tests/run.js"
+  }
+}
