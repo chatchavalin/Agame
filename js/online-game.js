@@ -60,6 +60,17 @@
   var _timerInterval = null;     // setInterval handle for local timer-display ticking
   var INITIAL_TIME_MS = 22 * 60 * 1000;  // 22 minutes per side, matches PvA default
 
+  // --- Clock-skew correction (chess clock) ---------------------------------
+  // turnStartedAt is written by ONE client and read by BOTH. If the two
+  // devices' wall clocks disagree, the on-turn timer desyncs. We estimate
+  // each device's offset from server time (NTP-style) and compute all timer
+  // math in "server time" = Date.now() + _clockOffset, so both clients agree.
+  // SAFETY: the correction is only applied when the measured skew is large
+  // (> threshold). Well-synced devices (the common case) keep _clockOffset = 0,
+  // i.e. byte-for-byte the old behavior. Any probe failure also leaves it 0.
+  var _clockOffset = 0;
+  var CLOCK_OFFSET_THRESHOLD_MS = 2000;  // only correct genuinely-skewed clocks
+
   /**
    * Calculate the point penalty for going over time. PvA rule: -10 points
    * per minute (rounded up) of overrun. Returns a positive penalty (caller
@@ -70,6 +81,60 @@
   function calculateTimePenalty(remainingMs) {
     if (remainingMs >= 0) return 0;
     return Math.ceil(Math.abs(remainingMs) / 60000) * 10;
+  }
+
+  /**
+   * "Server time" as best this device can estimate it. Equals the local
+   * clock plus the measured offset (0 unless a large skew was detected).
+   */
+  function serverNow() { return Date.now() + _clockOffset; }
+
+  /**
+   * NTP-style one-shot estimate of (serverTime − localTime) in ms.
+   * Writes a serverTimestamp probe to clockProbes/{uid}, forces a server
+   * read-back, and brackets the commit between two local readings:
+   *   offset ≈ serverMs − (t0 + t1) / 2
+   * Resolves to 0 on any failure (offline, rules deny, missing SDK) so the
+   * caller safely falls back to raw local time.
+   */
+  function estimateClockOffset() {
+    try {
+      if (typeof firebase === 'undefined' || !firebase.firestore) return Promise.resolve(0);
+      var user = firebase.auth && firebase.auth().currentUser;
+      if (!user) return Promise.resolve(0);
+      var ref = firebase.firestore().collection('clockProbes').doc(user.uid);
+      var t0 = Date.now();
+      return ref.set({ ts: firebase.firestore.FieldValue.serverTimestamp() })
+        .then(function () { return ref.get({ source: 'server' }); })
+        .then(function (snap) {
+          var t1 = Date.now();
+          var data = snap && snap.data && snap.data();
+          if (!data || !data.ts || typeof data.ts.toMillis !== 'function') return 0;
+          return data.ts.toMillis() - (t0 + t1) / 2;
+        })
+        .catch(function (e) {
+          console.warn('[online] clock-offset probe failed:', e && e.message);
+          return 0;
+        });
+    } catch (e) {
+      return Promise.resolve(0);
+    }
+  }
+
+  /**
+   * Fire-and-forget: measure the offset and apply it ONLY if the device clock
+   * is genuinely skewed (beyond the threshold). Keeps well-synced devices at
+   * offset 0 so the common case is unchanged.
+   */
+  function initClockOffset() {
+    estimateClockOffset().then(function (offset) {
+      if (Math.abs(offset) > CLOCK_OFFSET_THRESHOLD_MS) {
+        _clockOffset = offset;
+        console.log('[online] clock skew ' + Math.round(offset) + 'ms — applying correction');
+      } else {
+        _clockOffset = 0;
+      }
+    });
   }
 
   /**
@@ -84,7 +149,7 @@
     var hostMs = gs.hostTimeMs != null ? gs.hostTimeMs : INITIAL_TIME_MS;
     var guestMs = gs.guestTimeMs != null ? gs.guestTimeMs : INITIAL_TIME_MS;
     if (gs.gameOver) return { hostMs: hostMs, guestMs: guestMs };
-    var elapsed = gs.turnStartedAt ? Math.max(0, Date.now() - gs.turnStartedAt) : 0;
+    var elapsed = gs.turnStartedAt ? Math.max(0, serverNow() - gs.turnStartedAt) : 0;
     if (gs.turn === 'host') hostMs -= elapsed;
     else if (gs.turn === 'guest') guestMs -= elapsed;
     return { hostMs: hostMs, guestMs: guestMs };
@@ -99,12 +164,12 @@
    *   @returns {object} updated gameState (new object, gs unchanged)
    */
   function applyTurnElapsed(gs, movingRole) {
-    var elapsed = gs.turnStartedAt ? Math.max(0, Date.now() - gs.turnStartedAt) : 0;
+    var elapsed = gs.turnStartedAt ? Math.max(0, serverNow() - gs.turnStartedAt) : 0;
     var timeKey = movingRole + 'TimeMs';
     var currentTime = gs[timeKey] != null ? gs[timeKey] : INITIAL_TIME_MS;
     var out = Object.assign({}, gs);
     out[timeKey] = currentTime - elapsed;
-    out.turnStartedAt = Date.now();
+    out.turnStartedAt = serverNow();
     return out;
   }
 
@@ -208,6 +273,9 @@
       return;
     }
     myUid = user.uid;
+
+    // Measure this device's clock offset vs server (fire-and-forget; gated).
+    initClockOffset();
 
     if (!window.AMath || !window.AMath.onlineRoom) {
       showError('Online module not loaded.');
