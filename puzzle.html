@@ -240,6 +240,34 @@ body.theme-dark .player-area .amath-tile-rack {
     box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.5);
     transform: scale(1.05);
   }
+  .eq-timer {
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    font-weight: 800;
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    padding: 3px 9px;
+    border-radius: 6px;
+    transition: all 0.3s;
+    min-width: 44px;
+    text-align: center;
+  }
+  .eq-timer.warning {
+    color: #fbbf24;
+    background: rgba(251, 191, 36, 0.15);
+    border-color: rgba(251, 191, 36, 0.4);
+  }
+  .eq-timer.danger {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.5);
+    animation: pulse 0.8s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+  }
   .eq-tile.locked {
     background: linear-gradient(145deg, #cbd5e1, #94a3b8);
     color: #475569;
@@ -320,7 +348,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v47</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v48</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -329,7 +357,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
   <!-- Header -->
   <header style="padding:14px 16px 8px;text-align:center;">
-    <h2 style="margin:0 0 4px;font-size:18px;color:#fbbf24;font-weight:800;letter-spacing:0.5px;">🧩 Puzzle Mode<span style="font-size:9px;font-weight:400;vertical-align:super;margin-left:4px;color:#94a3b8;">v47</span></h2>
+    <h2 style="margin:0 0 4px;font-size:18px;color:#fbbf24;font-weight:800;letter-spacing:0.5px;">🧩 Puzzle Mode<span style="font-size:9px;font-weight:400;vertical-align:super;margin-left:4px;color:#94a3b8;">v48</span></h2>
     <p style="margin:0;font-size:11px;color:#94a3b8;">Train your A-Math instincts</p>
   </header>
 
@@ -472,7 +500,10 @@ body.theme-dark .player-area .amath-tile-rack {
 
   <!-- Card -->
   <div class="eq-card">
-    <div class="eq-section-label">Drag tiles to reorder. The order is your equation.</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+      <div class="eq-section-label" style="margin:0;">Drag tiles to reorder. The order is your equation.</div>
+      <div id="eq-timer" class="eq-timer">0:30</div>
+    </div>
     <div id="eq-rack-area" class="eq-rack-strip"></div>
 
     <div id="eq-result" class="eq-result"></div>
@@ -518,7 +549,10 @@ body.theme-dark .player-area .amath-tile-rack {
 
   <!-- Card -->
   <div class="eq-card">
-    <div class="eq-section-label">Drag tiles to reorder. The order is your equation.</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+      <div class="eq-section-label" style="margin:0;">Drag tiles to reorder. The order is your equation.</div>
+      <div id="ton4-timer" class="eq-timer">0:30</div>
+    </div>
     <div id="ton4-rack-area" class="eq-rack-strip"></div>
     <div id="ton4-result" class="eq-result"></div>
     <div class="eq-action-row">
@@ -539,34 +573,34 @@ body.theme-dark .player-area .amath-tile-rack {
 </div>
 
 <!-- Load main game JS modules in dependency order (same as index.html) -->
-<script src="js/constants.js?v=v47-2026-05-27"></script>
-<script src="js/utils.js?v=v47-2026-05-27"></script>
-<script src="js/evaluator.js?v=v47-2026-05-27"></script>
-<script src="js/bag.js?v=v47-2026-05-27"></script>
-<script src="js/rack.js?v=v47-2026-05-27"></script>
-<script src="js/board.js?v=v47-2026-05-27"></script>
-<script src="js/tile-tracker.js?v=v47-2026-05-27"></script>
-<script src="js/scoring.js?v=v47-2026-05-27"></script>
-<script src="js/placement.js?v=v47-2026-05-27"></script>
+<script src="js/constants.js?v=v48-2026-05-27"></script>
+<script src="js/utils.js?v=v48-2026-05-27"></script>
+<script src="js/evaluator.js?v=v48-2026-05-27"></script>
+<script src="js/bag.js?v=v48-2026-05-27"></script>
+<script src="js/rack.js?v=v48-2026-05-27"></script>
+<script src="js/board.js?v=v48-2026-05-27"></script>
+<script src="js/tile-tracker.js?v=v48-2026-05-27"></script>
+<script src="js/scoring.js?v=v48-2026-05-27"></script>
+<script src="js/placement.js?v=v48-2026-05-27"></script>
 <!-- AI modules for the in-browser puzzle generator -->
-<script src="js/ai-x9.js?v=v47-2026-05-27"></script>
-<script src="js/ai-x4.js?v=v47-2026-05-27"></script>
-<script src="js/ai-bingo-fast.js?v=v47-2026-05-27"></script>
-<script src="js/ai-bingo-grammar.js?v=v47-2026-05-27"></script>
-<script src="js/ai-yoyo.js?v=v47-2026-05-27"></script>
-<script src="js/ai-patterns-data.js?v=v47-2026-05-27"></script>
-<script src="js/ai-patterns-engine.js?v=v47-2026-05-27"></script>
-<script src="js/ai-swap.js?v=v47-2026-05-27"></script>
-<script src="js/ai-swap-brain2.js?v=v47-2026-05-27"></script>
-<script src="js/ai-player.js?v=v47-2026-05-27"></script>
-<script src="js/puzzle-generator.js?v=v47-2026-05-27"></script>
-<script src="js/book-puzzle-generator.js?v=v47-2026-05-27"></script>
-<script src="js/ton4-solver.js?v=v47-2026-05-27"></script>
-<script src="js/sounds.js?v=v47-2026-05-27"></script>
-<script src="js/progress.js?v=v47-2026-05-27"></script>
-<script src="js/settings.js?v=v47-2026-05-27"></script>
-<script src="js/ui.js?v=v47-2026-05-27"></script>
-<script src="js/interactions.js?v=v47-2026-05-27"></script>
+<script src="js/ai-x9.js?v=v48-2026-05-27"></script>
+<script src="js/ai-x4.js?v=v48-2026-05-27"></script>
+<script src="js/ai-bingo-fast.js?v=v48-2026-05-27"></script>
+<script src="js/ai-bingo-grammar.js?v=v48-2026-05-27"></script>
+<script src="js/ai-yoyo.js?v=v48-2026-05-27"></script>
+<script src="js/ai-patterns-data.js?v=v48-2026-05-27"></script>
+<script src="js/ai-patterns-engine.js?v=v48-2026-05-27"></script>
+<script src="js/ai-swap.js?v=v48-2026-05-27"></script>
+<script src="js/ai-swap-brain2.js?v=v48-2026-05-27"></script>
+<script src="js/ai-player.js?v=v48-2026-05-27"></script>
+<script src="js/puzzle-generator.js?v=v48-2026-05-27"></script>
+<script src="js/book-puzzle-generator.js?v=v48-2026-05-27"></script>
+<script src="js/ton4-solver.js?v=v48-2026-05-27"></script>
+<script src="js/sounds.js?v=v48-2026-05-27"></script>
+<script src="js/progress.js?v=v48-2026-05-27"></script>
+<script src="js/settings.js?v=v48-2026-05-27"></script>
+<script src="js/ui.js?v=v48-2026-05-27"></script>
+<script src="js/interactions.js?v=v48-2026-05-27"></script>
 
 <script>
 (function(){
@@ -1529,6 +1563,51 @@ var _eqResults = {};            // patternId+idx → 'correct' | 'incorrect'
 var _eqDragTileId = null;       // id of tile being dragged
 var _eqSelectedTileId = null;   // id of tile selected by single tap (click-to-place mode)
 
+// === Per-puzzle timer === (soft — turns red, doesn't auto-fail per Q2 spec)
+var _puzzleTimer = null;        // setInterval id
+var _puzzleTimerSecs = 0;       // elapsed seconds
+var _puzzleTimerLimit = 30;     // limit in seconds (default 30)
+var _puzzleTimerTargetEl = null; // element to update (#eq-timer or #ton4-timer)
+
+function startPuzzleTimer(elementId, limit) {
+  stopPuzzleTimer();
+  _puzzleTimerLimit = (typeof limit === 'number' && limit > 0) ? limit : 30;
+  _puzzleTimerSecs = 0;
+  _puzzleTimerTargetEl = document.getElementById(elementId);
+  updatePuzzleTimer();
+  _puzzleTimer = setInterval(function(){
+    _puzzleTimerSecs++;
+    updatePuzzleTimer();
+  }, 1000);
+}
+
+function stopPuzzleTimer() {
+  if (_puzzleTimer) {
+    clearInterval(_puzzleTimer);
+    _puzzleTimer = null;
+  }
+}
+
+function updatePuzzleTimer() {
+  if (!_puzzleTimerTargetEl) return;
+  var remaining = Math.max(0, _puzzleTimerLimit - _puzzleTimerSecs);
+  var mins = Math.floor(remaining / 60);
+  var secs = remaining % 60;
+  // If we've exceeded the limit, show elapsed past in red
+  if (remaining === 0) {
+    var overtime = _puzzleTimerSecs - _puzzleTimerLimit;
+    var omins = Math.floor(overtime / 60);
+    var osecs = overtime % 60;
+    _puzzleTimerTargetEl.textContent = '+' + omins + ':' + String(osecs).padStart(2, '0');
+  } else {
+    _puzzleTimerTargetEl.textContent = mins + ':' + String(secs).padStart(2, '0');
+  }
+  // Color escalation
+  _puzzleTimerTargetEl.classList.remove('warning', 'danger');
+  if (remaining === 0) _puzzleTimerTargetEl.classList.add('danger');
+  else if (remaining <= 10) _puzzleTimerTargetEl.classList.add('warning');
+}
+
 // Sound helpers — safe no-ops when sounds.js isn't loaded or sound is off.
 function _sfxClick() { try { window.AMath && window.AMath.sounds && window.AMath.sounds.tileClick(); } catch(e) {} }
 function _sfxPlace() { try { window.AMath && window.AMath.sounds && window.AMath.sounds.tilePlace(); } catch(e) {} }
@@ -1584,6 +1663,7 @@ window.openEquationPractice = async function(sid, cache) {
 };
 
 window.closeEquationPractice = function() {
+  stopPuzzleTimer();
   document.getElementById('screen-equation').style.display = 'none';
   document.getElementById('screen-select').style.display = 'block';
   initBookSections();
@@ -1666,6 +1746,9 @@ function renderCurrentProblem() {
 
   document.getElementById('eq-prev').disabled = (_eqActiveIdx === 0);
   document.getElementById('eq-next').disabled = (_eqActiveIdx === ps.length - 1);
+
+  // Start timer for this puzzle (30s default)
+  startPuzzleTimer('eq-timer', 30);
 }
 
 function renderEqRack() {
@@ -1945,8 +2028,10 @@ window.eqSubmit = function() {
   }
   if (r.valid) {
     _eqResults[_eqResultKey()] = 'correct';
+    var solveTime = _puzzleTimerSecs;  // captured for later ELO/PB tracking
     _sfxWin();
-    showResultBanner(true, '✓ Correct! ' + r.canonical.join(' '));
+    stopPuzzleTimer();
+    showResultBanner(true, '✓ Correct! ' + r.canonical.join(' ') + ' (' + solveTime + 's)');
     // Persist solved state
     if (window.AMath.progress) {
       window.AMath.progress.markSolved(_eqSectionId, _eqActivePattern, _eqActiveIdx);
@@ -2079,6 +2164,7 @@ window.openTon4 = async function() {
 };
 
 window.closeTon4 = function() {
+  stopPuzzleTimer();
   document.getElementById('screen-ton4').style.display = 'none';
   document.getElementById('screen-select').style.display = 'block';
   initBookSections();
@@ -2135,6 +2221,8 @@ function renderTon4Problem() {
 
   document.getElementById('ton4-prev').disabled = (_ton4ActiveTargetIdx === 0);
   document.getElementById('ton4-next').disabled = (_ton4ActiveTargetIdx === _ton4Data.targets.length - 1);
+
+  startPuzzleTimer('ton4-timer', 30);
 }
 
 function renderTon4Rack() {
@@ -2197,7 +2285,9 @@ window.ton4Submit = function() {
           window.AMath.progress.markSolved('ton4', 'set' + _ton4ActiveSet, _ton4ActiveTargetIdx);
         }
         _sfxWin();
-        showTon4Banner(true, '✓ Correct! ' + combo.join(' '));
+        var t4SolveTime = _puzzleTimerSecs;
+        stopPuzzleTimer();
+        showTon4Banner(true, '✓ Correct! ' + combo.join(' ') + ' (' + t4SolveTime + 's)');
         var solvedCount = 0;
         for (var k = 0; k < _ton4Data.targets.length; k++) {
           if (_ton4Results[_ton4ActiveSet + ':' + k] === 'correct') solvedCount++;
