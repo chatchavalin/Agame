@@ -7,7 +7,7 @@
 // This script bumps version stamp every time we deploy. If the SW is stale,
 // it tells the SW to unregister, clears all caches, and reloads.
 (function(){
-  var DEPLOYED_VERSION = 'v66-speed2min-2026-05-28';
+  var DEPLOYED_VERSION = 'v67-speedcard-2026-05-28';
   var lastVersion = localStorage.getItem('pz_version');
   if (lastVersion !== DEPLOYED_VERSION) {
     localStorage.setItem('pz_version', DEPLOYED_VERSION);
@@ -430,6 +430,18 @@ body.theme-dark .player-area .amath-tile-rack {
     </div>
   </div>
 
+  <!-- Speed Drill card — standalone quick-start, separate from Daily Challenge -->
+  <div id="speed-card" style="margin:8px 12px;padding:12px;background:linear-gradient(135deg,#dc2626,#ef4444);border-radius:12px;cursor:pointer;" onclick="openSpeedPicker()">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div style="font-size:24px;">⚡</div>
+      <div style="flex:1;">
+        <div style="font-size:10px;color:#fee2e2;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Speed Drill</div>
+        <div style="font-size:13px;color:#fff;font-weight:700;">2-minute sprint — solve as many as you can</div>
+      </div>
+      <div style="font-size:11px;color:#fff;font-weight:700;background:rgba(255,255,255,0.2);padding:3px 8px;border-radius:8px;">Start</div>
+    </div>
+  </div>
+
   <!-- Tournament Prep dashboard -->
   <section style="margin:8px 12px;padding:14px;background:linear-gradient(135deg,#0c4a6e,#075985);border-radius:14px;border:1px solid #0ea5e9;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
@@ -495,6 +507,16 @@ body.theme-dark .player-area .amath-tile-rack {
       <button onclick="saveTournamentDate()" class="eq-btn-primary" style="flex:1;">Save</button>
     </div>
     <button onclick="clearTournamentDate()" style="width:100%;margin-top:8px;background:none;border:none;color:#f87171;font-size:11px;cursor:pointer;font-family:inherit;text-decoration:underline;">Clear current tournament</button>
+  </div>
+</div>
+
+<!-- SPEED DRILL — SET PICKER -->
+<div id="speed-picker-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.95);z-index:10000;padding:20px;">
+  <div style="max-width:380px;margin:80px auto;background:linear-gradient(145deg,#1e293b,#0f172a);border:1px solid #ef4444;border-radius:14px;padding:20px;">
+    <h2 style="font-size:16px;color:#fca5a5;margin:0 0 4px;">⚡ Speed Drill</h2>
+    <p style="font-size:11px;color:#94a3b8;margin:0 0 14px;">2 minutes — solve as many as you can. Pick a set:</p>
+    <div id="speed-picker-sets"><!-- buttons injected by openSpeedPicker() --></div>
+    <button onclick="closeSpeedPicker()" class="eq-btn-secondary" style="width:100%;margin-top:6px;">Cancel</button>
   </div>
 </div>
 
@@ -627,7 +649,7 @@ body.theme-dark .player-area .amath-tile-rack {
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;">
     <button onclick="closeEquationPractice()" class="eq-btn-back">← Back</button>
     <span id="eq-title" style="font-size:14px;font-weight:700;color:#fbbf24;text-align:center;flex:1;">Equation Practice</span>
-    <button onclick="startSpeedRound()" id="eq-speed-btn" class="eq-btn-back" style="background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff;font-weight:700;">⚡ Speed</button>
+    <button onclick="startSpeedRoundBtn()" id="eq-speed-btn" class="eq-btn-back" style="background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff;font-weight:700;">⚡ Speed</button>
   </div>
 
   <!-- Pattern dropdown (only shown if section has multiple patterns) -->
@@ -2525,6 +2547,78 @@ var _speedCurrentOriginal = []; // for Reset on skip-only
 var _speedCurrentPuzzleStartT = 0;
 var _speedDragTileId = null;
 var _speedSelectedTileId = null;
+var _speedStandalone = false;   // true when launched from the select-screen card
+
+// Standalone Speed Drill entry (from the select-screen card). Pick a set,
+// then launch the 2-minute drill on that set's first pattern.
+window.openSpeedPicker = async function() {
+  if (!window.AMath._bookData && window.AMath.bookGenerator) {
+    await window.AMath.bookGenerator.loadBookData();
+  }
+  var data = window.AMath._bookData || {};
+  var titleMap = {
+    ton1: 'Set 1 — 8-Tile Bingo',
+    ton2: 'Set 2 — 9-Tile Patterns',
+    ton3: 'Set 3 — 9-Tile Open',
+  };
+  var html = '';
+  ['ton1', 'ton2', 'ton3'].forEach(function(sid){
+    if (!data[sid]) return;
+    html += '<button onclick="startSpeedForSection(\'' + sid + '\')" ' +
+      'style="width:100%;margin-bottom:8px;background:#dc2626;color:#fff;border:none;' +
+      'padding:11px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">' +
+      '⚡ ' + (titleMap[sid] || sid) + '</button>';
+  });
+  document.getElementById('speed-picker-sets').innerHTML =
+    html || '<p style="color:#94a3b8;font-size:12px;">No sets available yet.</p>';
+  document.getElementById('speed-picker-modal').style.display = 'block';
+};
+
+window.closeSpeedPicker = function() {
+  document.getElementById('speed-picker-modal').style.display = 'none';
+};
+
+window.startSpeedForSection = async function(sid) {
+  closeSpeedPicker();
+  if (!window.AMath._bookData && window.AMath.bookGenerator) {
+    await window.AMath.bookGenerator.loadBookData();
+  }
+  var data = window.AMath._bookData;
+  if (!data || !data[sid]) { alert('That set is not available yet.'); return; }
+  var section = data[sid];
+  var puzzles = [];
+  (section.patterns || []).forEach(function(pat){
+    (pat.puzzles || []).forEach(function(pz){
+      puzzles.push({ sectionId: sid, patternId: pat.id, patternLabel: pat.label,
+                     tokens: pz.rack.slice(), hasSolution: true });
+    });
+  });
+  if (!puzzles.length) { alert('No puzzles in this set.'); return; }
+  // Set up the equation-practice state (patterns, active pattern = first) — the
+  // speed round reads _eqActivePattern. The practice screen sits hidden behind
+  // the speed overlay; on finish we return straight to the select screen.
+  await openEquationPractice(sid, puzzles);
+  _speedStandalone = true;
+  startSpeedRound();
+};
+
+// Called by the in-practice ⚡ button — same drill, but NOT standalone (on
+// finish it returns to the practice screen, not the select screen).
+window.startSpeedRoundBtn = function() {
+  _speedStandalone = false;
+  startSpeedRound();
+};
+
+// Return to the puzzle select screen after a standalone speed drill, tearing
+// down the practice screen that was opened behind the overlay.
+function returnToSelectFromSpeed() {
+  document.getElementById('speed-round-overlay').style.display = 'none';
+  document.getElementById('speed-results-overlay').style.display = 'none';
+  document.getElementById('screen-equation').style.display = 'none';
+  document.getElementById('screen-select').style.display = 'block';
+  if (typeof initBookSections === 'function') initBookSections();
+  _speedStandalone = false;
+}
 
 window.startSpeedRound = function() {
   // Build from the CURRENT _eqActivePattern (the player is already in a pattern)
@@ -2863,10 +2957,12 @@ function endSpeedRound() {
 window.cancelSpeedRound = function() {
   if (_speedTimer) { clearInterval(_speedTimer); _speedTimer = null; }
   document.getElementById('speed-round-overlay').style.display = 'none';
+  if (_speedStandalone) returnToSelectFromSpeed();
 };
 
 window.closeSpeedResults = function() {
   document.getElementById('speed-results-overlay').style.display = 'none';
+  if (_speedStandalone) returnToSelectFromSpeed();
   // also refresh stats on main page in case user goes back
 };
 
