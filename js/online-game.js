@@ -586,6 +586,18 @@
       UI.renderScore(_uiParts.opponentScoreBox, oppName, localSession.aiScore);
     }
 
+    // Tile tracker — online PvP loaded the module but never mounted it. Render
+    // it into the inline panel buildGameLayout created (same element PvA uses
+    // on mobile). Online has no desktop side panel, so a page-scoped CSS rule
+    // in online.html keeps this panel visible at all widths.
+    if (window.AMath.tileTracker) {
+      var trackerPanel = document.getElementById('tile-tracker-panel');
+      if (trackerPanel && localSession && localSession.board && localSession.bag) {
+        try { window.AMath.tileTracker.render(trackerPanel, localSession); }
+        catch (e) { console.warn('[online] tile tracker render failed', e); }
+      }
+    }
+
     // Render timers from current state
     renderTimers();
     // Start the 1Hz ticker so the active player's timer counts down. Idempotent.

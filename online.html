@@ -75,6 +75,16 @@
       pointer-events: none;
     }
     .copy-feedback.show { opacity: 1; }
+
+    /* Online PvP has no desktop 3-column side panel, so the shared rule that
+       hides #tile-tracker-panel on wide screens (expecting a side panel that
+       doesn't exist here) would leave online players with no tracker on
+       desktop. Show the inline panel at all widths on this page only. */
+    #tile-tracker-panel {
+      display: block;
+      margin: 10px auto 0;
+      max-width: 700px;
+    }
   </style>
 </head>
 <body>
@@ -165,7 +175,7 @@
   <script src="js/tile-tracker.js?v=20260526m"></script>
   <script src="js/score-sheet.js?v=20260526m"></script>
   <script src="js/challenge.js?v=20260526m"></script>
-  <script src="js/online-game.js?v=20260526m"></script>
+  <script src="js/online-game.js?v=v59-tracker"></script>
   <script>
     var roomCode = new URLSearchParams(window.location.search).get('room');
     var role = new URLSearchParams(window.location.search).get('role');
