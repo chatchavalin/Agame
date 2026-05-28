@@ -63,7 +63,7 @@
   function tileSetName() {
     var t = 'prathom';
     try { if (window.AMath && window.AMath.settings && window.AMath.settings.get) t = window.AMath.settings.get('tileSet') || 'prathom'; } catch (e) {}
-    return t === 'mathayom' ? 'มัธยม / Mathayom (100-tile)' : 'ประถม / Prathom (70-tile)';
+    return t === 'mathayom' ? 'Mathayom (Secondary, 100-tile)' : 'Prathom (Elementary, 70-tile)';
   }
   function buildPrompt() {
     var inv = activeInventory();

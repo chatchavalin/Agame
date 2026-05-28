@@ -519,7 +519,7 @@
     byId('btn-commit').addEventListener('click', commitPlay);
     byId('btn-clear-tent').addEventListener('click', clearTentative);
 
-    // Tile-set selector (ประถม/มัธยม) — drives the active inventory globally.
+    // Tile-set selector (Prathom/Mathayom) — drives the active inventory globally.
     var tsel = byId('tileset-select');
     if (tsel) {
       try {
