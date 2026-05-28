@@ -117,26 +117,36 @@
     });
   }
 
+  // ---- choose transport: Firebase AI Logic (preferred) or raw key fallback --
+  function analyze(base64) {
+    if (window.AMath && typeof window.AMath.geminiScan === 'function') {
+      return window.AMath.geminiScan(base64, buildPrompt());   // via Firebase proxy, no key, no CORS
+    }
+    var key = getKey();
+    if (!key) return Promise.reject(new Error('NO_BACKEND'));
+    return callGemini(base64, key);                            // raw fallback (may hit CORS)
+  }
+
   // ---- orchestration --------------------------------------------------------
   function onPhoto(file) {
-    var key = getKey();
-    if (!key) { status('❌ Add your Gemini API key first (field above).', '#f87171'); return; }
     if (!file) return;
     status('⏳ Reading photo…');
     fileToBase64(file, function (base64) {
       if (!base64) { status('❌ Could not read that image.', '#f87171'); return; }
-      status('⏳ Analyzing board with Gemini… (this can take ~10s)');
-      callGemini(base64, key).then(function (text) {
+      status('⏳ Analyzing board… (this can take ~10s)');
+      analyze(base64).then(function (text) {
         var json = extractJson(text);
-        if (!json) { status('❌ Gemini did not return readable board data. Try a flatter, well-lit photo.', '#f87171'); return; }
+        if (!json) { status('❌ The model did not return readable board data. Try a flatter, well-lit photo.', '#f87171'); return; }
         var ok = window.AMath.scanApply ? window.AMath.scanApply(json, 'Scanned photo') : false;
         if (ok) status('✅ Scanned. Check the grid below and fix any misread tiles.', '#34d399');
         else status('⚠️ Scanned, but some cells need fixing — see the message below the grid.', '#fbbf24');
       }).catch(function (err) {
         var m = String(err && err.message || err);
-        if (/api key|API_KEY|invalid|permission/i.test(m)) m = 'Key rejected — check your Gemini API key.';
+        if (m === 'NO_BACKEND') m = 'Set up Firebase AI Logic in the console (recommended) or paste a Gemini key above.';
+        else if (/api key|API_KEY|invalid|permission|PERMISSION/i.test(m)) m = 'Access rejected — check your Firebase AI Logic setup (or key).';
         else if (/quota|rate|RESOURCE_EXHAUSTED/i.test(m)) m = 'Free quota hit — wait a bit and try again.';
-        else if (/failed to fetch|networkerror/i.test(m)) m = 'Network/CORS error reaching Gemini.';
+        else if (/failed to fetch|networkerror|CORS/i.test(m)) m = 'Network error reaching the AI service.';
+        else if (/app.?check|APP_CHECK/i.test(m)) m = 'Blocked by App Check — disable enforcement for now, or register this domain.';
         status('❌ ' + m, '#f87171');
       });
     });
