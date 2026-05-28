@@ -376,7 +376,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v52</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v53</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -385,7 +385,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
   <!-- Header -->
   <header style="padding:14px 16px 8px;text-align:center;">
-    <h2 style="margin:0 0 4px;font-size:18px;color:#fbbf24;font-weight:800;letter-spacing:0.5px;">🧩 Puzzle Mode<span style="font-size:9px;font-weight:400;vertical-align:super;margin-left:4px;color:#94a3b8;">v52</span></h2>
+    <h2 style="margin:0 0 4px;font-size:18px;color:#fbbf24;font-weight:800;letter-spacing:0.5px;">🧩 Puzzle Mode<span style="font-size:9px;font-weight:400;vertical-align:super;margin-left:4px;color:#94a3b8;">v53</span></h2>
     <p style="margin:0;font-size:11px;color:#94a3b8;">Train your A-Math instincts</p>
   </header>
 
@@ -423,6 +423,17 @@ body.theme-dark .player-area .amath-tile-rack {
       <div id="daily-status" style="font-size:11px;color:#fff;font-weight:700;background:rgba(255,255,255,0.2);padding:3px 8px;border-radius:8px;">Play</div>
     </div>
   </div>
+
+  <!-- Tournament Prep dashboard -->
+  <section style="margin:8px 12px;padding:14px;background:linear-gradient(135deg,#0c4a6e,#075985);border-radius:14px;border:1px solid #0ea5e9;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <h3 style="margin:0;font-size:13px;color:#7dd3fc;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">🏆 Tournament Prep</h3>
+      <button onclick="openTournamentSetup()" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:4px 10px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">⚙ Set date</button>
+    </div>
+    <div id="tournament-body">
+      <!-- populated by refreshTournamentCard() -->
+    </div>
+  </section>
 
   <!-- Practice Sets (includes Set 5 — Board Puzzles) -->
   <section style="margin:12px 12px 0;padding:14px;background:linear-gradient(145deg,#1e293b,#0f172a);border-radius:14px;border:1px solid #334155;">
@@ -464,6 +475,22 @@ body.theme-dark .player-area .amath-tile-rack {
 
 </div>
 
+
+<!-- TOURNAMENT DATE SETUP MODAL -->
+<div id="tournament-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.95);z-index:10000;padding:20px;">
+  <div style="max-width:380px;margin:80px auto;background:linear-gradient(145deg,#1e293b,#0f172a);border:1px solid #0ea5e9;border-radius:14px;padding:20px;">
+    <h2 style="font-size:16px;color:#7dd3fc;margin:0 0 12px;">🏆 Tournament Date</h2>
+    <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px;">Tournament name (optional)</label>
+    <input type="text" id="tournament-name-input" placeholder="e.g. EduPLOYS Championship" style="width:100%;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:7px;padding:9px;font-size:13px;font-family:inherit;margin-bottom:12px;box-sizing:border-box;">
+    <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px;">Date</label>
+    <input type="date" id="tournament-date-input" style="width:100%;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:7px;padding:9px;font-size:13px;font-family:inherit;margin-bottom:16px;box-sizing:border-box;">
+    <div style="display:flex;gap:8px;">
+      <button onclick="closeTournamentSetup()" class="eq-btn-secondary" style="flex:1;">Cancel</button>
+      <button onclick="saveTournamentDate()" class="eq-btn-primary" style="flex:1;">Save</button>
+    </div>
+    <button onclick="clearTournamentDate()" style="width:100%;margin-top:8px;background:none;border:none;color:#f87171;font-size:11px;cursor:pointer;font-family:inherit;text-decoration:underline;">Clear current tournament</button>
+  </div>
+</div>
 
 <!-- SPEED ROUND OVERLAY -->
 <div id="speed-round-overlay" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.96);z-index:9999;overflow-y:auto;padding:20px;">
@@ -684,34 +711,34 @@ body.theme-dark .player-area .amath-tile-rack {
 </div>
 
 <!-- Load main game JS modules in dependency order (same as index.html) -->
-<script src="js/constants.js?v=v52-2026-05-27"></script>
-<script src="js/utils.js?v=v52-2026-05-27"></script>
-<script src="js/evaluator.js?v=v52-2026-05-27"></script>
-<script src="js/bag.js?v=v52-2026-05-27"></script>
-<script src="js/rack.js?v=v52-2026-05-27"></script>
-<script src="js/board.js?v=v52-2026-05-27"></script>
-<script src="js/tile-tracker.js?v=v52-2026-05-27"></script>
-<script src="js/scoring.js?v=v52-2026-05-27"></script>
-<script src="js/placement.js?v=v52-2026-05-27"></script>
+<script src="js/constants.js?v=v53-2026-05-27"></script>
+<script src="js/utils.js?v=v53-2026-05-27"></script>
+<script src="js/evaluator.js?v=v53-2026-05-27"></script>
+<script src="js/bag.js?v=v53-2026-05-27"></script>
+<script src="js/rack.js?v=v53-2026-05-27"></script>
+<script src="js/board.js?v=v53-2026-05-27"></script>
+<script src="js/tile-tracker.js?v=v53-2026-05-27"></script>
+<script src="js/scoring.js?v=v53-2026-05-27"></script>
+<script src="js/placement.js?v=v53-2026-05-27"></script>
 <!-- AI modules for the in-browser puzzle generator -->
-<script src="js/ai-x9.js?v=v52-2026-05-27"></script>
-<script src="js/ai-x4.js?v=v52-2026-05-27"></script>
-<script src="js/ai-bingo-fast.js?v=v52-2026-05-27"></script>
-<script src="js/ai-bingo-grammar.js?v=v52-2026-05-27"></script>
-<script src="js/ai-yoyo.js?v=v52-2026-05-27"></script>
-<script src="js/ai-patterns-data.js?v=v52-2026-05-27"></script>
-<script src="js/ai-patterns-engine.js?v=v52-2026-05-27"></script>
-<script src="js/ai-swap.js?v=v52-2026-05-27"></script>
-<script src="js/ai-swap-brain2.js?v=v52-2026-05-27"></script>
-<script src="js/ai-player.js?v=v52-2026-05-27"></script>
-<script src="js/puzzle-generator.js?v=v52-2026-05-27"></script>
-<script src="js/book-puzzle-generator.js?v=v52-2026-05-27"></script>
-<script src="js/ton4-solver.js?v=v52-2026-05-27"></script>
-<script src="js/sounds.js?v=v52-2026-05-27"></script>
-<script src="js/progress.js?v=v52-2026-05-27"></script>
-<script src="js/settings.js?v=v52-2026-05-27"></script>
-<script src="js/ui.js?v=v52-2026-05-27"></script>
-<script src="js/interactions.js?v=v52-2026-05-27"></script>
+<script src="js/ai-x9.js?v=v53-2026-05-27"></script>
+<script src="js/ai-x4.js?v=v53-2026-05-27"></script>
+<script src="js/ai-bingo-fast.js?v=v53-2026-05-27"></script>
+<script src="js/ai-bingo-grammar.js?v=v53-2026-05-27"></script>
+<script src="js/ai-yoyo.js?v=v53-2026-05-27"></script>
+<script src="js/ai-patterns-data.js?v=v53-2026-05-27"></script>
+<script src="js/ai-patterns-engine.js?v=v53-2026-05-27"></script>
+<script src="js/ai-swap.js?v=v53-2026-05-27"></script>
+<script src="js/ai-swap-brain2.js?v=v53-2026-05-27"></script>
+<script src="js/ai-player.js?v=v53-2026-05-27"></script>
+<script src="js/puzzle-generator.js?v=v53-2026-05-27"></script>
+<script src="js/book-puzzle-generator.js?v=v53-2026-05-27"></script>
+<script src="js/ton4-solver.js?v=v53-2026-05-27"></script>
+<script src="js/sounds.js?v=v53-2026-05-27"></script>
+<script src="js/progress.js?v=v53-2026-05-27"></script>
+<script src="js/settings.js?v=v53-2026-05-27"></script>
+<script src="js/ui.js?v=v53-2026-05-27"></script>
+<script src="js/interactions.js?v=v53-2026-05-27"></script>
 
 <script>
 (function(){
@@ -1429,8 +1456,9 @@ function initBookSections() {
     container.innerHTML = '';
     const prog = window.AMath.progress;
 
-    // Show daily challenge card
+    // Show daily challenge card + tournament prep
     refreshDailyCard(data);
+    refreshTournamentCard(data);
 
     ['ton1','ton2','ton3','ton4'].forEach(function(sid){
       const section = data[sid];
@@ -1567,6 +1595,123 @@ function refreshDailyCard(bookData) {
     statusEl.style.background = solved ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.2)';
   }
 }
+
+function refreshTournamentCard(bookData) {
+  const tour = window.AMath && window.AMath.tournament;
+  const body = document.getElementById('tournament-body');
+  if (!tour || !body) return;
+
+  tour.checkExpiry();  // auto-archive past dates
+
+  const days = tour.daysUntil();
+  const name = tour.getName();
+
+  if (days === null) {
+    body.innerHTML = '<p style="margin:0;font-size:12px;color:#bae6fd;line-height:1.5;">No tournament set. Tap "Set date" to start a countdown and get a tailored prep plan based on your weak spots.</p>';
+    return;
+  }
+
+  const plan = tour.dailyPlan(bookData);
+  const intensityColors = { high: '#ef4444', medium: '#fbbf24', normal: '#10b981' };
+  const intensityLabels = { high: '🔥 HIGH INTENSITY', medium: '⚡ MEDIUM', normal: '✓ STEADY' };
+
+  let html = '';
+  // Countdown
+  html += '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px;">';
+  html += '<span style="font-size:32px;font-weight:800;color:#fff;line-height:1;">' + (days === 0 ? 'TODAY' : days) + '</span>';
+  if (days > 0) html += '<span style="font-size:13px;color:#bae6fd;">day' + (days === 1 ? '' : 's') + ' to go</span>';
+  html += '</div>';
+  if (name) html += '<div style="font-size:12px;color:#7dd3fc;font-weight:600;margin-bottom:8px;">' + name + '</div>';
+
+  // Intensity + message
+  html += '<div style="font-size:10px;font-weight:700;color:' + intensityColors[plan.intensity] + ';margin-bottom:4px;">' + intensityLabels[plan.intensity] + '</div>';
+  html += '<p style="margin:0 0 10px;font-size:11px;color:#bae6fd;line-height:1.5;">' + plan.message + '</p>';
+
+  // Weak spots
+  const touched = plan.patterns.filter(function(p){ return p.touched; });
+  if (touched.length > 0) {
+    html += '<div style="font-size:9px;color:#7dd3fc;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;font-weight:700;">Train these weak spots</div>';
+    touched.forEach(function(p){
+      const secLabel = { 'ton1':'Set 1', 'ton2':'Set 2', 'ton3':'Set 3' }[p.sid] || p.sid;
+      html += '<div onclick="drillWeakSpot(\'' + p.sid + '\',\'' + p.pid + '\')" style="background:rgba(255,255,255,0.08);border-radius:8px;padding:8px 10px;margin-bottom:5px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">';
+      html += '<div><div style="font-size:12px;color:#fff;font-weight:600;">' + secLabel + ' · ' + p.label + '</div>';
+      html += '<div style="font-size:9px;color:#bae6fd;margin-top:1px;">Rating ' + p.rating + ' · ' + p.accuracy + '% acc';
+      if (p.avgTime > 0) html += ' · ' + p.avgTime + 's avg';
+      html += '</div></div>';
+      html += '<span style="font-size:14px;">⚡</span>';
+      html += '</div>';
+    });
+  } else {
+    html += '<p style="margin:0;font-size:11px;color:#bae6fd;line-height:1.5;font-style:italic;">Play some puzzles to reveal your weak spots — they\'ll appear here with a one-tap drill.</p>';
+  }
+
+  body.innerHTML = html;
+}
+
+window.openTournamentSetup = function() {
+  const tour = window.AMath && window.AMath.tournament;
+  if (tour) {
+    var existing = tour.getDate();
+    var name = tour.getName();
+    if (existing) document.getElementById('tournament-date-input').value = existing;
+    if (name) document.getElementById('tournament-name-input').value = name;
+  }
+  document.getElementById('tournament-modal').style.display = 'block';
+};
+
+window.closeTournamentSetup = function() {
+  document.getElementById('tournament-modal').style.display = 'none';
+};
+
+window.saveTournamentDate = function() {
+  const tour = window.AMath && window.AMath.tournament;
+  if (!tour) return;
+  const date = document.getElementById('tournament-date-input').value;
+  const name = document.getElementById('tournament-name-input').value;
+  if (!date) { alert('Please pick a date.'); return; }
+  tour.setDate(date, name);
+  document.getElementById('tournament-modal').style.display = 'none';
+  // Refresh the card
+  if (window.AMath._bookData) refreshTournamentCard(window.AMath._bookData);
+};
+
+window.clearTournamentDate = function() {
+  const tour = window.AMath && window.AMath.tournament;
+  if (!tour) return;
+  if (!confirm('Clear the current tournament date?')) return;
+  tour.clear();
+  document.getElementById('tournament-modal').style.display = 'none';
+  if (window.AMath._bookData) refreshTournamentCard(window.AMath._bookData);
+};
+
+// One-tap drill: jump into a Speed Round on the weak pattern
+window.drillWeakSpot = async function(sid, pid) {
+  if (!window.AMath._bookData && window.AMath.bookGenerator) {
+    await window.AMath.bookGenerator.loadBookData();
+  }
+  const bookData = window.AMath._bookData;
+  if (!bookData || !bookData[sid]) return;
+  // Open the section in equation practice, set the pattern, then launch speed round
+  const section = bookData[sid];
+  const puzzles = [];
+  (section.patterns || []).forEach(function(pat){
+    (pat.puzzles || []).forEach(function(pz){
+      puzzles.push({
+        sectionId: sid, patternId: pat.id, patternLabel: pat.label,
+        tokens: pz.rack.slice(), hasSolution: true,
+      });
+    });
+  });
+  openEquationPractice(sid, puzzles).then(function(){
+    setTimeout(function(){
+      _eqActivePattern = pid;
+      var sel = document.getElementById('eq-pattern-select');
+      if (sel) sel.value = pid;
+      // Launch speed round directly on this pattern
+      startSpeedRound();
+    }, 60);
+  });
+};
 
 window.openDailyChallenge = async function() {
   const prog = window.AMath && window.AMath.progress;
