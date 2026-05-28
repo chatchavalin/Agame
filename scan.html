@@ -81,6 +81,10 @@
           <button class="btn btn-amber" id="btn-photo">📷 Take / choose photo</button>
           <input id="photo-input" type="file" accept="image/*" style="display:none;">
         </div>
+        <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:#cbd5e1; cursor:pointer;">
+          <input id="merge-scan" type="checkbox" style="width:18px; height:18px;">
+          Merge into current board (fill empty squares, keep what's there) — scan again to fill a missed row/column
+        </label>
         <div id="camera-status"></div>
         <details style="margin-top:10px;">
           <summary style="font-size:12px;color:#64748b;cursor:pointer;">Fallback: paste a Gemini API key</summary>
@@ -140,7 +144,7 @@
   <script src="js/settings.js?v=v54-2026-05-27"></script>
   <script src="js/ui.js?v=v61-saveexit"></script>
   <script src="js/board-import.js?v=v80-surgical"></script>
-  <script src="js/scan.js?v=v80-surgical"></script>
+  <script src="js/scan.js?v=v81-merge"></script>
   <script src="js/scan-camera.js?v=v78-grid"></script>
   <script type="module" src="js/scan-ai.js?v=v73-fbai"></script>
 </body>

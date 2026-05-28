@@ -290,9 +290,24 @@
       if (status) { status.style.color = '#f87171'; status.innerHTML = '❌ ' + res.errors.join('<br>'); }
       return false;
     }
-    blankModel();
-    res.board.forEach(function (e) { editBoard[e.r][e.c] = { face: e.f, assigned: e.a || null }; });
-    res.rack.forEach(function (e, i) { editRack[i] = { face: e.f, assigned: e.a || null }; });
+    var mergeEl = document.getElementById('merge-scan');
+    var merge = !!(mergeEl && mergeEl.checked);
+
+    var added = 0, kept = 0;
+    if (merge) {
+      // Fill only empty squares; keep tiles already on the board (and your fixes).
+      res.board.forEach(function (e) {
+        if (editBoard[e.r][e.c]) { kept++; return; }
+        editBoard[e.r][e.c] = { face: e.f, assigned: e.a || null };
+        added++;
+      });
+      res.rack.forEach(function (e, i) { if (!editRack[i]) editRack[i] = { face: e.f, assigned: e.a || null }; });
+    } else {
+      blankModel();
+      res.board.forEach(function (e) { editBoard[e.r][e.c] = { face: e.f, assigned: e.a || null }; });
+      res.rack.forEach(function (e, i) { editRack[i] = { face: e.f, assigned: e.a || null }; });
+      added = res.board.length;
+    }
 
     var ac = runAutoCorrect();   // sets _problemCells from equation checks
 
@@ -302,7 +317,8 @@
 
     if (status) {
       status.style.color = '#34d399';
-      var html = '✅ ' + (sourceLabel || 'Imported') + ': ' + res.board.length + ' tile(s) read.';
+      var html = '✅ ' + (sourceLabel || 'Imported') + ': ' +
+        (merge ? (added + ' new tile(s) added, ' + kept + ' kept') : (res.board.length + ' tile(s) read')) + '.';
       if (ac && ac.fixes.length) {
         html += '<br><span style="color:#38bdf8;">🔧 Auto-fixed ' + ac.fixes.length + ': ' +
           ac.fixes.map(function (f) { return '(' + (f.r + 1) + ',' + (f.c + 1) + ') ' + f.from + '→' + f.to; }).join(', ') + '</span>';
