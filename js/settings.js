@@ -152,8 +152,8 @@
     tileSetRow.innerHTML =
       '<div class="settings-label-block">Tile Set</div>' +
       '<select id="setting-tile-set" class="settings-select">' +
-      '<option value="prathom"' + (current.tileSet === 'prathom' ? ' selected' : '') + '>ประถม Prathom (70 tiles)</option>' +
-      '<option value="mathayom"' + (current.tileSet === 'mathayom' ? ' selected' : '') + '>มัธยม Mathayom (100 tiles)</option>' +
+      '<option value="prathom"' + (current.tileSet === 'prathom' ? ' selected' : '') + '>Prathom — Elementary (70 tiles)</option>' +
+      '<option value="mathayom"' + (current.tileSet === 'mathayom' ? ' selected' : '') + '>Mathayom — Secondary (100 tiles)</option>' +
       '</select>';
     dialog.appendChild(tileSetRow);
 
