@@ -85,16 +85,69 @@
     }
   }
 
+  /**
+   * Play a short burst of filtered noise — the percussive transient that
+   * gives a sound its "physical" character (a tile clacking, not a beep).
+   * Envelope is baked into the buffer (fast exponential decay) so it reads
+   * as a sharp clack rather than a sustained hiss.
+   *
+   * @param duration: seconds (keep short, e.g. 0.02–0.06)
+   * @param filterType: 'bandpass' | 'highpass' | 'lowpass'
+   * @param filterFreq: filter center/cutoff in Hz
+   * @param q: filter resonance (bandpass sharpness)
+   * @param volume: 0-1 peak
+   */
+  function noiseBurst(duration, filterType, filterFreq, q, volume) {
+    if (!enabled) return;
+    const ctx = getCtx();
+    if (!ctx) return;
+
+    const len = Math.max(1, Math.floor(ctx.sampleRate * duration));
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) {
+      // White noise shaped by a steep decay envelope (cubic) → clack, not hiss.
+      const env = Math.pow(1 - i / len, 3);
+      data[i] = (Math.random() * 2 - 1) * env;
+    }
+
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+
+    const filt = ctx.createBiquadFilter();
+    filt.type = filterType || 'bandpass';
+    filt.frequency.value = filterFreq || 2000;
+    if (q !== undefined) filt.Q.value = q;
+
+    const gain = ctx.createGain();
+    gain.gain.value = volume !== undefined ? volume : 0.2;
+
+    src.connect(filt);
+    filt.connect(gain);
+    gain.connect(ctx.destination);
+
+    src.start();
+    src.stop(ctx.currentTime + duration + 0.02);
+  }
+
   // ============================================================================
   // SOUND EFFECTS
   // ============================================================================
 
   function tileClick() {
-    tone(800, 0.05, 'square', 0.08);
+    // Picking up / selecting a tile: a light, high plastic "tick".
+    // Short bright noise transient + a faint high body tap.
+    noiseBurst(0.026, 'highpass', 3200, 0.7, 0.10);
+    tone(340, 0.03, 'triangle', 0.05);
   }
 
   function tilePlace() {
-    tone(600, 0.08, 'sine', 0.12);
+    // Placing a tile on the board: the satisfying physical "clack" of a
+    // plastic tile hitting the board. A sharp mid-band noise transient
+    // (the contact click) layered over a low triangle "tok" (the body
+    // resonance / hollow board thunk).
+    noiseBurst(0.045, 'bandpass', 2600, 1.2, 0.22);
+    tone(168, 0.07, 'triangle', 0.11);
   }
 
   function submitSuccess() {
