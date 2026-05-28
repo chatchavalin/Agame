@@ -32,6 +32,7 @@
   var editRack = [];
   var mode = 'edit';           // 'edit' | 'play'
   var solo = null;             // play-mode state
+  var _problemCells = {};       // "r,c" -> true, cells flagged by auto-correct
 
   function blankModel() {
     editBoard = [];
@@ -131,6 +132,10 @@
         var c = parseInt(cellEl.dataset.col, 10);
         if (isNaN(r) || isNaN(c)) return;
         cellEl.style.cursor = 'pointer';
+        if (mode === 'edit' && _problemCells[r + ',' + c]) {
+          cellEl.style.outline = '3px solid #f87171';
+          cellEl.style.outlineOffset = '-2px';
+        }
         cellEl.addEventListener('click', function () {
           if (mode === 'edit') openCellPicker(r, c);
           else onPlayCellClick(r, c);
@@ -177,6 +182,7 @@
   function openCellPicker(r, c) {
     showPicker('Cell (' + (r + 1) + ',' + (c + 1) + ')', editBoard[r][c], function (val) {
       editBoard[r][c] = val;   // null clears
+      delete _problemCells[r + ',' + c];
       renderEditor();
     }, true);
   }
@@ -263,6 +269,19 @@
     document.body.appendChild(ov);
   }
 
+  // Run equation-based auto-correction over the current editBoard.
+  function runAutoCorrect() {
+    if (!BI.autoCorrect || !window.AMath.evaluator) return null;
+    var validate = function (faces) {
+      var v = window.AMath.evaluator.validateEquation(faces);
+      return !!(v && v.valid);
+    };
+    var res = BI.autoCorrect(editBoard, validate);
+    _problemCells = {};
+    res.problems.forEach(function (p) { _problemCells[p[0] + ',' + p[1]] = true; });
+    return res;
+  }
+
   // ---- import: from a board-code string (used by paste box AND camera) -----
   function applyImportText(text, sourceLabel) {
     var status = document.getElementById('import-status');
@@ -274,11 +293,23 @@
     blankModel();
     res.board.forEach(function (e) { editBoard[e.r][e.c] = { face: e.f, assigned: e.a || null }; });
     res.rack.forEach(function (e, i) { editRack[i] = { face: e.f, assigned: e.a || null }; });
+
+    var ac = runAutoCorrect();
+
     if (status) {
       status.style.color = '#34d399';
-      status.innerHTML = '✅ ' + (sourceLabel || 'Imported') + ': ' + res.board.length + ' board tiles, ' +
-        res.rack.length + ' rack tiles.' +
-        (res.warnings.length ? '<br>⚠️ ' + res.warnings.join('<br>⚠️ ') : '');
+      var html = '✅ ' + (sourceLabel || 'Imported') + ': ' + res.board.length + ' board tiles, ' +
+        res.rack.length + ' rack tiles.';
+      if (res.warnings.length) html += '<br>⚠️ ' + res.warnings.join('<br>⚠️ ');
+      if (ac && ac.fixes.length) {
+        html += '<br><span style="color:#38bdf8;">🔧 Auto-fixed ' + ac.fixes.length + ' tile(s): ' +
+          ac.fixes.map(function (f) { return '(' + (f.r + 1) + ',' + (f.c + 1) + ') ' + f.from + '→' + f.to; }).join(', ') + '</span>';
+      }
+      if (ac && ac.problems.length) {
+        html += '<br><span style="color:#fbbf24;">⚠️ ' + ac.problems.length +
+          ' cell(s) still look wrong (outlined red) — tap to fix.</span>';
+      }
+      status.innerHTML = html;
     }
     if (mode !== 'edit') backToEdit();
     renderEditor();
@@ -401,9 +432,7 @@
 
     var faces = collectLineFaces(sameRow, sameRow ? rows[0] : cols[0]);
     if (!faces) { msg.style.color = '#f87171'; msg.textContent = '❌ Tiles must be contiguous.'; return; }
-    var tokens = EV.tokenize(faces);
-    if (tokens && tokens.error) { msg.style.color = '#f87171'; msg.textContent = '❌ ' + tokens.error; return; }
-    var v = EV.validateEquation(tokens.tokens || tokens);
+    var v = EV.validateEquation(faces);   // validateEquation takes faces directly
     if (v && v.valid) {
       msg.style.color = '#34d399';
       msg.textContent = '✅ Valid equation: ' + faces.join(' ');
@@ -455,7 +484,7 @@
     renderEditor();
     var byId = function (id) { return document.getElementById(id); };
     byId('btn-load-code').addEventListener('click', loadCode);
-    byId('btn-clear-all').addEventListener('click', function () { blankModel(); renderEditor(); var s = byId('import-status'); if (s) s.textContent = ''; });
+    byId('btn-clear-all').addEventListener('click', function () { blankModel(); _problemCells = {}; renderEditor(); var s = byId('import-status'); if (s) s.textContent = ''; });
     byId('btn-start-play').addEventListener('click', startPlay);
     byId('btn-back-edit').addEventListener('click', backToEdit);
     byId('btn-check').addEventListener('click', checkPlay);
