@@ -204,7 +204,7 @@
     byId('btn-back').addEventListener('click', function () { rack.pop(); renderRack(); });
     byId('btn-clear').addEventListener('click', function () { rack = []; renderRack(); byId('cam-status').textContent = ''; });
 
-    var photoBtn = byId('btn-photo'), photoInput = byId('photo-input');
+    var photoBtn = byId('calc-photo'), photoInput = byId('calc-photo-input');
     photoBtn.addEventListener('click', function () { photoInput.click(); });
     photoInput.addEventListener('change', function (e) { var f = e.target.files && e.target.files[0]; onPhoto(f); e.target.value = ''; });
 

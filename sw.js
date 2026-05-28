@@ -1,5 +1,5 @@
 // Bump CACHE_NAME whenever ANY asset changes to force update.
-const CACHE_NAME = 'amath-v101-hooktile';
+const CACHE_NAME = 'amath-v102-photofix';
 const ASSETS = [
   '/Agame/',
   '/Agame/lobby.html',
