@@ -69,6 +69,7 @@
       '4. Read ONLY tiles sitting inside the 15x15 grid. IGNORE everything else in the photo: the plastic frame, the player racks/trays, the dice, score sheets, and any printed tile-frequency tables or text on paper.',
       '5. "f" MUST be exactly one of: "0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","20","+","-","+/-","×/÷","=","BLANK". (Tiles 17,18,19 do NOT exist.)',
       '6. A ± tile is "+/-"; a combined ×÷ tile is "×/÷". If you can tell which operation it is used as, add "a":"+"/"-"/"×"/"÷"; else omit "a". A blank tile is "BLANK".',
+      '6b. IMPORTANT: there is no standalone × or ÷ tile. If a cell shows a multiply "×", output {"f":"×/÷","a":"×"}. If it shows a divide "÷", output {"f":"×/÷","a":"÷"}.',
       '',
       'TILE SUPPLY (the whole game has only these many of each — you can NOT see more than this on the board, so if you are about to exceed a count you have misread something):',
       '0×4, 1×4, 2×4, 3×4, 4×4, 5×3, 6×3, 7×2, 8×3, 9×2, 10×1, 11×1, 12×1, 13×1, 14×1, 15×1, 16×1, 20×1, +×4, -×4, +/-×5, ×/÷×4, =×8, BLANK×4.',

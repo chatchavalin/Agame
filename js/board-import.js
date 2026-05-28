@@ -45,6 +45,32 @@
     return 'imp_' + Date.now().toString(36) + '_' + _idCounter;
   }
 
+  // Map values a vision model naturally emits onto our exact face vocabulary.
+  // Key insight: there is NO standalone × or ÷ tile — those come from the
+  // "×/÷" choice tile, so a bare × becomes face "×/÷" assigned "×", etc.
+  var FACE_ALIAS = {
+    '×': { f: '×/÷', a: '×' }, '÷': { f: '×/÷', a: '÷' },
+    'x': { f: '×/÷', a: '×' }, 'X': { f: '×/÷', a: '×' }, '*': { f: '×/÷', a: '×' },
+    '/': { f: '×/÷', a: '÷' }, '÷/×': { f: '×/÷' }, 'x/÷': { f: '×/÷' },
+    '±': { f: '+/-' }, '+-': { f: '+/-' }, '-/+': { f: '+/-' },
+    '−': { f: '-' }, '–': { f: '-' }, '—': { f: '-' },
+    '': { f: 'BLANK' }, 'blank': { f: 'BLANK' }, 'Blank': { f: 'BLANK' },
+    '▢': { f: 'BLANK' }, '?': { f: 'BLANK' }, '_': { f: 'BLANK' },
+  };
+  var ASSIGN_ALIAS = { 'x': '×', 'X': '×', '*': '×', '/': '÷', '−': '-' };
+
+  // Returns normalized { f, a } from a raw face + raw assigned value.
+  function normalizeFace(rawF, rawA) {
+    var f = (rawF == null ? '' : String(rawF)).trim();
+    var a = (rawA == null || rawA === '') ? null : String(rawA).trim();
+    if (a && ASSIGN_ALIAS[a]) a = ASSIGN_ALIAS[a];
+    if (FACE_ALIAS[f]) {
+      var m = FACE_ALIAS[f];
+      return { f: m.f, a: a || m.a || null };
+    }
+    return { f: f, a: a };
+  }
+
   /**
    * Make a full tile object from a face (+ optional assigned value), looking up
    * type/points from the inventory. Returns null for an unknown face.
@@ -107,16 +133,18 @@
       }
       var key = r + ',' + c;
       if (seen[key]) { errors.push('Two tiles on the same cell ' + key + '.'); return; }
-      if (!inv[f]) { errors.push('Cell ' + key + ': unknown face "' + f + '".'); return; }
+      var norm = normalizeFace(cell.f, cell.a);
+      var f = norm.f;
+      if (!inv[f]) { errors.push('Cell ' + key + ': unknown face "' + cell.f + '".'); return; }
       var entry = { r: r, c: c, f: f };
       var def = inv[f];
       if (def.type === 'choice' || def.type === 'blank') {
-        if (cell.a == null || cell.a === '') {
+        if (norm.a == null || norm.a === '') {
           warnings.push('Cell ' + key + ' (' + f + ') needs a chosen value (+,−,×,÷ or a number).');
-        } else if (ASSIGNABLE.indexOf(String(cell.a)) === -1) {
-          errors.push('Cell ' + key + ': invalid chosen value "' + cell.a + '".');
+        } else if (ASSIGNABLE.indexOf(String(norm.a)) === -1) {
+          errors.push('Cell ' + key + ': invalid chosen value "' + norm.a + '".');
         } else {
-          entry.a = String(cell.a);
+          entry.a = String(norm.a);
         }
       }
       seen[key] = true;
@@ -126,12 +154,13 @@
     // --- rack (optional; user usually fills this manually) ---
     var rack = [];
     (obj.rack || []).forEach(function (item, i) {
-      var f = (typeof item === 'string') ? item : (item && item.f);
-      var a = (typeof item === 'object' && item) ? item.a : undefined;
-      if (!f) return; // empty slot
-      if (!inv[f]) { errors.push('Rack slot ' + i + ': unknown face "' + f + '".'); return; }
-      var ri = { f: f };
-      if (a != null && a !== '') ri.a = String(a);
+      var rawF = (typeof item === 'string') ? item : (item && item.f);
+      var rawA = (typeof item === 'object' && item) ? item.a : undefined;
+      if (rawF == null || rawF === '') return; // empty slot
+      var nr = normalizeFace(rawF, rawA);
+      if (!inv[nr.f]) { errors.push('Rack slot ' + i + ': unknown face "' + rawF + '".'); return; }
+      var ri = { f: nr.f };
+      if (nr.a != null && nr.a !== '') ri.a = String(nr.a);
       rack.push(ri);
     });
     if (rack.length > RACK_SIZE) {
