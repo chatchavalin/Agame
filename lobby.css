@@ -302,3 +302,30 @@ body {
 @media (max-width: 360px) {
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ============================================================
+   LIGHT MODE  (toggled by the 🎨 header icon → body.lobby-light)
+   Overrides the dark defaults with a clean light palette.
+   ============================================================ */
+body.lobby-light { background: #f1f5f9; color: #1f2937; }
+body.lobby-light #screen-login { background: linear-gradient(135deg,#e0e7ff 0%,#f1f5f9 50%,#e0e7ff 100%); }
+body.lobby-light .login-card,
+body.lobby-light .lobby-header,
+body.lobby-light .stat-card,
+body.lobby-light .leaderboard-section,
+body.lobby-light .badges-section,
+body.lobby-light #active-rooms-section,
+body.lobby-light .my-games-section,
+body.lobby-light .lb-list,
+body.lobby-light .card,
+body.lobby-light .panel { background: #ffffff; color: #1f2937; border-color: #e2e8f0; }
+body.lobby-light .lobby-name,
+body.lobby-light .stat-value,
+body.lobby-light h1, body.lobby-light h2, body.lobby-light h3 { color: #1f2937; }
+body.lobby-light .lobby-school,
+body.lobby-light .stat-label,
+body.lobby-light .muted,
+body.lobby-light .lb-loading { color: #64748b; }
+body.lobby-light .btn-icon-header { background: #e2e8f0; color: #1f2937; }
+body.lobby-light .btn-guest { color: #2563eb; }
+/* keep the bright gradient play buttons & their white text unchanged */

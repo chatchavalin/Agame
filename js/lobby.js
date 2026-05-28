@@ -705,16 +705,39 @@
   // ============================================================
 
   document.addEventListener('DOMContentLoaded', function () {
+    try { applyLobbyMode(currentLobbyMode()); } catch (e) {}
     initAuth();
   });
 
   // Export
+  // Light/dark toggle for the lobby (the lobby uses its own dark stylesheet,
+  // separate from the in-game theme system). Persists in localStorage so it sticks.
+  function applyLobbyMode(mode) {
+    document.body.classList.toggle('lobby-light', mode === 'light');
+    var btn = document.getElementById('btn-theme');
+    if (btn) {
+      btn.textContent = mode === 'light' ? '🌙' : '☀️';
+      btn.setAttribute('title', mode === 'light' ? 'Switch to dark' : 'Switch to light');
+    }
+  }
+  function currentLobbyMode() {
+    try { return localStorage.getItem('amath-lobby-mode') || 'dark'; } catch (e) { return 'dark'; }
+  }
+  function cycleTheme() {
+    var next = currentLobbyMode() === 'light' ? 'dark' : 'light';
+    try { localStorage.setItem('amath-lobby-mode', next); } catch (e) {}
+    applyLobbyMode(next);
+  }
+
   window.AMathLobby = {
     loginGoogle: loginGoogle,
     loginEmail: loginEmail,
     registerEmail: registerEmail,
     playGuest: playGuest,
     logout: logout,
+    cycleTheme: cycleTheme,
+    applyLobbyMode: applyLobbyMode,
+    currentLobbyMode: currentLobbyMode,
     saveProfile: saveProfile,
     showProfile: showProfile,
     closeProfile: closeProfile,

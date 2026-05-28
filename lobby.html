@@ -11,7 +11,7 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="lobby.css?v=v68-lobbycolor">
+  <link rel="stylesheet" href="lobby.css?v=v120-theme">
 </head>
 <body>
 
@@ -94,7 +94,10 @@
           <div id="lobby-school" class="lobby-school"></div>
         </div>
       </div>
-      <button class="btn-icon-header" onclick="AMathLobby.logout()">🚪</button>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <button class="btn-icon-header" id="btn-theme" title="Change theme" aria-label="Change theme" onclick="AMathLobby.cycleTheme()">🎨</button>
+        <button class="btn-icon-header" onclick="AMathLobby.logout()">🚪</button>
+      </div>
     </header>
 
     <!-- Stats Cards -->
@@ -282,7 +285,7 @@
   <script src="js/achievements.js?v=20260525i"></script>
   <script src="js/game-bridge.js?v=20260525i"></script>
   <script src="js/online-room.js?v=20260525i"></script>
-  <script src="js/lobby.js?v=20260525i"></script>
+  <script src="js/lobby.js?v=v120-theme"></script>
   <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 </body>
 </html>
