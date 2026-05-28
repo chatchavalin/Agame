@@ -126,7 +126,7 @@
       res.appendChild(h);
       if (sols.length) {
         var p = document.createElement('p'); p.className = 'muted';
-        p.textContent = '✅ Possible. Score ' + base + ' pts (tile points only — no premium squares or bingo bonus). All arrangements score the same since a bingo uses every tile:';
+        p.textContent = '✅ Possible (' + sols.length + (sols.capped ? '+' : '') + ' shown). Score ' + base + ' pts (tile points only — no premium squares or bingo bonus). All arrangements score the same since a bingo uses every tile:';
         res.appendChild(p);
         sols.forEach(function (s) {
           var line = document.createElement('div'); line.style.display = 'flex'; line.style.alignItems = 'center'; line.style.flexWrap = 'wrap';
@@ -162,7 +162,7 @@
       report.nine.forEach(function (it) { it.total = base + tilePts(it.hook, m); });
       report.nine.sort(function (a, b) { return b.total - a.total; });
       var intro = document.createElement('p'); intro.className = 'muted';
-      intro.textContent = 'Ranked by total score (tile points only). Your tiles = ' + base + ' pts; each card adds the hook tile:';
+      intro.textContent = report.nine.length + ' hook tile(s) make a bingo — ranked by total score (tile points only). Your tiles = ' + base + ' pts, each card adds the hook:';
       res.appendChild(intro);
       report.nine.forEach(function (item, idx) {
         var card = document.createElement('div'); card.className = 'hook-card';
@@ -212,6 +212,7 @@
   // ----- init -----
   function init() {
     renderRack();
+    byId('results').innerHTML = '<p class="muted">Add your tiles above (tap a slot or 📷 photo your rack), then tap <b>8-tile</b> or <b>9-tile bingo</b>. Results show as tiles, ranked by score.</p>';
     byId('btn-8').addEventListener('click', run8);
     byId('btn-9').addEventListener('click', run9);
     byId('btn-clear').addEventListener('click', function () {
