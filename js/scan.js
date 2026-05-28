@@ -518,6 +518,25 @@
     byId('btn-check').addEventListener('click', checkPlay);
     byId('btn-commit').addEventListener('click', commitPlay);
     byId('btn-clear-tent').addEventListener('click', clearTentative);
+
+    // Tile-set selector (ประถม/มัธยม) — drives the active inventory globally.
+    var tsel = byId('tileset-select');
+    if (tsel) {
+      try {
+        if (window.AMath && window.AMath.settings && window.AMath.settings.get) {
+          tsel.value = window.AMath.settings.get('tileSet') || 'prathom';
+        }
+      } catch (e) {}
+      tsel.addEventListener('change', function () {
+        try {
+          if (window.AMath && window.AMath.settings && window.AMath.settings.set) {
+            window.AMath.settings.set('tileSet', tsel.value);
+          }
+        } catch (e) {}
+        // Re-validate the current board against the new inventory and re-flag.
+        if (mode === 'edit') { runAutoCorrect(); refreshSummary(); renderEditor(); }
+      });
+    }
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

@@ -65,6 +65,13 @@
 
     <!-- IMPORT -->
     <div class="panel" id="import-section">
+      <label style="display:flex; align-items:center; gap:10px; margin:0 0 14px; font-size:14px; color:#e2e8f0;">
+        <span style="font-weight:700;">ชุดเบี้ย / Tile set:</span>
+        <select id="tileset-select" style="flex:1; min-width:0; background:#0f172a; color:#e2e8f0; border:1px solid #475569; border-radius:10px; padding:9px; font-size:14px; font-family:inherit;">
+          <option value="prathom">เบี้ยประถม · Prathom (70 tiles)</option>
+          <option value="mathayom">เบี้ยมัธยม · Mathayom (100 tiles)</option>
+        </select>
+      </label>
       <h2>1 · Import</h2>
       <p class="hint">Paste a board code here. (Take a photo of your physical board, send it to Claude in chat, and paste the code it gives you.) Camera import is coming next.</p>
       <textarea id="code-input" placeholder='{"v":1,"board":[{"r":0,"c":0,"f":"2"}],"rack":["13","5"]}'></textarea>
@@ -148,8 +155,8 @@
   <script src="js/settings.js?v=v54-2026-05-27"></script>
   <script src="js/ui.js?v=v61-saveexit"></script>
   <script src="js/board-import.js?v=v85-assign"></script>
-  <script src="js/scan.js?v=v85-assign"></script>
-  <script src="js/scan-camera.js?v=v88-rack"></script>
+  <script src="js/scan.js?v=v89-tileset"></script>
+  <script src="js/scan-camera.js?v=v89-tileset"></script>
   <script type="module" src="js/scan-ai.js?v=v86-temp"></script>
 </body>
 </html>

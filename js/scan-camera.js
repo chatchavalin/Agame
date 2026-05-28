@@ -56,9 +56,29 @@
   }
 
   // ---- prompt: read the board into our exact board-code vocabulary ----------
+  function activeInventory() {
+    try { if (window.TILE_INVENTORY && window.TILE_INVENTORY.length) return window.TILE_INVENTORY; } catch (e) {}
+    return null;
+  }
+  function tileSetName() {
+    var t = 'prathom';
+    try { if (window.AMath && window.AMath.settings && window.AMath.settings.get) t = window.AMath.settings.get('tileSet') || 'prathom'; } catch (e) {}
+    return t === 'mathayom' ? 'มัธยม / Mathayom (100-tile)' : 'ประถม / Prathom (70-tile)';
+  }
   function buildPrompt() {
+    var inv = activeInventory();
+    var twoDigits = inv ? inv.filter(function (d) { return d.type === 'twodigit'; }).map(function (d) { return d.face; })
+                        : ['10', '11', '12', '13', '14', '15', '16', '20'];
+    var missing = ['17', '18', '19'].filter(function (f) { return twoDigits.indexOf(f) === -1; });
+    var twoDigitNote = missing.length
+      ? 'Two-digit tiles in THIS set are only: ' + twoDigits.join(', ') + '. Tiles ' + missing.join(',') + ' do NOT exist in this set.'
+      : 'Two-digit tiles in THIS set: ' + twoDigits.join(', ') + ' (all of 10–20 exist).';
+    var countsLine = inv
+      ? 'Exact tile supply for this set — you cannot see more than these of any face: ' +
+        inv.map(function (d) { return '"' + d.face + '"×' + d.count; }).join(', ') + '.'
+      : 'Most number tiles have ≤4 copies; "=" up to 8–11; operators ≤4–5.';
     return [
-      'You are digitizing a photo of an A-Math / MathSmith board (a 15x15 grid of squares). Read which tile, if any, sits on each square.',
+      'You are digitizing a photo of an A-Math / MathSmith board (a 15x15 grid of squares). This game uses the ' + tileSetName() + ' tile set. Read which tile, if any, sits on each square.',
       '',
       'Output ONLY a JSON object (no prose, no markdown) of EXACTLY this form:',
       '{"v":2,"grid":[ <row0>, <row1>, ... <row14> ]}',
@@ -69,13 +89,13 @@
       '',
       'How to read a tile:',
       '- A tile shows ONE large symbol in the center — output only that. The tiny number in the lower-right CORNER is the point value; it is NOT a tile and must be ignored. Example: a tile with a large "8" and a small "2" in the corner is "8" (never "2", never two tiles).',
-      '- Two-digit tiles (10,11,12,13,14,15,16,20) are ONE tile in ONE square. Never split "20" into "2" and "0".',
+      '- ' + twoDigitNote + ' A two-digit tile is ONE tile in ONE square; never split "20" into "2" and "0".',
       '- Conversely, two ADJACENT squares that each hold a single digit are TWO separate tiles, not one two-digit number. A "2" square next to a "0" square is "2" and "0" (in two slots), NOT a single "20". Only call it "20" when both digits are printed on ONE physical tile.',
-      '- Allowed faces: "0".."9","10","11","12","13","14","15","16","20","+","-","=","±" (the +/- tile), "×" or "÷" (the ×/÷ tile used as multiply/divide), "BLANK". Tiles 17,18,19 do not exist.',
+      '- Allowed faces: "0".."9", ' + twoDigits.map(function (f) { return '"' + f + '"'; }).join(',') + ', "+","-","=","±" (the +/- tile), "×" or "÷" (the ×/÷ tile used as multiply/divide), "BLANK".',
       '',
       'Do NOT read non-tiles: ignore the coordinate letters/numbers around the edges, and ignore square-bonus labels on empty squares ("DOUBLE","TRIPLE","EQUATION","PIECE","2X","3X","GAMESMITH"). An "X" in a bonus label is not a tile.',
       '',
-      'Sanity check before answering: the whole game has at most 4 of most number tiles (fewer of 5-9 and of two-digit tiles), 8 "=", 4 "+", 4 "-", 5 "±", 4 "×/÷". If your grid contains far more of something than could exist, you have misread subscripts as tiles — re-read and correct.',
+      'Sanity check before answering: ' + countsLine + ' If your grid contains more of something than that, you have misread (often subscripts read as tiles) — re-read and correct.',
       'Return the JSON object only.'
     ].join('\n');
   }
