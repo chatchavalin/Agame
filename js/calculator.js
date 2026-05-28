@@ -102,6 +102,15 @@
     return '<div class="eqline">' + s + note + '</div>';
   }
 
+  // ----- scoring (base tile points only: no premium squares, no bingo bonus) -----
+  function pointsMap() { var m = {}; activeInv().forEach(function (d) { m[d.face] = d.points; }); return m; }
+  function tilePts(face, m) {
+    if (m[face] != null) return m[face];
+    if (face === '×' || face === '÷') return (m['×/÷'] != null ? m['×/÷'] : 0); // played via ×/÷ tile
+    return 0;
+  }
+  function rackScore(tiles, m) { return tiles.reduce(function (s, f) { return s + tilePts(f, m); }, 0); }
+
   // ----- solving -----
   function currentTiles() { return rack.filter(function (f) { return f; }); }
 
@@ -111,10 +120,12 @@
     if (tiles.length < 2) { res.innerHTML = '<p class="muted">Add some rack tiles first.</p>'; return; }
     res.innerHTML = '<p class="muted">Searching…</p>';
     setTimeout(function () {
+      var m = pointsMap();
+      var base = rackScore(tiles, m);
       var sols = window.AMath.bingoSolver.solve(tiles, validate, { maxSolutions: 6 });
-      var html = '<h2 style="font-size:15px;">8-tile bingo (' + tiles.length + ' tiles)</h2>';
+      var html = '<h2 style="font-size:15px;">8-tile bingo (' + tiles.length + ' tiles) — ' + base + ' pts</h2>';
       if (sols.length) {
-        html += '<p class="muted">✅ Yes — these tiles can form an equation:</p>';
+        html += '<p class="muted">✅ Yes. Base score ' + base + ' pts (tile points only — no premium squares or bingo bonus). Every arrangement scores the same, since a bingo uses all your tiles:</p>';
         sols.forEach(function (s) { html += solutionHtml(s); });
         if (sols.capped) html += '<p class="muted">(search stopped early; more may exist)</p>';
       } else {
@@ -131,11 +142,17 @@
     res.innerHTML = '<p class="muted">Searching every possible hook tile… (a few seconds)</p>';
     setTimeout(function () {
       var report = window.AMath.bingoSolver.bingos(tiles, validate, activeInv(), { examples: 2 });
+      var m = pointsMap();
+      var base = rackScore(tiles, m);
       var html = '<h2 style="font-size:15px;">9-tile bingo — your ' + tiles.length + ' tiles + 1 hook</h2>';
       if (report.nine.length) {
-        html += '<p class="muted">✅ These board tiles let you bingo (hook → example):</p>';
+        // total score = base (your tiles) + the hook tile's points; rank high → low
+        report.nine.forEach(function (it) { it.total = base + tilePts(it.hook, m); });
+        report.nine.sort(function (a, b) { return b.total - a.total; });
+        html += '<p class="muted">✅ Ranked by total score (tile points only — no premium squares or bingo bonus). Your ' + tiles.length + ' tiles = ' + base + ' pts; + the hook tile:</p>';
         report.nine.forEach(function (item) {
           html += '<div class="hook-card"><span class="hook-face">' + label(item.hook) + '</span>';
+          html += '<b>' + item.total + ' pts</b><br>';
           html += item.examples.map(function (s) {
             var note = (s.blankVals && s.blankVals.length)
               ? ' <span class="muted">(blank ? = ' + s.blankVals.map(label).join(', ') + ')</span>' : '';
