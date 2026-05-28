@@ -1,5 +1,5 @@
 // Bump CACHE_NAME whenever ANY asset changes to force update.
-const CACHE_NAME = 'amath-v60-clocksync';
+const CACHE_NAME = 'amath-v61-saveexit';
 const ASSETS = [
   '/Agame/',
   '/Agame/lobby.html',

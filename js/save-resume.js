@@ -86,6 +86,30 @@
     } catch (e) {
       console.warn('Failed to clear save:', e);
     }
+    // Also clear the cross-device server copy, if logged in. Best-effort:
+    // every clearSave() site (new game, game over, settings reset) is a point
+    // where the in-progress game has genuinely ended, so the server copy
+    // should go too. Centralized here so all call sites are covered.
+    try {
+      if (window.AMathBridge && window.AMathBridge.clearInProgressGame) {
+        window.AMathBridge.clearInProgressGame();
+      }
+    } catch (e) { /* non-fatal */ }
+  }
+
+  /**
+   * Overwrite the local save slot with a raw pre-serialized JSON string
+   * (used to seed a newer copy pulled from the server before the resume
+   * prompt). Returns true on success.
+   */
+  function saveRaw(jsonString) {
+    try {
+      localStorage.setItem(STORAGE_KEY, jsonString);
+      return true;
+    } catch (e) {
+      console.warn('Failed to saveRaw:', e);
+      return false;
+    }
   }
 
   /**
@@ -187,6 +211,7 @@
     load: load,
     hasSavedGame: hasSavedGame,
     clearSave: clearSave,
+    saveRaw: saveRaw,
     describeSavedGame: describeSavedGame,
     serialize: serialize,
     exportToFile: exportToFile,

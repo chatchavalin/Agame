@@ -13,7 +13,58 @@
   document.addEventListener('DOMContentLoaded', function () {
     runVerification();
 
-    // Check for saved game
+    // Decide resume vs fresh start. When logged in, briefly check the server
+    // for a newer cross-device save first, then run the resume prompt.
+    maybeResumeThenStart();
+
+    const toggleBtn = document.getElementById('debug-toggle');
+    const debugDiv = document.getElementById('debug-output');
+    if (toggleBtn && debugDiv) {
+      toggleBtn.addEventListener('click', function () {
+        debugDiv.classList.toggle('show');
+      });
+    }
+  });
+
+  /**
+   * If logged in, pull any server-saved in-progress game and seed it into the
+   * local slot when it's newer than (or absent from) localStorage — so the
+   * existing resume prompt can offer it, enabling cross-device resume. Guarded
+   * with a timeout + try/catch so the game ALWAYS starts even if the network
+   * is slow or Firestore is unavailable.
+   */
+  function maybeResumeThenStart() {
+    const SaveResume = window.AMath.saveResume;
+    let finished = false;
+    const proceed = function () {
+      if (finished) return;
+      finished = true;
+      runResumePrompt();
+    };
+    try {
+      const Bridge = window.AMathBridge;
+      if (SaveResume && SaveResume.saveRaw && Bridge && !Bridge.isGuest() && Bridge.loadInProgressGame) {
+        const to = setTimeout(proceed, 1800); // never wait forever on the network
+        Bridge.loadInProgressGame().then(function (server) {
+          clearTimeout(to);
+          try {
+            if (server && server.json) {
+              const desc = SaveResume.describeSavedGame();
+              const localAt = desc ? (desc.timestamp || 0) : 0;
+              if (!desc || (server.at && server.at > localAt)) {
+                SaveResume.saveRaw(server.json); // seed newer server copy locally
+              }
+            }
+          } catch (e) { /* ignore — fall through to whatever's local */ }
+          proceed();
+        }, function () { clearTimeout(to); proceed(); });
+        return;
+      }
+    } catch (e) { /* fall through to local-only */ }
+    proceed();
+  }
+
+  function runResumePrompt() {
     const SaveResume = window.AMath.saveResume;
     if (SaveResume && SaveResume.hasSavedGame()) {
       const info = SaveResume.describeSavedGame();
@@ -24,21 +75,40 @@
       if (confirm(msg)) {
         resumeGame(SaveResume.load());
       } else {
-        SaveResume.clearSave();
+        SaveResume.clearSave(); // also clears server copy (see save-resume.js)
         startGameSession();
       }
     } else {
       startGameSession();
     }
+  }
 
-    const toggleBtn = document.getElementById('debug-toggle');
-    const debugDiv = document.getElementById('debug-output');
-    if (toggleBtn && debugDiv) {
-      toggleBtn.addEventListener('click', function () {
-        debugDiv.classList.toggle('show');
-      });
-    }
-  });
+  /**
+   * Exit to the lobby. Saves the current in-progress game first — localStorage
+   * synchronously (reliable) plus a best-effort server copy when logged in, so
+   * the game can be resumed on return (even from another device). Navigation is
+   * never blocked: if the server write is slow it's capped at 1.2s.
+   */
+  window.AMath = window.AMath || {};
+  window.AMath.exitToLobby = function () {
+    const go = function () { window.location.href = 'lobby.html'; };
+    try {
+      const SR = window.AMath.saveResume;
+      const Bridge = window.AMathBridge;
+      if (session && !session.gameOver && SR) {
+        SR.save(session); // localStorage — synchronous, reliable
+        if (Bridge && !Bridge.isGuest() && Bridge.saveInProgressGame) {
+          const json = SR.serialize(session);
+          let done = false;
+          const nav = function () { if (!done) { done = true; go(); } };
+          Bridge.saveInProgressGame(json).then(nav, nav);
+          setTimeout(nav, 1200); // safety cap so exit never hangs
+          return;
+        }
+      }
+    } catch (e) { /* never block exit */ }
+    go();
+  };
 
   function runVerification() {
     // Verification kept minimal; full tests already validated in earlier phases.

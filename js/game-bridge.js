@@ -240,11 +240,59 @@
     init();
   }
 
+  // --- In-progress PvA game persistence (cross-device resume) ---------------
+  // Stored as a JSON STRING on the user's own doc (Firestore can't hold the
+  // board's nested arrays as structured data, and a string reuses the existing
+  // users/{uid} update rule — no rules change needed). Best-effort: every path
+  // is guarded so a failure never blocks gameplay or navigation.
+  async function saveInProgressGame(jsonString) {
+    if (!_userId || _userId === 'guest' || !_db || !jsonString) return false;
+    try {
+      await _db.collection('users').doc(_userId).set({
+        savedPvaGameJson: jsonString,
+        savedPvaGameAt: Date.now(),
+      }, { merge: true });
+      return true;
+    } catch (e) {
+      console.warn('[Bridge] saveInProgressGame failed:', e && e.message);
+      return false;
+    }
+  }
+
+  async function loadInProgressGame() {
+    if (!_userId || _userId === 'guest' || !_db) return null;
+    try {
+      var snap = await _db.collection('users').doc(_userId).get();
+      var data = snap && snap.exists ? snap.data() : null;
+      if (!data || !data.savedPvaGameJson) return null;
+      return { json: data.savedPvaGameJson, at: data.savedPvaGameAt || 0 };
+    } catch (e) {
+      console.warn('[Bridge] loadInProgressGame failed:', e && e.message);
+      return null;
+    }
+  }
+
+  async function clearInProgressGame() {
+    if (!_userId || _userId === 'guest' || !_db) return;
+    try {
+      var FieldValue = firebase.firestore.FieldValue;
+      await _db.collection('users').doc(_userId).set({
+        savedPvaGameJson: FieldValue.delete(),
+        savedPvaGameAt: FieldValue.delete(),
+      }, { merge: true });
+    } catch (e) {
+      console.warn('[Bridge] clearInProgressGame failed:', e && e.message);
+    }
+  }
+
   window.AMathBridge = {
     saveGameResult: saveGameResult,
     saveReplay: saveReplay,
     listMyGames: listMyGames,
     getReplay: getReplay,
+    saveInProgressGame: saveInProgressGame,
+    loadInProgressGame: loadInProgressGame,
+    clearInProgressGame: clearInProgressGame,
     getUserId: function () { return _userId; },
     getUserName: function () { return _userName; },
     getUserPhoto: function () { return _userPhoto; },
