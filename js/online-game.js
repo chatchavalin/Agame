@@ -274,13 +274,40 @@
     }
     myUid = user.uid;
 
-    // Measure this device's clock offset vs server (fire-and-forget; gated).
-    initClockOffset();
-
     if (!window.AMath || !window.AMath.onlineRoom) {
       showError('Online module not loaded.');
       return;
     }
+
+    // If we arrived via a direct invite link as the guest, the lobby's join
+    // step (which records our identity on the room) was skipped. Claim the
+    // guest slot ourselves so the host sees us and we see the real game.
+    // joinRoom is idempotent when we're already the guest (re-entry/refresh).
+    if (myRole === 'guest') {
+      var gName = user.displayName || 'Guest';
+      var gPhoto = user.photoURL || '';
+      try {
+        // Prefer the player's saved profile (custom name/avatar), matching
+        // what the lobby writes for the host.
+        var pdoc = await firebase.firestore().collection('users').doc(user.uid).get();
+        if (pdoc.exists) {
+          var p = pdoc.data() || {};
+          if (p.displayName) gName = p.displayName;
+          if (p.photoURL) gPhoto = p.photoURL;
+        }
+      } catch (e) { /* profile fetch is best-effort */ }
+      try {
+        await window.AMath.onlineRoom.joinRoom(roomCode, { guestName: gName, guestPhoto: gPhoto });
+      } catch (err) {
+        var msg = (err && err.message) || '';
+        if (/full/i.test(msg)) { showError('This room is already full.'); return; }
+        // Already joined / own-room edge → safe to continue to subscribe.
+        console.warn('[Online] guest claim:', msg);
+      }
+    }
+
+    // Measure this device's clock offset vs server (fire-and-forget; gated).
+    initClockOffset();
 
     unsubscribe = window.AMath.onlineRoom.subscribe(roomCode, onRoomUpdate, function (err) {
       showError('Sync error: ' + err.message);
