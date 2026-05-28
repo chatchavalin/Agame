@@ -361,6 +361,19 @@
     });
   }
 
+  // Public: read just the rack/tray from a photo file (used by the Calculator
+  // page). Resolves to an array of face strings (≤8).
+  window.AMath = window.AMath || {};
+  window.AMath.scanRackFromFile = function (file) {
+    return new Promise(function (resolve, reject) {
+      if (!file) { reject(new Error('No file')); return; }
+      fileToBase64(file, function (base64) {
+        if (!base64) { reject(new Error('Could not read that image.')); return; }
+        runRackPasses(base64).then(resolve).catch(reject);
+      });
+    });
+  };
+
   // ---- wire UI --------------------------------------------------------------
   function init() {
     var keyInput = document.getElementById('gemini-key');

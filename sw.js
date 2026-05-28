@@ -1,5 +1,5 @@
 // Bump CACHE_NAME whenever ANY asset changes to force update.
-const CACHE_NAME = 'amath-v90b-en';
+const CACHE_NAME = 'amath-v91-calc';
 const ASSETS = [
   '/Agame/',
   '/Agame/lobby.html',
@@ -9,6 +9,9 @@ const ASSETS = [
   '/Agame/js/scan-camera.js',
   '/Agame/js/scan-ai.js',
   '/Agame/js/board-import.js',
+  '/Agame/calculator.html',
+  '/Agame/js/calculator.js',
+  '/Agame/js/bingo-solver.js',
 ];
 
 self.addEventListener('install', (e) => {
