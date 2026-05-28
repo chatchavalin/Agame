@@ -32,7 +32,7 @@
     if (face === '+/-' || face === '×/÷') {
       el.classList.add('choice');
       var s = document.createElement('span');
-      s.textContent = (face === '×/÷') ? '×÷' : '+−';
+      s.textContent = (face === '×/÷') ? '×/÷' : '+/−';
       el.appendChild(s);
     } else {
       var s = document.createElement('span'); s.textContent = (face === 'BLANK') ? '?' : face; el.appendChild(s);
