@@ -320,7 +320,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v45</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v46</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -509,33 +509,33 @@ body.theme-dark .player-area .amath-tile-rack {
 </div>
 
 <!-- Load main game JS modules in dependency order (same as index.html) -->
-<script src="js/constants.js?v=v45-2026-05-27"></script>
-<script src="js/utils.js?v=v45-2026-05-27"></script>
-<script src="js/evaluator.js?v=v45-2026-05-27"></script>
-<script src="js/bag.js?v=v45-2026-05-27"></script>
-<script src="js/rack.js?v=v45-2026-05-27"></script>
-<script src="js/board.js?v=v45-2026-05-27"></script>
-<script src="js/tile-tracker.js?v=v45-2026-05-27"></script>
-<script src="js/scoring.js?v=v45-2026-05-27"></script>
-<script src="js/placement.js?v=v45-2026-05-27"></script>
+<script src="js/constants.js?v=v46-2026-05-27"></script>
+<script src="js/utils.js?v=v46-2026-05-27"></script>
+<script src="js/evaluator.js?v=v46-2026-05-27"></script>
+<script src="js/bag.js?v=v46-2026-05-27"></script>
+<script src="js/rack.js?v=v46-2026-05-27"></script>
+<script src="js/board.js?v=v46-2026-05-27"></script>
+<script src="js/tile-tracker.js?v=v46-2026-05-27"></script>
+<script src="js/scoring.js?v=v46-2026-05-27"></script>
+<script src="js/placement.js?v=v46-2026-05-27"></script>
 <!-- AI modules for the in-browser puzzle generator -->
-<script src="js/ai-x9.js?v=v45-2026-05-27"></script>
-<script src="js/ai-x4.js?v=v45-2026-05-27"></script>
-<script src="js/ai-bingo-fast.js?v=v45-2026-05-27"></script>
-<script src="js/ai-bingo-grammar.js?v=v45-2026-05-27"></script>
-<script src="js/ai-yoyo.js?v=v45-2026-05-27"></script>
-<script src="js/ai-patterns-data.js?v=v45-2026-05-27"></script>
-<script src="js/ai-patterns-engine.js?v=v45-2026-05-27"></script>
-<script src="js/ai-swap.js?v=v45-2026-05-27"></script>
-<script src="js/ai-swap-brain2.js?v=v45-2026-05-27"></script>
-<script src="js/ai-player.js?v=v45-2026-05-27"></script>
-<script src="js/puzzle-generator.js?v=v45-2026-05-27"></script>
-<script src="js/book-puzzle-generator.js?v=v45-2026-05-27"></script>
-<script src="js/ton4-solver.js?v=v45-2026-05-27"></script>
-<script src="js/sounds.js?v=v45-2026-05-27"></script>
-<script src="js/settings.js?v=v45-2026-05-27"></script>
-<script src="js/ui.js?v=v45-2026-05-27"></script>
-<script src="js/interactions.js?v=v45-2026-05-27"></script>
+<script src="js/ai-x9.js?v=v46-2026-05-27"></script>
+<script src="js/ai-x4.js?v=v46-2026-05-27"></script>
+<script src="js/ai-bingo-fast.js?v=v46-2026-05-27"></script>
+<script src="js/ai-bingo-grammar.js?v=v46-2026-05-27"></script>
+<script src="js/ai-yoyo.js?v=v46-2026-05-27"></script>
+<script src="js/ai-patterns-data.js?v=v46-2026-05-27"></script>
+<script src="js/ai-patterns-engine.js?v=v46-2026-05-27"></script>
+<script src="js/ai-swap.js?v=v46-2026-05-27"></script>
+<script src="js/ai-swap-brain2.js?v=v46-2026-05-27"></script>
+<script src="js/ai-player.js?v=v46-2026-05-27"></script>
+<script src="js/puzzle-generator.js?v=v46-2026-05-27"></script>
+<script src="js/book-puzzle-generator.js?v=v46-2026-05-27"></script>
+<script src="js/ton4-solver.js?v=v46-2026-05-27"></script>
+<script src="js/sounds.js?v=v46-2026-05-27"></script>
+<script src="js/settings.js?v=v46-2026-05-27"></script>
+<script src="js/ui.js?v=v46-2026-05-27"></script>
+<script src="js/interactions.js?v=v46-2026-05-27"></script>
 
 <script>
 (function(){
@@ -1378,6 +1378,12 @@ var _eqResults = {};            // patternId+idx → 'correct' | 'incorrect'
 var _eqDragTileId = null;       // id of tile being dragged
 var _eqSelectedTileId = null;   // id of tile selected by single tap (click-to-place mode)
 
+// Sound helpers — safe no-ops when sounds.js isn't loaded or sound is off.
+function _sfxClick() { try { window.AMath && window.AMath.sounds && window.AMath.sounds.tileClick(); } catch(e) {} }
+function _sfxPlace() { try { window.AMath && window.AMath.sounds && window.AMath.sounds.tilePlace(); } catch(e) {} }
+function _sfxWin() { try { window.AMath && window.AMath.sounds && window.AMath.sounds.submitSuccess(); } catch(e) {} }
+function _sfxFail() { try { window.AMath && window.AMath.sounds && window.AMath.sounds.submitFail(); } catch(e) {} }
+
 window.openEquationPractice = async function(sid, cache) {
   if (!window.AMath._bookData && window.AMath.bookGenerator) {
     await window.AMath.bookGenerator.loadBookData();
@@ -1554,6 +1560,7 @@ function makeRackTileEl(tile, idx, prefix) {
   // Desktop drag (HTML5)
   el.addEventListener('dragstart', function(e){
     _eqDragTileId = tile.id;
+    _sfxClick();
     el.classList.add('dragging');
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move';
@@ -1579,6 +1586,7 @@ function makeRackTileEl(tile, idx, prefix) {
     var draggedTileId = e.dataTransfer ? e.dataTransfer.getData('text/plain') : _eqDragTileId;
     if (!draggedTileId || draggedTileId === tile.id) return;
     reorderEqTile(draggedTileId, idx, prefix);
+    _sfxPlace();
   });
 
   // Mobile touch drag — optimised for 60fps
@@ -1586,6 +1594,7 @@ function makeRackTileEl(tile, idx, prefix) {
   // (those reads force a synchronous layout recalc on every touchmove).
   el.addEventListener('touchstart', function(e){
     _eqDragTileId = tile.id;
+    _sfxClick();
     el.classList.add('dragging');
     el._dragHalfW = el.offsetWidth / 2;
     el._dragHalfH = el.offsetHeight / 2;
@@ -1658,6 +1667,7 @@ function makeRackTileEl(tile, idx, prefix) {
     _eqDragTileId = null;
     // If the touch didn't result in a drag-reorder (i.e. it was just a tap),
     // treat it as a click-to-select / click-to-place event.
+    if (didReorder) _sfxPlace();
     if (!didReorder && !el._dragMoved) {
       handleTileClick(tile.id, idx, prefix);
     }
@@ -1683,21 +1693,21 @@ function makeRackTileEl(tile, idx, prefix) {
 // Tapping the same tile again deselects it.
 function handleTileClick(tileId, idx, prefix) {
   if (_eqSelectedTileId === tileId) {
-    // Deselect
     _eqSelectedTileId = null;
+    _sfxClick();
     refreshTileSelection(prefix);
     return;
   }
   if (_eqSelectedTileId === null) {
-    // First click: select this tile
     _eqSelectedTileId = tileId;
+    _sfxClick();
     refreshTileSelection(prefix);
     return;
   }
-  // Second click on a different tile: reorder selected → here
   var selectedId = _eqSelectedTileId;
   _eqSelectedTileId = null;
   reorderEqTile(selectedId, idx, prefix);
+  _sfxPlace();
   refreshTileSelection(prefix);
 }
 
@@ -1779,6 +1789,7 @@ window.eqSubmit = function() {
   var r = tryAllAssignments(tokens, pattern);
   if (r.valid) {
     _eqResults[_eqResultKey()] = 'correct';
+    _sfxWin();
     showResultBanner(true, '✓ Correct! ' + r.canonical.join(' '));
     var ps = _eqPatterns[_eqActivePattern].puzzles;
     var solvedCount = 0;
@@ -1788,6 +1799,7 @@ window.eqSubmit = function() {
     document.getElementById('eq-score-summary').textContent = 'Solved: ' + solvedCount + ' / ' + ps.length;
   } else {
     _eqResults[_eqResultKey()] = 'incorrect';
+    _sfxFail();
     showResultBanner(false, '✗ ' + (r.reason || 'Not a valid equation.'));
   }
 };
@@ -2019,6 +2031,7 @@ window.ton4Submit = function() {
       if (matches) {
         _ton4Results[_ton4ActiveSet + ':' + _ton4ActiveTargetIdx] = 'correct';
         _ton4SaveState();
+        _sfxWin();
         showTon4Banner(true, '✓ Correct! ' + combo.join(' '));
         var solvedCount = 0;
         for (var k = 0; k < _ton4Data.targets.length; k++) {
@@ -2042,6 +2055,7 @@ window.ton4Submit = function() {
   }
   _ton4Results[_ton4ActiveSet + ':' + _ton4ActiveTargetIdx] = 'incorrect';
   _ton4SaveState();
+  _sfxFail();
   showTon4Banner(false, isOperatorTarget
     ? '✗ Equation does not include the target operator ' + target
     : '✗ Equation does not equal ' + target);
