@@ -81,9 +81,9 @@
         if (seen[key]) return;
         if (validate(seq)) {
           seen[key] = true;
-          var blankVals = [];
-          for (var k = 0; k < n; k++) if (blk[k]) blankVals.push(seq[k]);
-          out.push({ faces: seq.slice(), blankVals: blankVals });
+          var blankVals = [], blankIdx = [];
+          for (var k = 0; k < n; k++) if (blk[k]) { blankVals.push(seq[k]); blankIdx.push(k); }
+          out.push({ faces: seq.slice(), blankVals: blankVals, blankIdx: blankIdx });
         }
         return;
       }

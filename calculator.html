@@ -25,36 +25,55 @@
   select { background:#0f172a; color:#e2e8f0; border:1px solid #475569; border-radius:10px;
     padding:9px; font-size:14px; font-family:inherit; }
 
-  #rack-wrap { display:flex; gap:4px; justify-content:center; flex-wrap:nowrap; margin:10px 0; }
-  .rack-slot { flex:1 1 0; min-width:0; max-width:54px; aspect-ratio:0.9; border-radius:10px;
-    border:2px dashed #475569; display:flex; align-items:center; justify-content:center;
-    background:#0f172a; cursor:pointer; }
-  .rack-slot.empty { color:#475569; font-size:24px; font-weight:700; }
-  .rack-slot .chip { font-weight:800; font-size:18px; color:#1f2937; background:#fef3c7;
-    width:100%; height:100%; border-radius:8px; display:flex; align-items:center; justify-content:center; }
+  #rack-wrap { display:flex; gap:5px; justify-content:center; flex-wrap:nowrap; margin:12px 0; }
+
+  /* A-Math game tile — matches the cream/amber identity from the main game */
+  .gtile { position:relative; display:inline-flex; align-items:center; justify-content:center;
+    background:#fef3c7; border:2px solid #f59e0b; border-radius:9px; color:#1f2937;
+    font-weight:800; line-height:1; box-shadow:0 2px 0 rgba(0,0,0,.28); flex:0 0 auto; }
+  .gtile .pts { position:absolute; right:3px; bottom:2px; font-size:9px; font-weight:700; color:#a16207; }
+  .gtile.stacked { flex-direction:column; }
+  .gtile.stacked .t, .gtile.stacked .b { font-size:52%; }
+  .gtile.stacked .b { border-top:1.5px solid #b45309; margin-top:1px; padding-top:1px; }
+  .gtile.blank { border-style:dashed; background:#fffbeb; color:#b45309; }
+  .gtile.blank .qmark { position:absolute; left:3px; top:1px; font-size:9px; color:#d97706; font-weight:800; }
+
+  .rack-slot { flex:1 1 0; min-width:0; max-width:56px; aspect-ratio:0.86; cursor:pointer; }
+  .rack-slot.empty { border:2px dashed #475569; border-radius:9px; background:#0f172a;
+    display:flex; align-items:center; justify-content:center; color:#475569; font-size:26px; font-weight:700; }
+  .rack-slot .gtile { width:100%; height:100%; font-size:22px; }
 
   /* picker modal */
   .modal { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center;
     justify-content:center; z-index:50; padding:16px; }
   .modal.open { display:flex; }
-  .picker { background:#0f1b2e; border:1px solid #334155; border-radius:16px; padding:16px; width:100%; max-width:340px; }
+  .picker { background:#0f1b2e; border:1px solid #334155; border-radius:16px; padding:16px; width:100%; max-width:360px; }
   .picker h3 { margin:0 0 10px; font-size:15px; }
-  .picker-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:6px; }
-  .picker-btn { aspect-ratio:1; border:1px solid #475569; background:#0f172a; color:#e2e8f0;
-    border-radius:8px; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit; }
-  .picker-btn:hover { border-color:#fbbf24; }
-  .picker-actions { display:flex; gap:8px; margin-top:12px; }
+  .picker-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }
+  .picker-btn { aspect-ratio:0.86; padding:0; border:none; background:none; cursor:pointer; }
+  .picker-btn .gtile { width:100%; height:100%; font-size:19px; }
+  .picker-btn:active .gtile { transform:translateY(1px); }
+  .picker-actions { display:flex; gap:8px; margin-top:14px; }
   .picker-clear { flex:1; padding:9px; border:none; border-radius:8px; background:#7f1d1d; color:#fecaca; font-weight:700; cursor:pointer; }
   .picker-cancel { flex:1; padding:9px; border:1px solid #334155; border-radius:8px; background:#0f172a; color:#94a3b8; font-weight:700; cursor:pointer; }
 
   /* results */
   #results { margin-top:4px; }
-  .eqline { font-size:18px; font-weight:800; letter-spacing:1px; background:#0b1220;
-    border:1px solid #1e293b; border-radius:10px; padding:10px 12px; margin:6px 0; }
-  .hook-card { background:#0b1220; border:1px solid #1e293b; border-radius:12px; padding:10px 12px; margin:8px 0; }
-  .hook-face { display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:30px;
-    padding:0 8px; background:#38bdf8; color:#06283a; border-radius:8px; font-weight:800; margin-right:8px; }
-  .muted { color:#94a3b8; font-size:13px; }
+  .score-badge { display:inline-flex; align-items:center; gap:5px; background:#fbbf24; color:#1f2937;
+    font-weight:800; font-size:14px; padding:4px 12px; border-radius:999px; }
+  .eqrow { display:flex; flex-wrap:wrap; align-items:center; gap:5px; margin:8px 0; }
+  .eqrow .numgroup { display:flex; gap:1px; }
+  .eqrow .gtile { width:32px; height:36px; font-size:16px; border-radius:7px; }
+  .blank-note { color:#b45309; background:#fffbeb; border:1px dashed #f59e0b; border-radius:6px;
+    padding:1px 6px; font-size:12px; font-weight:700; margin-left:4px; }
+  .hook-card { background:#0b1220; border:1px solid #1e293b; border-radius:12px; padding:12px; margin:8px 0; }
+  .rank-row { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+  .rank-num { flex:0 0 auto; width:26px; height:26px; border-radius:50%; background:#1e293b; color:#94a3b8;
+    display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px; }
+  .rank-num.r1 { background:#fbbf24; color:#1f2937; }
+  .rank-num.r2 { background:#cbd5e1; color:#1f2937; }
+  .rank-num.r3 { background:#d68a4f; color:#fff; }
+  .muted { color:#94a3b8; font-size:13px; line-height:1.5; }
 </style>
 </head>
 <body>
@@ -111,9 +130,9 @@
   <script src="js/utils.js?v=v90-en"></script>
   <script src="js/evaluator.js?v=v90-en"></script>
   <script src="js/settings.js?v=v90-en"></script>
-  <script src="js/bingo-solver.js?v=v93-blank"></script>
+  <script src="js/bingo-solver.js?v=v95-tiles"></script>
   <script src="js/scan-ai.js?v=v86-temp" type="module"></script>
   <script src="js/scan-camera.js?v=v91-calc"></script>
-  <script src="js/calculator.js?v=v94-score"></script>
+  <script src="js/calculator.js?v=v95-tiles"></script>
 </body>
 </html>
