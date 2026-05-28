@@ -144,7 +144,7 @@
     if (tiles.length < 2) { res.innerHTML = '<p class="muted">Add some tiles first.</p>'; return; }
     res.innerHTML = '<p class="muted">Searching every possible hook tile… (a few seconds)</p>';
     setTimeout(function () {
-      var report = window.AMath.bingoSolver.bingos(tiles, validate, activeInv(), { examples: 2 });
+      var report = window.AMath.bingoSolver.bingos(tiles, validate, activeInv(), { examples: 1 });
       var m = pointsMap(), base = rackScore(tiles, m);
       res.innerHTML = '';
       var h = document.createElement('div');
