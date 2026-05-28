@@ -144,23 +144,22 @@
     (obj.board || []).forEach(function (cell, i) {
       var r = parseInt(cell.r, 10);
       var c = parseInt(cell.c, 10);
-      var f = cell.f;
       if (isNaN(r) || isNaN(c) || r < 0 || c < 0 || r >= BOARD_SIZE || c >= BOARD_SIZE) {
-        errors.push('Board entry ' + i + ': bad cell (' + cell.r + ',' + cell.c + ').');
+        warnings.push('Skipped a tile with an out-of-range position.');
         return;
       }
       var key = r + ',' + c;
-      if (seen[key]) { errors.push('Two tiles on the same cell ' + key + '.'); return; }
+      if (seen[key]) { warnings.push('Two tiles on cell ' + key + ' — kept the first.'); return; }
       var norm = normalizeFace(cell.f, cell.a);
       var f = norm.f;
-      if (!inv[f]) { errors.push('Cell ' + key + ': unknown face "' + cell.f + '".'); return; }
+      if (!inv[f]) { warnings.push('Couldn\u2019t read a tile at (' + (r + 1) + ',' + (c + 1) + ') — left empty.'); return; }
       var entry = { r: r, c: c, f: f };
       var def = inv[f];
       if (def.type === 'choice' || def.type === 'blank') {
         if (norm.a == null || norm.a === '') {
-          warnings.push('Cell ' + key + ' (' + f + ') needs a chosen value (+,−,×,÷ or a number).');
+          warnings.push('Cell (' + (r + 1) + ',' + (c + 1) + ') (' + f + ') needs a chosen value.');
         } else if (ASSIGNABLE.indexOf(String(norm.a)) === -1) {
-          errors.push('Cell ' + key + ': invalid chosen value "' + norm.a + '".');
+          warnings.push('Cell (' + (r + 1) + ',' + (c + 1) + '): unclear chosen value.');
         } else {
           entry.a = String(norm.a);
         }
@@ -176,23 +175,26 @@
       var rawA = (typeof item === 'object' && item) ? item.a : undefined;
       if (rawF == null || rawF === '') return; // empty slot
       var nr = normalizeFace(rawF, rawA);
-      if (!inv[nr.f]) { errors.push('Rack slot ' + i + ': unknown face "' + rawF + '".'); return; }
+      if (!inv[nr.f]) { warnings.push('Couldn\u2019t read a rack tile — left empty.'); return; }
       var ri = { f: nr.f };
       if (nr.a != null && nr.a !== '') ri.a = String(nr.a);
       rack.push(ri);
     });
     if (rack.length > RACK_SIZE) {
-      errors.push('Rack has ' + rack.length + ' tiles (max ' + RACK_SIZE + ').');
+      warnings.push('Rack had ' + rack.length + ' tiles — kept the first ' + RACK_SIZE + '.');
+      rack = rack.slice(0, RACK_SIZE);
     }
 
-    // --- inventory overflow check (board + rack can't exceed real tile counts) ---
-    var used = {};
+    // --- inventory overflow: don't block; flag the over-used faces so the UI
+    //     can highlight those tiles for the user to fix. ---
+    var used = {}, flaggedFaces = [];
     board.forEach(function (e) { used[e.f] = (used[e.f] || 0) + 1; });
     rack.forEach(function (e) { used[e.f] = (used[e.f] || 0) + 1; });
     Object.keys(used).forEach(function (face) {
       var def = inv[face];
       if (def && used[face] > def.count) {
-        errors.push('Used ' + used[face] + ' × "' + face + '" but only ' + def.count + ' exist.');
+        warnings.push('Read ' + used[face] + ' × "' + face + '" but only ' + def.count + ' exist — extra ones flagged.');
+        flaggedFaces.push(face);
       }
     });
 
@@ -210,6 +212,7 @@
       rack: rack,
       turn: turn,
       scores: scores,
+      flaggedFaces: flaggedFaces,
     };
   }
 

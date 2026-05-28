@@ -294,20 +294,33 @@
     res.board.forEach(function (e) { editBoard[e.r][e.c] = { face: e.f, assigned: e.a || null }; });
     res.rack.forEach(function (e, i) { editRack[i] = { face: e.f, assigned: e.a || null }; });
 
-    var ac = runAutoCorrect();
+    var ac = runAutoCorrect();   // sets _problemCells from equation checks
+
+    // Also flag every cell whose face is over the tile supply, so the user can
+    // see and remove the extra ones.
+    var flagged = (res.flaggedFaces || []);
+    if (flagged.length) {
+      for (var fr = 0; fr < SIZE; fr++) for (var fc = 0; fc < SIZE; fc++) {
+        var m = editBoard[fr][fc];
+        if (m && flagged.indexOf(m.face) !== -1) _problemCells[fr + ',' + fc] = true;
+      }
+    }
 
     if (status) {
       status.style.color = '#34d399';
-      var html = '✅ ' + (sourceLabel || 'Imported') + ': ' + res.board.length + ' board tiles, ' +
-        res.rack.length + ' rack tiles.';
-      if (res.warnings.length) html += '<br>⚠️ ' + res.warnings.join('<br>⚠️ ');
+      var html = '✅ ' + (sourceLabel || 'Imported') + ': ' + res.board.length + ' tile(s) read.';
       if (ac && ac.fixes.length) {
-        html += '<br><span style="color:#38bdf8;">🔧 Auto-fixed ' + ac.fixes.length + ' tile(s): ' +
+        html += '<br><span style="color:#38bdf8;">🔧 Auto-fixed ' + ac.fixes.length + ': ' +
           ac.fixes.map(function (f) { return '(' + (f.r + 1) + ',' + (f.c + 1) + ') ' + f.from + '→' + f.to; }).join(', ') + '</span>';
       }
-      if (ac && ac.problems.length) {
-        html += '<br><span style="color:#fbbf24;">⚠️ ' + ac.problems.length +
-          ' cell(s) still look wrong (outlined red) — tap to fix.</span>';
+      var attention = Object.keys(_problemCells).length;
+      if (attention) {
+        html += '<br><span style="color:#fbbf24;">⚠️ ' + attention +
+          ' cell(s) outlined red need a look — tap any to fix or clear. Squares the scan missed: just tap them to fill in.</span>';
+      }
+      if (res.warnings.length) {
+        html += '<br><span style="color:#94a3b8;font-size:11px;">' + res.warnings.slice(0, 6).join('<br>') +
+          (res.warnings.length > 6 ? '<br>…' : '') + '</span>';
       }
       status.innerHTML = html;
     }
