@@ -34,8 +34,8 @@
   .mode-tab.active { border-color:#fbbf24; color:#fbbf24; }
 
   #board-wrap { display:flex; justify-content:center; margin:6px 0 12px; }
-  #rack-wrap { display:flex; gap:5px; justify-content:center; flex-wrap:wrap; margin:8px 0; }
-  .rack-slot { width:40px; height:46px; border-radius:8px; border:2px dashed #475569;
+  #rack-wrap { display:flex; gap:4px; justify-content:center; flex-wrap:nowrap; margin:8px 0; }
+  .rack-slot { flex:1 1 0; min-width:0; max-width:46px; height:46px; border-radius:8px; border:2px dashed #475569;
     display:flex; align-items:center; justify-content:center; background:#0f172a; cursor:pointer; }
   .rack-slot.empty { color:#475569; font-size:22px; font-weight:700; }
   .rack-slot .face-chip { font-weight:800; font-size:15px; color:#1f2937; background:#fef3c7;
