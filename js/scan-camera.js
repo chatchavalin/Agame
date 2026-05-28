@@ -200,11 +200,23 @@
 
   var PASSES = 5;
   var PASS_TEMPS = [0.0, 0.2, 0.35, 0.5, 0.65];  // diverse reads → meaningful vote
+  var RACK_PASSES = 3;
 
-  // Run PASSES reads on an image and merge them, then apply.
+  function friendlyErr(err) {
+    var m = String(err && err.message || err);
+    if (m === 'NO_BACKEND') return 'Set up Firebase AI Logic in the console (recommended) or paste a Gemini key above.';
+    if (/api key|API_KEY|invalid|permission|PERMISSION/i.test(m)) return 'Access rejected — check your Firebase AI Logic setup (or key).';
+    if (/quota|rate|RESOURCE_EXHAUSTED/i.test(m)) return 'Free quota hit — wait a bit and try again.';
+    if (/failed to fetch|networkerror|CORS/i.test(m)) return 'Network error reaching the AI service.';
+    if (/app.?check|APP_CHECK/i.test(m)) return 'Blocked by App Check — disable enforcement for now, or register this domain.';
+    return m;
+  }
+
+  // Read the board across PASSES (varied temperatures) and merge by vote.
+  // Resolves to { grid, n } or { grid:null, err }.
   function runScanPasses(image) {
     var prompt = buildPrompt();
-    var done = 0, jobs = [];
+    var done = 0, lastErr = null, jobs = [];
     for (var i = 0; i < PASSES; i++) {
       var temp = PASS_TEMPS[i % PASS_TEMPS.length];
       jobs.push(
@@ -212,25 +224,65 @@
           status('⏳ Reading board — pass ' + (++done) + '/' + PASSES + '…');
           try { var o = JSON.parse(extractJson(text) || 'null'); return (o && Array.isArray(o.grid)) ? o.grid : null; }
           catch (e) { return null; }
+        }).catch(function (e) { lastErr = e; return null; })
+      );
+    }
+    return Promise.all(jobs).then(function (results) {
+      var grids = results.filter(function (g) { return g; });
+      if (!grids.length) return { grid: null, err: lastErr };
+      return { grid: mergeGrids(grids), n: grids.length };
+    });
+  }
+
+  // Read the player's rack from the (uncropped) image across a few passes and
+  // merge per-position by vote. Resolves to an array of face strings (≤8).
+  function rackPrompt() {
+    return [
+      'This photo includes a player\'s tile RACK / TRAY — a single row of up to 8 game tiles in a holder, SEPARATE from the 15x15 board (usually along the bottom edge, tiles face-up).',
+      'Read ONLY the rack tiles, in order from LEFT to RIGHT. Ignore the 15x15 board grid and everything else.',
+      'Output ONLY JSON: {"rack":[ up to 8 strings ]}. Each string is the tile face: "0".."9","10","11","12","13","14","15","16","20","+","-","=","±" (the +/- tile), "×" or "÷" (the ×/÷ tile), "BLANK". The tiny corner number is the point value — ignore it.',
+      'If there is no visible rack/tray, return {"rack":[]}.'
+    ].join('\n');
+  }
+  function mergeRacks(lists) {
+    var need = lists.length <= 1 ? 1 : Math.floor(lists.length / 2) + 1;
+    var out = [];
+    for (var i = 0; i < 8; i++) {
+      var counts = {}, order = [];
+      lists.forEach(function (l) {
+        var v = (l && l[i] != null) ? String(l[i]).trim() : '';
+        if (v === '' || v === '.') return;
+        if (!(v in counts)) { counts[v] = 0; order.push(v); }
+        counts[v]++;
+      });
+      var best = '', bestN = 0;
+      order.forEach(function (v) { if (counts[v] > bestN) { bestN = counts[v]; best = v; } });
+      out.push(bestN >= need ? best : '');
+    }
+    while (out.length && out[out.length - 1] === '') out.pop();
+    return out;
+  }
+  function runRackPasses(image) {
+    var jobs = [];
+    for (var i = 0; i < RACK_PASSES; i++) {
+      var temp = PASS_TEMPS[i % PASS_TEMPS.length];
+      jobs.push(
+        analyze2(image, rackPrompt(), temp).then(function (text) {
+          try { var o = JSON.parse(extractJson(text) || 'null'); return (o && Array.isArray(o.rack)) ? o.rack : null; }
+          catch (e) { return null; }
         }).catch(function () { return null; })
       );
     }
-    Promise.all(jobs).then(function (results) {
-      var grids = results.filter(function (g) { return g; });
-      if (!grids.length) { status('❌ The model did not return readable board data. Try a flatter, well-lit photo.', '#f87171'); return; }
-      var json = JSON.stringify({ v: 2, grid: mergeGrids(grids) });
-      var ok = window.AMath.scanApply ? window.AMath.scanApply(json, 'Scanned (' + grids.length + ' passes merged)') : false;
-      if (ok) status('✅ Scanned (' + grids.length + ' passes merged). Check the grid below and fix any misreads.', '#34d399');
-      else status('⚠️ Scanned, but some cells need fixing — see the message below the grid.', '#fbbf24');
-    }).catch(function (err) {
-      var m = String(err && err.message || err);
-      if (m === 'NO_BACKEND') m = 'Set up Firebase AI Logic in the console (recommended) or paste a Gemini key above.';
-      else if (/api key|API_KEY|invalid|permission|PERMISSION/i.test(m)) m = 'Access rejected — check your Firebase AI Logic setup (or key).';
-      else if (/quota|rate|RESOURCE_EXHAUSTED/i.test(m)) m = 'Free quota hit — wait a bit and try again.';
-      else if (/failed to fetch|networkerror|CORS/i.test(m)) m = 'Network error reaching the AI service.';
-      else if (/app.?check|APP_CHECK/i.test(m)) m = 'Blocked by App Check — disable enforcement for now, or register this domain.';
-      status('❌ ' + m, '#f87171');
-    });
+    return Promise.all(jobs).then(function (res) { return mergeRacks(res.filter(Boolean)); });
+  }
+
+  function applyScan(grid, rack) {
+    var payload = { v: 2, grid: grid };
+    if (rack && rack.length) payload.rack = rack;
+    var ok = window.AMath.scanApply ? window.AMath.scanApply(JSON.stringify(payload), 'Scanned') : false;
+    var rackNote = (rack && rack.length) ? (' + ' + rack.length + ' rack tile(s)') : '';
+    if (ok) status('✅ Scanned' + rackNote + '. Check the grid below and fix any misreads.', '#34d399');
+    else status('⚠️ Scanned' + rackNote + ', but some cells need fixing — see the message below the grid.', '#fbbf24');
   }
 
   function onPhoto(file) {
@@ -238,11 +290,19 @@
     status('⏳ Reading photo…');
     fileToBase64(file, function (base64) {
       if (!base64) { status('❌ Could not read that image.', '#f87171'); return; }
+      var rackEl = document.getElementById('read-rack');
+      var wantRack = !!(rackEl && rackEl.checked);
       status('⏳ Finding the board edges…');
       detectBoard(base64).then(function (box) {
         cropToBox(base64, box, function (cropped) {
           status('⏳ Reading board — ' + PASSES + ' passes for accuracy… (~30s)');
-          runScanPasses(cropped);
+          runScanPasses(cropped).then(function (r) {
+            if (!r.grid) { status('❌ ' + (r.err ? friendlyErr(r.err) : 'The model did not return readable board data. Try a flatter, well-lit photo.'), '#f87171'); return; }
+            if (!wantRack) { applyScan(r.grid, null); return; }
+            status('⏳ Reading your rack…');
+            runRackPasses(base64).then(function (rack) { applyScan(r.grid, rack); })
+              .catch(function () { applyScan(r.grid, null); });
+          }).catch(function (err) { status('❌ ' + friendlyErr(err), '#f87171'); });
         });
       });
     });
