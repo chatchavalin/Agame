@@ -30,13 +30,23 @@
   }
 
   // Structural prune on the partial face sequence (more tiles may follow).
+  // Mirrors the evaluator's A-Math rules so we never skip a legal equation:
+  //  - a segment (equation start, or right after '=') may begin with a number
+  //    or a unary '-'; never with '+', '×', '÷', or '='.
+  //  - two operators may never be adjacent (so a unary '-' must be followed by
+  //    a number, and 'op =' / '= =' are invalid).
   function partialOk(seq) {
     var L = seq.length;
     if (L === 0) return true;
     var last = seq[L - 1], prev = L >= 2 ? seq[L - 2] : null;
-    if (L === 1 && (isBinOp(last) || last === '=')) return false;     // can't start with op or '='
-    if (last === '=' && (prev === '=' || isBinOp(prev))) return false; // '= =' or 'op ='
-    if (isBinOp(last) && (prev === '=' || isBinOp(prev))) return false; // '= op' or 'op op'
+    if (L === 1) {
+      return !(last === '=' || last === '+' || last === '×' || last === '÷'); // '-' (unary) and numbers ok
+    }
+    if (isBinOp(last) && isBinOp(prev)) return false;          // no two adjacent operators
+    if (prev === '=') {                                        // start of a new segment
+      return !(last === '+' || last === '×' || last === '÷' || last === '='); // '-' (unary) ok
+    }
+    if (last === '=' && isBinOp(prev)) return false;           // a segment can't end with an operator
     return true;
   }
 
