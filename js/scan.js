@@ -296,15 +296,9 @@
 
     var ac = runAutoCorrect();   // sets _problemCells from equation checks
 
-    // Also flag every cell whose face is over the tile supply, so the user can
-    // see and remove the extra ones.
-    var flagged = (res.flaggedFaces || []);
-    if (flagged.length) {
-      for (var fr = 0; fr < SIZE; fr++) for (var fc = 0; fc < SIZE; fc++) {
-        var m = editBoard[fr][fc];
-        if (m && flagged.indexOf(m.face) !== -1) _problemCells[fr + ',' + fc] = true;
-      }
-    }
+    // Flag only the surplus tiles (extras beyond the real supply), so red marks
+    // the genuine problems instead of every copy.
+    (res.flaggedCells || []).forEach(function (rc) { _problemCells[rc[0] + ',' + rc[1]] = true; });
 
     if (status) {
       status.style.color = '#34d399';

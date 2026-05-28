@@ -185,15 +185,22 @@
       rack = rack.slice(0, RACK_SIZE);
     }
 
-    // --- inventory overflow: don't block; flag the over-used faces so the UI
-    //     can highlight those tiles for the user to fix. ---
-    var used = {}, flaggedFaces = [];
-    board.forEach(function (e) { used[e.f] = (used[e.f] || 0) + 1; });
-    rack.forEach(function (e) { used[e.f] = (used[e.f] || 0) + 1; });
+    // --- inventory overflow: don't block. Flag only the SURPLUS tiles (the
+    //     extras beyond what exists), not every copy — keeps the highlight
+    //     surgical so the user sees the few genuine problems. ---
+    var used = {}, flaggedFaces = [], flaggedCells = [];
+    board.forEach(function (e) {
+      used[e.f] = (used[e.f] || 0) + 1;
+      var def = inv[e.f];
+      if (def && used[e.f] > def.count) flaggedCells.push([e.r, e.c]); // this copy is a surplus
+    });
+    var rackUsed = {};
+    rack.forEach(function (e) { rackUsed[e.f] = (rackUsed[e.f] || 0) + 1; });
     Object.keys(used).forEach(function (face) {
       var def = inv[face];
-      if (def && used[face] > def.count) {
-        warnings.push('Read ' + used[face] + ' × "' + face + '" but only ' + def.count + ' exist — extra ones flagged.');
+      var total = used[face] + (rackUsed[face] || 0);
+      if (def && total > def.count) {
+        warnings.push('Read ' + total + ' \u00d7 "' + face + '" but only ' + def.count + ' exist \u2014 extra one(s) flagged red.');
         flaggedFaces.push(face);
       }
     });
@@ -213,6 +220,7 @@
       turn: turn,
       scores: scores,
       flaggedFaces: flaggedFaces,
+      flaggedCells: flaggedCells,
     };
   }
 
