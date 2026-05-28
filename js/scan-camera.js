@@ -70,6 +70,7 @@
       'How to read a tile:',
       '- A tile shows ONE large symbol in the center — output only that. The tiny number in the lower-right CORNER is the point value; it is NOT a tile and must be ignored. Example: a tile with a large "8" and a small "2" in the corner is "8" (never "2", never two tiles).',
       '- Two-digit tiles (10,11,12,13,14,15,16,20) are ONE tile in ONE square. Never split "20" into "2" and "0".',
+      '- Conversely, two ADJACENT squares that each hold a single digit are TWO separate tiles, not one two-digit number. A "2" square next to a "0" square is "2" and "0" (in two slots), NOT a single "20". Only call it "20" when both digits are printed on ONE physical tile.',
       '- Allowed faces: "0".."9","10","11","12","13","14","15","16","20","+","-","=","±" (the +/- tile), "×" or "÷" (the ×/÷ tile used as multiply/divide), "BLANK". Tiles 17,18,19 do not exist.',
       '',
       'Do NOT read non-tiles: ignore the coordinate letters/numbers around the edges, and ignore square-bonus labels on empty squares ("DOUBLE","TRIPLE","EQUATION","PIECE","2X","3X","GAMESMITH"). An "X" in a bonus label is not a tile.',
@@ -89,7 +90,7 @@
   }
 
   // ---- call Gemini ----------------------------------------------------------
-  function callGemini(base64, key) {
+  function callGemini(base64, key, temperature) {
     var body = {
       contents: [{
         parts: [
@@ -97,7 +98,7 @@
           { text: buildPrompt() }
         ]
       }],
-      generationConfig: { responseMimeType: 'application/json', temperature: 0 }
+      generationConfig: { responseMimeType: 'application/json', temperature: (typeof temperature === 'number' ? temperature : 0) }
     };
     return fetch(ENDPOINT, {
       method: 'POST',
@@ -159,7 +160,6 @@
   }
 
   // ---- orchestration --------------------------------------------------------
-  var PASSES = 3;
 
   // Ask the model for the playing grid's bounding box (fractions of the image),
   // so we can crop tightly to the board before reading — bigger tiles, no frame
@@ -198,13 +198,17 @@
     img.src = 'data:image/jpeg;base64,' + base64;
   }
 
+  var PASSES = 5;
+  var PASS_TEMPS = [0.0, 0.2, 0.35, 0.5, 0.65];  // diverse reads → meaningful vote
+
   // Run PASSES reads on an image and merge them, then apply.
   function runScanPasses(image) {
     var prompt = buildPrompt();
     var done = 0, jobs = [];
     for (var i = 0; i < PASSES; i++) {
+      var temp = PASS_TEMPS[i % PASS_TEMPS.length];
       jobs.push(
-        analyze2(image, prompt).then(function (text) {
+        analyze2(image, prompt, temp).then(function (text) {
           status('⏳ Reading board — pass ' + (++done) + '/' + PASSES + '…');
           try { var o = JSON.parse(extractJson(text) || 'null'); return (o && Array.isArray(o.grid)) ? o.grid : null; }
           catch (e) { return null; }
@@ -237,7 +241,7 @@
       status('⏳ Finding the board edges…');
       detectBoard(base64).then(function (box) {
         cropToBox(base64, box, function (cropped) {
-          status('⏳ Reading board — ' + PASSES + ' passes for accuracy… (~20s)');
+          status('⏳ Reading board — ' + PASSES + ' passes for accuracy… (~30s)');
           runScanPasses(cropped);
         });
       });
@@ -245,13 +249,13 @@
   }
 
   // analyze() that takes an explicit prompt (so all passes share one prompt build)
-  function analyze2(base64, prompt) {
+  function analyze2(base64, prompt, temperature) {
     if (window.AMath && typeof window.AMath.geminiScan === 'function') {
-      return window.AMath.geminiScan(base64, prompt);
+      return window.AMath.geminiScan(base64, prompt, temperature);
     }
     var key = getKey();
     if (!key) return Promise.reject(new Error('NO_BACKEND'));
-    return callGemini(base64, key);
+    return callGemini(base64, key, temperature);
   }
   function _onPhoto_OLD(file) {
     if (!file) return;

@@ -33,16 +33,17 @@ const firebaseConfig = {
 // Google retires it (see firebase.google.com/docs/ai-logic/models).
 const MODEL = "gemini-2.5-flash";
 
-let _model = null;
-function ensureModel() {
-  if (_model) return _model;
+let _models = {};
+function ensureModel(temp) {
+  var key = String(temp);
+  if (_models[key]) return _models[key];
   const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
   const ai = getAI(app, { backend: new GoogleAIBackend() });
-  _model = getGenerativeModel(ai, {
+  _models[key] = getGenerativeModel(ai, {
     model: MODEL,
-    generationConfig: { responseMimeType: "application/json", temperature: 0 }
+    generationConfig: { responseMimeType: "application/json", temperature: temp }
   });
-  return _model;
+  return _models[key];
 }
 
 window.AMath = window.AMath || {};
@@ -51,9 +52,12 @@ window.AMath = window.AMath || {};
  * Analyze a base64 JPEG of the board. Returns the model's text (expected JSON).
  * @param {string} base64  image data without the data: prefix
  * @param {string} prompt  the board-reading instruction (built in scan-camera.js)
+ * @param {number} [temperature]  sampling temperature (varied across passes so a
+ *                                multi-pass vote sees genuinely different reads)
  */
-window.AMath.geminiScan = async function (base64, prompt) {
-  const model = ensureModel();
+window.AMath.geminiScan = async function (base64, prompt, temperature) {
+  const t = (typeof temperature === "number") ? temperature : 0;
+  const model = ensureModel(t);
   const imagePart = { inlineData: { mimeType: "image/jpeg", data: base64 } };
   // Best practice: image first, then the text instruction.
   const result = await model.generateContent([imagePart, prompt]);
