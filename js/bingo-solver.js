@@ -145,7 +145,7 @@
     return { eight: eight, nine: nine, capped: capped };
   }
 
-  var api = { solve: solve, bingos: bingos, candidateHooks: candidateHooks };
+  var api = { solve: solve, bingos: bingos, candidateHooks: candidateHooks, choicesFor: choicesFor };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof window !== 'undefined') {
