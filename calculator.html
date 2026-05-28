@@ -38,24 +38,21 @@
   .gtile.blank { border-style:dashed; background:#fffbeb; color:#b45309; }
   .gtile.blank .qmark { position:absolute; left:3px; top:1px; font-size:9px; color:#d97706; font-weight:800; }
 
-  .rack-slot { flex:1 1 0; min-width:0; max-width:56px; aspect-ratio:0.86; cursor:pointer; }
+  .rack-slot { flex:1 1 0; min-width:0; max-width:46px; aspect-ratio:1; cursor:pointer; }
   .rack-slot.empty { border:2px dashed #475569; border-radius:9px; background:#0f172a;
-    display:flex; align-items:center; justify-content:center; color:#475569; font-size:26px; font-weight:700; }
-  .rack-slot .gtile { width:100%; height:100%; font-size:22px; }
+    display:flex; align-items:center; justify-content:center; color:#475569; font-size:22px; font-weight:700; }
+  .rack-slot .gtile { width:100%; height:100%; font-size:20px; }
 
-  /* picker modal */
-  .modal { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center;
-    justify-content:center; z-index:50; padding:16px; }
-  .modal.open { display:flex; }
-  .picker { background:#0f1b2e; border:1px solid #334155; border-radius:16px; padding:16px; width:100%; max-width:360px; }
-  .picker h3 { margin:0 0 10px; font-size:15px; }
-  .picker-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }
-  .picker-btn { aspect-ratio:0.86; padding:0; border:none; background:none; cursor:pointer; }
-  .picker-btn .gtile { width:100%; height:100%; font-size:19px; }
-  .picker-btn:active .gtile { transform:translateY(1px); }
-  .picker-actions { display:flex; gap:8px; margin-top:14px; }
-  .picker-clear { flex:1; padding:9px; border:none; border-radius:8px; background:#7f1d1d; color:#fecaca; font-weight:700; cursor:pointer; }
-  .picker-cancel { flex:1; padding:9px; border:1px solid #334155; border-radius:8px; background:#0f172a; color:#94a3b8; font-weight:700; cursor:pointer; }
+  /* calculator keypad — tap tiles to type into the rack */
+  #keypad { display:grid; grid-template-columns:repeat(5,1fr); gap:7px; margin-top:8px; }
+  .key { aspect-ratio:1; padding:0; border:none; background:none; cursor:pointer; }
+  .key .gtile { width:100%; height:100%; font-size:20px; }
+  .key:active .gtile { transform:translateY(1px); box-shadow:0 1px 0 rgba(0,0,0,.28); }
+
+  /* find row */
+  .find-row { display:flex; gap:8px; align-items:stretch; margin-bottom:10px; }
+  .find-row select { flex:1; min-width:0; }
+  .find-row #btn-find { flex:0 0 auto; padding-left:20px; padding-right:20px; }
 
   /* results */
   #results { margin-top:4px; }
@@ -63,7 +60,7 @@
     font-weight:800; font-size:14px; padding:4px 12px; border-radius:999px; }
   .eqrow { display:flex; flex-wrap:wrap; align-items:center; gap:5px; margin:8px 0; }
   .eqrow .numgroup { display:flex; gap:1px; }
-  .eqrow .gtile { width:32px; height:36px; font-size:16px; border-radius:7px; }
+  .eqrow .gtile { width:34px; height:34px; font-size:16px; border-radius:7px; }
   .blank-note { color:#b45309; background:#fffbeb; border:1px dashed #f59e0b; border-radius:6px;
     padding:1px 6px; font-size:12px; font-weight:700; margin-left:4px; }
   .hook-card { background:#0b1220; border:1px solid #1e293b; border-radius:12px; padding:12px; margin:8px 0; }
@@ -92,37 +89,30 @@
         </select>
       </label>
 
-      <h2>Your rack (8 tiles)</h2>
-      <p class="hint">Tap a slot to set a tile, or take a photo of your rack. Choice tiles: ± is the +/− tile, ×÷ is the ×/÷ tile.</p>
+      <h2>Your tiles</h2>
       <div id="rack-wrap"></div>
       <div class="btn-row">
-        <button class="btn btn-amber" id="btn-photo">📷 Photo of rack</button>
-        <input id="photo-input" type="file" accept="image/*" style="display:none;">
+        <button class="btn btn-ghost" id="btn-back">⌫ Back</button>
         <button class="btn btn-ghost" id="btn-clear">Clear</button>
+        <button class="btn btn-amber" id="btn-photo">📷 Photo</button>
+        <input id="photo-input" type="file" accept="image/*" style="display:none;">
       </div>
       <div id="cam-status" class="hint"></div>
+
+      <p class="hint" style="margin-top:12px;">Tap tiles to add them (left to right). Tap a tile in your rack to remove it.</p>
+      <div id="keypad"></div>
     </div>
 
     <div class="panel">
       <h2>Find bingos</h2>
-      <div class="btn-row">
-        <button class="btn btn-primary" id="btn-8">8-tile bingo</button>
-        <button class="btn btn-primary" id="btn-9">9-tile bingo (with a hook)</button>
+      <div class="find-row">
+        <select id="mode-select">
+          <option value="9">9-tile bingo — 8 tiles + 1 hook</option>
+          <option value="8">8-tile bingo — your 8 tiles alone</option>
+        </select>
+        <button class="btn btn-primary" id="btn-find">Find</button>
       </div>
-      <p class="hint">8-tile: your 8 tiles alone form one equation. 9-tile: your 8 tiles plus one tile already on the board (the “hook”). For 9-tile we list every hook face that works.</p>
       <div id="results"></div>
-    </div>
-  </div>
-
-  <!-- picker -->
-  <div class="modal" id="picker-modal">
-    <div class="picker">
-      <h3 id="picker-title">Pick a tile</h3>
-      <div class="picker-grid" id="picker-grid"></div>
-      <div class="picker-actions">
-        <button class="picker-clear" id="picker-clear">Clear</button>
-        <button class="picker-cancel" id="picker-cancel">Cancel</button>
-      </div>
     </div>
   </div>
 
@@ -133,6 +123,6 @@
   <script src="js/bingo-solver.js?v=v95-tiles"></script>
   <script src="js/scan-ai.js?v=v86-temp" type="module"></script>
   <script src="js/scan-camera.js?v=v91-calc"></script>
-  <script src="js/calculator.js?v=v96-clarity"></script>
+  <script src="js/calculator.js?v=v97-keypad"></script>
 </body>
 </html>

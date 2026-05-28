@@ -1,5 +1,5 @@
 // Bump CACHE_NAME whenever ANY asset changes to force update.
-const CACHE_NAME = 'amath-v96-clarity';
+const CACHE_NAME = 'amath-v97-keypad';
 const ASSETS = [
   '/Agame/',
   '/Agame/lobby.html',
