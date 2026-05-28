@@ -7,7 +7,7 @@
 // This script bumps version stamp every time we deploy. If the SW is stale,
 // it tells the SW to unregister, clears all caches, and reloads.
 (function(){
-  var DEPLOYED_VERSION = 'v65-enlabel-2026-05-28';
+  var DEPLOYED_VERSION = 'v66-speed2min-2026-05-28';
   var lastVersion = localStorage.getItem('pz_version');
   if (lastVersion !== DEPLOYED_VERSION) {
     localStorage.setItem('pz_version', DEPLOYED_VERSION);
@@ -505,7 +505,7 @@ body.theme-dark .player-area .amath-tile-rack {
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
       <button onclick="cancelSpeedRound()" class="eq-btn-back">← Cancel</button>
       <span style="font-size:14px;font-weight:800;color:#ef4444;letter-spacing:0.5px;">⚡ SPEED ROUND</span>
-      <div id="speed-timer-display" style="font-family:'Courier New',monospace;font-size:20px;font-weight:800;color:#ef4444;background:rgba(239,68,68,0.15);border:1px solid #ef4444;padding:4px 12px;border-radius:8px;min-width:70px;text-align:center;">3:00</div>
+      <div id="speed-timer-display" style="font-family:'Courier New',monospace;font-size:20px;font-weight:800;color:#ef4444;background:rgba(239,68,68,0.15);border:1px solid #ef4444;padding:4px 12px;border-radius:8px;min-width:70px;text-align:center;">2:00</div>
     </div>
 
     <!-- Stats row -->
@@ -2510,7 +2510,7 @@ window.eqGoNext = function() {
 };
 
 // ============== SPEED ROUND ==============
-// 3-minute drill on a chosen Set + Pattern. Tracks solved/attempts/best time
+// 2-minute drill on a chosen Set + Pattern. Tracks solved/attempts/best time
 // and writes personal bests to localStorage.
 
 var _speedSectionId = null;
@@ -2518,7 +2518,7 @@ var _speedPatternId = null;
 var _speedPattern = null;       // { label, patternRegex, lockedShape, puzzles }
 var _speedPool = [];            // remaining puzzle indices to draw from
 var _speedTimer = null;
-var _speedRemaining = 180;      // seconds
+var _speedRemaining = 120;      // seconds (2-minute drill)
 var _speedStats = { solved: 0, attempts: 0, best: null, total: 0, times: [] };
 var _speedCurrentTiles = [];    // current rack [{face,id,locked}]
 var _speedCurrentOriginal = []; // for Reset on skip-only
@@ -2543,7 +2543,7 @@ window.startSpeedRound = function() {
     var t = _speedPool[i]; _speedPool[i] = _speedPool[j]; _speedPool[j] = t;
   }
 
-  _speedRemaining = 180;
+  _speedRemaining = 120;
   _speedStats = { solved: 0, attempts: 0, best: null, total: 0, times: [] };
   
   document.getElementById('speed-round-overlay').style.display = 'block';
@@ -2838,7 +2838,11 @@ function endSpeedRound() {
   document.getElementById('speed-results-avg').textContent = _speedStats.times.length > 0 ? avg : '—';
 
   // Personal best check
-  var pbKey = 'amath_speed_pb_' + _speedSectionId + '_' + _speedPatternId;
+  // PB key includes the round duration ('120s') so personal bests only ever
+  // compare runs of the SAME length. (When the drill was 3 min, PBs lived under
+  // the un-suffixed key; those are intentionally retired — a 3-min "most solved"
+  // could never be beaten in 2 min, which would make the PB banner never fire.)
+  var pbKey = 'amath_speed_pb_' + _speedSectionId + '_' + _speedPatternId + '_120s';
   var prevPB = null;
   try { prevPB = JSON.parse(localStorage.getItem(pbKey) || 'null'); } catch(e){}
   var pbBeaten = false;
