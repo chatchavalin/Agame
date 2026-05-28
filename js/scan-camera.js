@@ -89,6 +89,7 @@
       '',
       'How to read a tile:',
       '- A tile shows ONE large symbol in the center — output only that. The tiny number in the lower-right CORNER is the point value; it is NOT a tile and must be ignored. Example: a tile with a large "8" and a small "2" in the corner is "8" (never "2", never two tiles).',
+      '- BLANK tile: a tile with NO symbol printed in the center (a plain blank face) and only a small "0" in the lower-right corner is a "BLANK" (a wildcard). Do NOT confuse it with the digit zero: the digit "0" tile has a large "0" printed in the CENTER, while a BLANK has an EMPTY center and just "0" in the corner. If the face is empty, output "BLANK".',
       '- ' + twoDigitNote + ' A two-digit tile is ONE tile in ONE square; never split "20" into "2" and "0".',
       '- Conversely, two ADJACENT squares that each hold a single digit are TWO separate tiles, not one two-digit number. A "2" square next to a "0" square is "2" and "0" (in two slots), NOT a single "20". Only call it "20" when both digits are printed on ONE physical tile.',
       '- Allowed faces: "0".."9", ' + twoDigits.map(function (f) { return '"' + f + '"'; }).join(',') + ', "+","-","=","±" (the +/- tile), "×" or "÷" (the ×/÷ tile used as multiply/divide), "BLANK".',
@@ -261,8 +262,9 @@
       'This photo shows a player\'s tile RACK / TRAY: a single row of up to 8 game tiles sitting in a holder (often a close-up of just the tray; a 15x15 board may or may not also be visible).',
       'Read ONLY the rack/tray tiles, in order from LEFT to RIGHT. If a 15x15 board is visible, ignore it.',
       'Each tile has a large face and a tiny corner number (its point value — IGNORE the corner number).',
-      'Output ONLY JSON: {"rack":[ up to 8 strings ]}. Each string is the tile FACE: "0".."9","10","11","12","13","14","15","16","20","+","-","=","±" (the +/- tile), "×" or "÷" (the ×/÷ tile), "BLANK" (a tile with no face printed — its corner value is 0).',
-      'Include every tile in the tray, including a BLANK tile (blue/empty face). Do not skip any slot that holds a tile.',
+      'BLANK tile: a tile with NO symbol in the center (plain/empty face) and only a small "0" in the corner is "BLANK" (a wildcard). Do not confuse it with the digit zero — the "0" digit tile has a large "0" printed in the CENTER. If the center is empty, it is "BLANK".',
+      'Output ONLY JSON: {"rack":[ up to 8 strings ]}. Each string is the tile FACE: "0".."9","10","11","12","13","14","15","16","20","+","-","=","±" (the +/- tile), "×" or "÷" (the ×/÷ tile), "BLANK" (empty face, corner value 0).',
+      'Include every tile in the tray, including a BLANK tile (a plain tile with an empty face). Do not skip any slot that holds a tile.',
       'If you truly see no rack/tray tiles at all, return {"rack":[]}.'
     ].join('\n');
   }
