@@ -706,10 +706,37 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     try { applyLobbyMode(currentLobbyMode()); } catch (e) {}
+    try { applySoundIcon(soundEnabled()); } catch (e) {}
     initAuth();
   });
 
   // Export
+  // Sound on/off toggle. The lobby doesn't load settings.js, but it reads and
+  // writes the SAME settings blob (amath_settings_v1 → soundEnabled) the game
+  // uses, so toggling here carries into Play vs AI / Online.
+  var SETTINGS_KEY = 'amath_settings_v1';
+  function soundEnabled() {
+    try { var s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); return s.soundEnabled !== false; }
+    catch (e) { return true; }
+  }
+  function applySoundIcon(on) {
+    var btn = document.getElementById('btn-sound');
+    if (btn) {
+      btn.textContent = on ? '🔊' : '🔇';
+      btn.setAttribute('title', on ? 'Sound on (tap to mute)' : 'Sound off (tap to unmute)');
+    }
+    try { if (window.AMath && window.AMath.sounds) window.AMath.sounds.setEnabled(on); } catch (e) {}
+  }
+  function toggleSound() {
+    var on = !soundEnabled();
+    try {
+      var s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+      s.soundEnabled = on;
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+    } catch (e) {}
+    applySoundIcon(on);
+  }
+
   // Light/dark toggle for the lobby (the lobby uses its own dark stylesheet,
   // separate from the in-game theme system). Persists in localStorage so it sticks.
   function applyLobbyMode(mode) {
@@ -736,6 +763,7 @@
     playGuest: playGuest,
     logout: logout,
     cycleTheme: cycleTheme,
+    toggleSound: toggleSound,
     applyLobbyMode: applyLobbyMode,
     currentLobbyMode: currentLobbyMode,
     saveProfile: saveProfile,
