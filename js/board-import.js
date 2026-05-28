@@ -207,7 +207,7 @@
     opts = opts || {};
     var rng = opts.rng || Math.random;
 
-    var board = emptyBoard();
+    var board = opts.boardFactory ? opts.boardFactory() : emptyBoard();
     var usedFaces = {};
 
     norm.board.forEach(function (e) {
@@ -232,9 +232,10 @@
     var bag = computeBag(usedFaces, inventory);
 
     // Fill an opponent rack from the bag (random draw) up to RACK_SIZE.
+    // Skipped for solo/analysis (no opponent → tiles stay in the bag).
     var aiTiles = [];
     var aiSlotMap = {};
-    var need = Math.min(RACK_SIZE, bag.tiles.length);
+    var need = (opts.fillOpponent === false) ? 0 : Math.min(RACK_SIZE, bag.tiles.length);
     for (var i = 0; i < need; i++) {
       var pick = Math.floor(rng() * bag.tiles.length);
       var drawn = bag.tiles.splice(pick, 1)[0];

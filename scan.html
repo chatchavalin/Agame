@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Scan / Import Board — A-Math</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=v57-landscape">
+<style>
+  body { font-family:'Outfit',sans-serif; background:#0f172a; color:#e2e8f0; margin:0; }
+  .scan-wrap { max-width:640px; margin:0 auto; padding:14px 12px 60px; }
+  .scan-header { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .scan-header .back-btn { background:none; border:none; color:#94a3b8; font-size:22px; cursor:pointer; padding:4px; }
+  .scan-header h1 { font-size:18px; font-weight:800; color:#fbbf24; margin:0; }
+  .panel { background:#1e293b; border:1px solid #334155; border-radius:14px; padding:14px; margin-bottom:14px; }
+  .panel h2 { font-size:14px; font-weight:700; margin:0 0 8px; color:#e2e8f0; }
+  .panel .hint { font-size:12px; color:#94a3b8; margin:0 0 10px; line-height:1.5; }
+  textarea#code-input { width:100%; box-sizing:border-box; min-height:90px; resize:vertical;
+    background:#0f172a; color:#e2e8f0; border:1px solid #334155; border-radius:10px; padding:10px;
+    font-family:'Courier New',monospace; font-size:12px; }
+  .btn-row { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .btn { border:none; border-radius:10px; font-family:inherit; font-weight:700; font-size:13px;
+    padding:10px 16px; cursor:pointer; }
+  .btn-primary { background:linear-gradient(135deg,#22c55e,#10b981); color:#fff; }
+  .btn-amber { background:linear-gradient(135deg,#fbbf24,#f59e0b); color:#1f2937; }
+  .btn-ghost { background:#0f172a; color:#94a3b8; border:1px solid #334155; }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  #import-status, #validate-msg, #play-msg { font-size:12px; line-height:1.5; margin-top:8px; }
+  #bag-info { font-size:12px; color:#94a3b8; margin-top:6px; font-variant-numeric:tabular-nums; }
+  .mode-tabs { display:flex; gap:6px; margin-bottom:10px; }
+  .mode-tab { flex:1; padding:8px; border:2px solid #334155; background:#0f172a; color:#94a3b8;
+    border-radius:10px; font-size:12px; font-weight:700; text-align:center; }
+  .mode-tab.active { border-color:#fbbf24; color:#fbbf24; }
+
+  #board-wrap { display:flex; justify-content:center; margin:6px 0 12px; }
+  #rack-wrap { display:flex; gap:5px; justify-content:center; flex-wrap:wrap; margin:8px 0; }
+  .rack-slot { width:40px; height:46px; border-radius:8px; border:2px dashed #475569;
+    display:flex; align-items:center; justify-content:center; background:#0f172a; cursor:pointer; }
+  .rack-slot.empty { color:#475569; font-size:22px; font-weight:700; }
+  .rack-slot .face-chip { font-weight:800; font-size:15px; color:#1f2937; background:#fef3c7;
+    width:100%; height:100%; border-radius:6px; display:flex; align-items:center; justify-content:center; }
+
+  /* picker overlay */
+  .picker-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex;
+    align-items:center; justify-content:center; z-index:1000; padding:16px; }
+  .picker-panel { background:#1e293b; border:1px solid #475569; border-radius:16px; padding:16px;
+    max-width:360px; width:100%; max-height:80vh; overflow:auto; }
+  .picker-title { font-size:14px; font-weight:700; margin-bottom:12px; color:#fbbf24; }
+  .picker-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:6px; }
+  .picker-btn { aspect-ratio:1; border:1px solid #475569; background:#0f172a; color:#e2e8f0;
+    border-radius:8px; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit; }
+  .picker-btn:hover { border-color:#fbbf24; }
+  .picker-actions { display:flex; gap:8px; margin-top:12px; }
+  .picker-clear { flex:1; padding:9px; border:none; border-radius:8px; background:#7f1d1d; color:#fecaca; font-weight:700; cursor:pointer; }
+  .picker-cancel { flex:1; padding:9px; border:1px solid #334155; border-radius:8px; background:#0f172a; color:#94a3b8; font-weight:700; cursor:pointer; }
+</style>
+</head>
+<body>
+  <div class="scan-wrap">
+    <div class="scan-header">
+      <button class="back-btn" onclick="window.location.href='lobby.html'">←</button>
+      <h1>📷 Scan / Import Board</h1>
+    </div>
+
+    <!-- IMPORT -->
+    <div class="panel" id="import-section">
+      <h2>1 · Import</h2>
+      <p class="hint">Paste a board code here. (Take a photo of your physical board, send it to Claude in chat, and paste the code it gives you.) Camera import is coming next.</p>
+      <textarea id="code-input" placeholder='{"v":1,"board":[{"r":0,"c":0,"f":"2"}],"rack":["13","5"]}'></textarea>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-load-code">Load code</button>
+        <button class="btn btn-ghost" id="btn-clear-all">Clear board</button>
+      </div>
+      <div id="import-status"></div>
+    </div>
+
+    <!-- REVIEW / PLAY -->
+    <div class="panel" id="review-section">
+      <div class="mode-tabs">
+        <div class="mode-tab active" id="mode-edit">Review &amp; Edit</div>
+        <div class="mode-tab" id="mode-play">Play (solo)</div>
+      </div>
+
+      <div id="board-wrap"></div>
+      <div id="rack-wrap"></div>
+
+      <!-- edit controls -->
+      <div id="edit-controls">
+        <div id="bag-info"></div>
+        <div id="validate-msg"></div>
+        <p class="hint">Tap any board cell or rack slot to set or clear a tile. Choice (±, ×÷) and BLANK tiles will ask which value they represent.</p>
+        <div class="btn-row">
+          <button class="btn btn-amber" id="btn-start-play">Start Playing (solo) →</button>
+        </div>
+      </div>
+
+      <!-- play controls -->
+      <div id="play-controls" style="display:none;">
+        <div id="play-score" style="font-weight:800;color:#fbbf24;font-size:15px;margin:4px 0;"></div>
+        <div id="play-msg"></div>
+        <p class="hint">Tap a rack tile, then an empty cell to place it. Tap a just-placed tile to take it back. "Check" validates the equation on that line.</p>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btn-check">Check equation</button>
+          <button class="btn btn-amber" id="btn-commit">Commit &amp; refill</button>
+          <button class="btn btn-ghost" id="btn-clear-tent">Clear placed</button>
+          <button class="btn btn-ghost" id="btn-back-edit">← Back to edit</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- modules (mirrors puzzle.html load order; only what scan needs) -->
+  <script src="js/constants.js?v=v54-2026-05-27"></script>
+  <script src="js/utils.js?v=v54-2026-05-27"></script>
+  <script src="js/evaluator.js?v=v54-2026-05-27"></script>
+  <script src="js/bag.js?v=v54-2026-05-27"></script>
+  <script src="js/rack.js?v=v54-2026-05-27"></script>
+  <script src="js/board.js?v=v54-2026-05-27"></script>
+  <script src="js/scoring.js?v=v54-2026-05-27"></script>
+  <script src="js/settings.js?v=v54-2026-05-27"></script>
+  <script src="js/ui.js?v=v61-saveexit"></script>
+  <script src="js/board-import.js?v=v71-import"></script>
+  <script src="js/scan.js?v=v71-import"></script>
+</body>
+</html>
