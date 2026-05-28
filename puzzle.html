@@ -216,29 +216,57 @@ body.theme-dark .player-area .amath-tile-rack {
     background: linear-gradient(145deg, #fef3c7, #fde68a);
     color: #1f2937;
     border: 2px solid #d97706;
-    border-radius: 6px;
+    border-radius: 4px;
     font-weight: 800;
     font-size: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
     cursor: grab;
     user-select: none;
     touch-action: none;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
-    transition: transform 0.08s, border-color 0.15s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.4);
+    transition: transform 0.1s ease-out, border-color 0.15s, box-shadow 0.15s;
   }
-  .eq-tile:active { cursor: grabbing; transform: scale(1.08); }
-  .eq-tile.dragging { opacity: 0.5; }
+  .eq-tile:active { cursor: grabbing; transform: scale(1.1); box-shadow: 0 4px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.4); }
+  .eq-tile.dragging { opacity: 0.6; box-shadow: 0 6px 12px rgba(0,0,0,0.4); }
   .eq-tile.drop-target {
     border-color: #10b981;
     background: linear-gradient(145deg, #d1fae5, #a7f3d0);
-    transform: scale(1.05);
+    transform: scale(1.08);
+  }
+  /* Point value in corner — matches PvA tile look */
+  .eq-tile .tile-pts {
+    position: absolute;
+    bottom: 1px;
+    right: 2px;
+    font-size: 7px;
+    font-weight: 700;
+    color: rgba(0,0,0,0.5);
+    line-height: 1;
   }
   .eq-tile.selected {
     border-color: #fbbf24;
     box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.5);
     transform: scale(1.05);
+  }
+  /* Success animation — green glow pulse */
+  .eq-result.correct {
+    animation: success-glow 0.6s ease-out;
+  }
+  @keyframes success-glow {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16,185,129,0.6); }
+    50% { transform: scale(1.05); box-shadow: 0 0 0 16px rgba(16,185,129,0); }
+    100% { transform: scale(1); }
+  }
+  .eq-result.incorrect {
+    animation: shake 0.4s;
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    75% { transform: translateX(6px); }
   }
   .eq-timer {
     font-family: 'Courier New', monospace;
@@ -348,7 +376,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v50</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v51</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -357,7 +385,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
   <!-- Header -->
   <header style="padding:14px 16px 8px;text-align:center;">
-    <h2 style="margin:0 0 4px;font-size:18px;color:#fbbf24;font-weight:800;letter-spacing:0.5px;">🧩 Puzzle Mode<span style="font-size:9px;font-weight:400;vertical-align:super;margin-left:4px;color:#94a3b8;">v50</span></h2>
+    <h2 style="margin:0 0 4px;font-size:18px;color:#fbbf24;font-weight:800;letter-spacing:0.5px;">🧩 Puzzle Mode<span style="font-size:9px;font-weight:400;vertical-align:super;margin-left:4px;color:#94a3b8;">v51</span></h2>
     <p style="margin:0;font-size:11px;color:#94a3b8;">Train your A-Math instincts</p>
   </header>
 
@@ -656,34 +684,34 @@ body.theme-dark .player-area .amath-tile-rack {
 </div>
 
 <!-- Load main game JS modules in dependency order (same as index.html) -->
-<script src="js/constants.js?v=v50-2026-05-27"></script>
-<script src="js/utils.js?v=v50-2026-05-27"></script>
-<script src="js/evaluator.js?v=v50-2026-05-27"></script>
-<script src="js/bag.js?v=v50-2026-05-27"></script>
-<script src="js/rack.js?v=v50-2026-05-27"></script>
-<script src="js/board.js?v=v50-2026-05-27"></script>
-<script src="js/tile-tracker.js?v=v50-2026-05-27"></script>
-<script src="js/scoring.js?v=v50-2026-05-27"></script>
-<script src="js/placement.js?v=v50-2026-05-27"></script>
+<script src="js/constants.js?v=v51-2026-05-27"></script>
+<script src="js/utils.js?v=v51-2026-05-27"></script>
+<script src="js/evaluator.js?v=v51-2026-05-27"></script>
+<script src="js/bag.js?v=v51-2026-05-27"></script>
+<script src="js/rack.js?v=v51-2026-05-27"></script>
+<script src="js/board.js?v=v51-2026-05-27"></script>
+<script src="js/tile-tracker.js?v=v51-2026-05-27"></script>
+<script src="js/scoring.js?v=v51-2026-05-27"></script>
+<script src="js/placement.js?v=v51-2026-05-27"></script>
 <!-- AI modules for the in-browser puzzle generator -->
-<script src="js/ai-x9.js?v=v50-2026-05-27"></script>
-<script src="js/ai-x4.js?v=v50-2026-05-27"></script>
-<script src="js/ai-bingo-fast.js?v=v50-2026-05-27"></script>
-<script src="js/ai-bingo-grammar.js?v=v50-2026-05-27"></script>
-<script src="js/ai-yoyo.js?v=v50-2026-05-27"></script>
-<script src="js/ai-patterns-data.js?v=v50-2026-05-27"></script>
-<script src="js/ai-patterns-engine.js?v=v50-2026-05-27"></script>
-<script src="js/ai-swap.js?v=v50-2026-05-27"></script>
-<script src="js/ai-swap-brain2.js?v=v50-2026-05-27"></script>
-<script src="js/ai-player.js?v=v50-2026-05-27"></script>
-<script src="js/puzzle-generator.js?v=v50-2026-05-27"></script>
-<script src="js/book-puzzle-generator.js?v=v50-2026-05-27"></script>
-<script src="js/ton4-solver.js?v=v50-2026-05-27"></script>
-<script src="js/sounds.js?v=v50-2026-05-27"></script>
-<script src="js/progress.js?v=v50-2026-05-27"></script>
-<script src="js/settings.js?v=v50-2026-05-27"></script>
-<script src="js/ui.js?v=v50-2026-05-27"></script>
-<script src="js/interactions.js?v=v50-2026-05-27"></script>
+<script src="js/ai-x9.js?v=v51-2026-05-27"></script>
+<script src="js/ai-x4.js?v=v51-2026-05-27"></script>
+<script src="js/ai-bingo-fast.js?v=v51-2026-05-27"></script>
+<script src="js/ai-bingo-grammar.js?v=v51-2026-05-27"></script>
+<script src="js/ai-yoyo.js?v=v51-2026-05-27"></script>
+<script src="js/ai-patterns-data.js?v=v51-2026-05-27"></script>
+<script src="js/ai-patterns-engine.js?v=v51-2026-05-27"></script>
+<script src="js/ai-swap.js?v=v51-2026-05-27"></script>
+<script src="js/ai-swap-brain2.js?v=v51-2026-05-27"></script>
+<script src="js/ai-player.js?v=v51-2026-05-27"></script>
+<script src="js/puzzle-generator.js?v=v51-2026-05-27"></script>
+<script src="js/book-puzzle-generator.js?v=v51-2026-05-27"></script>
+<script src="js/ton4-solver.js?v=v51-2026-05-27"></script>
+<script src="js/sounds.js?v=v51-2026-05-27"></script>
+<script src="js/progress.js?v=v51-2026-05-27"></script>
+<script src="js/settings.js?v=v51-2026-05-27"></script>
+<script src="js/ui.js?v=v51-2026-05-27"></script>
+<script src="js/interactions.js?v=v51-2026-05-27"></script>
 
 <script>
 (function(){
@@ -1863,10 +1891,28 @@ function applyRackTileSize(rackId, tileCount) {
 }
 
 // One-row rack tile. Supports drag-to-reorder.
+// A-Math tile point values
+var TILE_POINTS = {
+  '0':1,'1':1,'2':1,'3':1,'4':2,'5':2,'6':2,'7':2,'8':3,'9':3,
+  '10':3,'11':4,'12':4,'13':4,'14':4,'15':4,'16':4,'17':4,'18':4,'19':4,'20':4,
+  '+':2,'-':2,'×':2,'÷':2,'+/-':2,'×/÷':2,'=':1,'BLANK':0
+};
+
+function getTilePoints(face) {
+  return TILE_POINTS[face] || 0;
+}
+
 function makeRackTileEl(tile, idx, prefix) {
   var el = document.createElement('div');
   el.className = 'eq-tile rack-tile' + (tile.locked ? ' locked' : '');
-  el.textContent = tile.face === 'BLANK' ? '?' : tile.face;
+  // Tile face + point value (PvA style: face center, pts bottom-right)
+  var faceText = tile.face === 'BLANK' ? '?' : tile.face;
+  var pts = getTilePoints(tile.face);
+  if (pts > 0 && !tile.locked) {
+    el.innerHTML = faceText + '<span class="tile-pts">' + pts + '</span>';
+  } else {
+    el.textContent = faceText;
+  }
   el.dataset.tileId = tile.id;
   el.dataset.idx = idx;
   el.dataset.prefix = prefix;
@@ -2318,7 +2364,13 @@ function renderSpeedRack() {
 function makeSpeedTileEl(tile, idx) {
   var el = document.createElement('div');
   el.className = 'eq-tile rack-tile' + (tile.locked ? ' locked' : '');
-  el.textContent = tile.face === 'BLANK' ? '?' : tile.face;
+  var faceText = tile.face === 'BLANK' ? '?' : tile.face;
+  var pts = getTilePoints(tile.face);
+  if (pts > 0 && !tile.locked) {
+    el.innerHTML = faceText + '<span class="tile-pts">' + pts + '</span>';
+  } else {
+    el.textContent = faceText;
+  }
   el.dataset.tileId = tile.id;
   el.dataset.idx = idx;
   el.dataset.prefix = 'speed';
