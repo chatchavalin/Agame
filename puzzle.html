@@ -348,7 +348,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v48</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v49</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -357,7 +357,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
   <!-- Header -->
   <header style="padding:14px 16px 8px;text-align:center;">
-    <h2 style="margin:0 0 4px;font-size:18px;color:#fbbf24;font-weight:800;letter-spacing:0.5px;">🧩 Puzzle Mode<span style="font-size:9px;font-weight:400;vertical-align:super;margin-left:4px;color:#94a3b8;">v48</span></h2>
+    <h2 style="margin:0 0 4px;font-size:18px;color:#fbbf24;font-weight:800;letter-spacing:0.5px;">🧩 Puzzle Mode<span style="font-size:9px;font-weight:400;vertical-align:super;margin-left:4px;color:#94a3b8;">v49</span></h2>
     <p style="margin:0;font-size:11px;color:#94a3b8;">Train your A-Math instincts</p>
   </header>
 
@@ -432,6 +432,84 @@ body.theme-dark .player-area .amath-tile-rack {
 </div>
 
 
+<!-- SPEED ROUND OVERLAY -->
+<div id="speed-round-overlay" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.96);z-index:9999;overflow-y:auto;padding:20px;">
+  <div style="max-width:480px;margin:0 auto;">
+    <!-- Header bar -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <button onclick="cancelSpeedRound()" class="eq-btn-back">← Cancel</button>
+      <span style="font-size:14px;font-weight:800;color:#ef4444;letter-spacing:0.5px;">⚡ SPEED ROUND</span>
+      <div id="speed-timer-display" style="font-family:'Courier New',monospace;font-size:20px;font-weight:800;color:#ef4444;background:rgba(239,68,68,0.15);border:1px solid #ef4444;padding:4px 12px;border-radius:8px;min-width:70px;text-align:center;">3:00</div>
+    </div>
+
+    <!-- Stats row -->
+    <div style="display:flex;justify-content:space-around;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:10px;margin-bottom:12px;">
+      <div style="text-align:center;">
+        <div id="speed-solved" style="font-size:20px;font-weight:800;color:#10b981;">0</div>
+        <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Solved</div>
+      </div>
+      <div style="width:1px;background:#334155;"></div>
+      <div style="text-align:center;">
+        <div id="speed-attempts" style="font-size:20px;font-weight:800;color:#fbbf24;">0</div>
+        <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Attempts</div>
+      </div>
+      <div style="width:1px;background:#334155;"></div>
+      <div style="text-align:center;">
+        <div id="speed-best" style="font-size:20px;font-weight:800;color:#a855f7;">—</div>
+        <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Best (s)</div>
+      </div>
+    </div>
+
+    <!-- Pattern label -->
+    <div id="speed-pattern-label" style="text-align:center;font-size:12px;color:#94a3b8;margin-bottom:8px;"></div>
+
+    <!-- Card -->
+    <div class="eq-card">
+      <div id="speed-rack-area" class="eq-rack-strip"></div>
+      <div id="speed-result" class="eq-result"></div>
+      <div class="eq-action-row">
+        <button onclick="speedSkip()" class="eq-btn-secondary">⏭ Skip</button>
+        <button onclick="speedSubmit()" class="eq-btn-primary">✓ Submit</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SPEED ROUND RESULTS OVERLAY -->
+<div id="speed-results-overlay" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.97);z-index:10000;padding:20px;">
+  <div style="max-width:420px;margin:60px auto;background:linear-gradient(145deg,#1e293b,#0f172a);border:1px solid #334155;border-radius:14px;padding:24px;text-align:center;">
+    <div style="font-size:32px;margin-bottom:8px;">⚡</div>
+    <h2 style="font-size:20px;color:#fbbf24;margin:0 0 4px;">Round Complete!</h2>
+    <p id="speed-results-pattern" style="font-size:12px;color:#94a3b8;margin:0 0 18px;"></p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">
+      <div style="background:#0f172a;border:1px solid #10b981;border-radius:8px;padding:12px;">
+        <div id="speed-results-solved" style="font-size:28px;font-weight:800;color:#10b981;">0</div>
+        <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Solved</div>
+      </div>
+      <div style="background:#0f172a;border:1px solid #fbbf24;border-radius:8px;padding:12px;">
+        <div id="speed-results-accuracy" style="font-size:28px;font-weight:800;color:#fbbf24;">—</div>
+        <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Accuracy</div>
+      </div>
+      <div style="background:#0f172a;border:1px solid #a855f7;border-radius:8px;padding:12px;">
+        <div id="speed-results-best" style="font-size:28px;font-weight:800;color:#a855f7;">—</div>
+        <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Best (s)</div>
+      </div>
+      <div style="background:#0f172a;border:1px solid #ef4444;border-radius:8px;padding:12px;">
+        <div id="speed-results-avg" style="font-size:28px;font-weight:800;color:#ef4444;">—</div>
+        <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Avg (s)</div>
+      </div>
+    </div>
+
+    <div id="speed-results-pb" style="font-size:11px;color:#fbbf24;margin-bottom:12px;display:none;font-weight:700;">🏆 New personal best!</div>
+
+    <div style="display:flex;gap:8px;justify-content:center;">
+      <button onclick="closeSpeedResults()" class="eq-btn-secondary">Close</button>
+      <button onclick="restartSpeedRound()" class="eq-btn-primary">⚡ Again</button>
+    </div>
+  </div>
+</div>
+
 <!-- PUZZLE SCREEN — uses main-game layout via UI.buildGameLayout() -->
 <div id="screen-puzzle">
   <div class="pz-meta">
@@ -483,7 +561,7 @@ body.theme-dark .player-area .amath-tile-rack {
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;">
     <button onclick="closeEquationPractice()" class="eq-btn-back">← Back</button>
     <span id="eq-title" style="font-size:14px;font-weight:700;color:#fbbf24;text-align:center;flex:1;">Equation Practice</span>
-    <div style="width:60px;"></div>
+    <button onclick="startSpeedRound()" id="eq-speed-btn" class="eq-btn-back" style="background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff;font-weight:700;">⚡ Speed</button>
   </div>
 
   <!-- Pattern dropdown (only shown if section has multiple patterns) -->
@@ -573,34 +651,34 @@ body.theme-dark .player-area .amath-tile-rack {
 </div>
 
 <!-- Load main game JS modules in dependency order (same as index.html) -->
-<script src="js/constants.js?v=v48-2026-05-27"></script>
-<script src="js/utils.js?v=v48-2026-05-27"></script>
-<script src="js/evaluator.js?v=v48-2026-05-27"></script>
-<script src="js/bag.js?v=v48-2026-05-27"></script>
-<script src="js/rack.js?v=v48-2026-05-27"></script>
-<script src="js/board.js?v=v48-2026-05-27"></script>
-<script src="js/tile-tracker.js?v=v48-2026-05-27"></script>
-<script src="js/scoring.js?v=v48-2026-05-27"></script>
-<script src="js/placement.js?v=v48-2026-05-27"></script>
+<script src="js/constants.js?v=v49-2026-05-27"></script>
+<script src="js/utils.js?v=v49-2026-05-27"></script>
+<script src="js/evaluator.js?v=v49-2026-05-27"></script>
+<script src="js/bag.js?v=v49-2026-05-27"></script>
+<script src="js/rack.js?v=v49-2026-05-27"></script>
+<script src="js/board.js?v=v49-2026-05-27"></script>
+<script src="js/tile-tracker.js?v=v49-2026-05-27"></script>
+<script src="js/scoring.js?v=v49-2026-05-27"></script>
+<script src="js/placement.js?v=v49-2026-05-27"></script>
 <!-- AI modules for the in-browser puzzle generator -->
-<script src="js/ai-x9.js?v=v48-2026-05-27"></script>
-<script src="js/ai-x4.js?v=v48-2026-05-27"></script>
-<script src="js/ai-bingo-fast.js?v=v48-2026-05-27"></script>
-<script src="js/ai-bingo-grammar.js?v=v48-2026-05-27"></script>
-<script src="js/ai-yoyo.js?v=v48-2026-05-27"></script>
-<script src="js/ai-patterns-data.js?v=v48-2026-05-27"></script>
-<script src="js/ai-patterns-engine.js?v=v48-2026-05-27"></script>
-<script src="js/ai-swap.js?v=v48-2026-05-27"></script>
-<script src="js/ai-swap-brain2.js?v=v48-2026-05-27"></script>
-<script src="js/ai-player.js?v=v48-2026-05-27"></script>
-<script src="js/puzzle-generator.js?v=v48-2026-05-27"></script>
-<script src="js/book-puzzle-generator.js?v=v48-2026-05-27"></script>
-<script src="js/ton4-solver.js?v=v48-2026-05-27"></script>
-<script src="js/sounds.js?v=v48-2026-05-27"></script>
-<script src="js/progress.js?v=v48-2026-05-27"></script>
-<script src="js/settings.js?v=v48-2026-05-27"></script>
-<script src="js/ui.js?v=v48-2026-05-27"></script>
-<script src="js/interactions.js?v=v48-2026-05-27"></script>
+<script src="js/ai-x9.js?v=v49-2026-05-27"></script>
+<script src="js/ai-x4.js?v=v49-2026-05-27"></script>
+<script src="js/ai-bingo-fast.js?v=v49-2026-05-27"></script>
+<script src="js/ai-bingo-grammar.js?v=v49-2026-05-27"></script>
+<script src="js/ai-yoyo.js?v=v49-2026-05-27"></script>
+<script src="js/ai-patterns-data.js?v=v49-2026-05-27"></script>
+<script src="js/ai-patterns-engine.js?v=v49-2026-05-27"></script>
+<script src="js/ai-swap.js?v=v49-2026-05-27"></script>
+<script src="js/ai-swap-brain2.js?v=v49-2026-05-27"></script>
+<script src="js/ai-player.js?v=v49-2026-05-27"></script>
+<script src="js/puzzle-generator.js?v=v49-2026-05-27"></script>
+<script src="js/book-puzzle-generator.js?v=v49-2026-05-27"></script>
+<script src="js/ton4-solver.js?v=v49-2026-05-27"></script>
+<script src="js/sounds.js?v=v49-2026-05-27"></script>
+<script src="js/progress.js?v=v49-2026-05-27"></script>
+<script src="js/settings.js?v=v49-2026-05-27"></script>
+<script src="js/ui.js?v=v49-2026-05-27"></script>
+<script src="js/interactions.js?v=v49-2026-05-27"></script>
 
 <script>
 (function(){
@@ -2106,6 +2184,359 @@ window.eqGoPrev = function() {
 window.eqGoNext = function() {
   var ps = _eqPatterns[_eqActivePattern].puzzles;
   if (_eqActiveIdx < ps.length - 1) { _eqActiveIdx++; renderCurrentProblem(); }
+};
+
+// ============== SPEED ROUND ==============
+// 3-minute drill on a chosen Set + Pattern. Tracks solved/attempts/best time
+// and writes personal bests to localStorage.
+
+var _speedSectionId = null;
+var _speedPatternId = null;
+var _speedPattern = null;       // { label, patternRegex, lockedShape, puzzles }
+var _speedPool = [];            // remaining puzzle indices to draw from
+var _speedTimer = null;
+var _speedRemaining = 180;      // seconds
+var _speedStats = { solved: 0, attempts: 0, best: null, total: 0, times: [] };
+var _speedCurrentTiles = [];    // current rack [{face,id,locked}]
+var _speedCurrentOriginal = []; // for Reset on skip-only
+var _speedCurrentPuzzleStartT = 0;
+var _speedDragTileId = null;
+var _speedSelectedTileId = null;
+
+window.startSpeedRound = function() {
+  // Build from the CURRENT _eqActivePattern (the player is already in a pattern)
+  if (!_eqSectionId || !_eqActivePattern || !_eqPatterns[_eqActivePattern]) {
+    alert('Open a pattern first, then tap ⚡ Speed.');
+    return;
+  }
+  _speedSectionId = _eqSectionId;
+  _speedPatternId = _eqActivePattern;
+  _speedPattern = _eqPatterns[_eqActivePattern];
+
+  // Build pool — indices 0..n-1, shuffled
+  _speedPool = _speedPattern.puzzles.map(function(_, i){ return i; });
+  for (var i = _speedPool.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i+1));
+    var t = _speedPool[i]; _speedPool[i] = _speedPool[j]; _speedPool[j] = t;
+  }
+
+  _speedRemaining = 180;
+  _speedStats = { solved: 0, attempts: 0, best: null, total: 0, times: [] };
+  
+  document.getElementById('speed-round-overlay').style.display = 'block';
+  document.getElementById('speed-pattern-label').textContent =
+    _speedSectionId.toUpperCase() + ' · ' + _speedPattern.label;
+  updateSpeedStats();
+  
+  if (_speedTimer) clearInterval(_speedTimer);
+  _speedTimer = setInterval(speedTick, 1000);
+  
+  drawNextSpeedPuzzle();
+};
+
+function speedTick() {
+  _speedRemaining--;
+  var mins = Math.floor(_speedRemaining / 60);
+  var secs = _speedRemaining % 60;
+  var el = document.getElementById('speed-timer-display');
+  if (el) {
+    el.textContent = mins + ':' + String(Math.max(0,secs)).padStart(2,'0');
+    if (_speedRemaining <= 10) {
+      el.style.background = 'rgba(239,68,68,0.3)';
+      el.style.borderColor = '#ef4444';
+      el.style.animation = 'pulse 0.6s infinite';
+    }
+  }
+  if (_speedRemaining <= 0) {
+    endSpeedRound();
+  }
+}
+
+function drawNextSpeedPuzzle() {
+  if (_speedPool.length === 0) {
+    // Repopulate
+    _speedPool = _speedPattern.puzzles.map(function(_, i){ return i; });
+    for (var i = _speedPool.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i+1));
+      var t = _speedPool[i]; _speedPool[i] = _speedPool[j]; _speedPool[j] = t;
+    }
+  }
+  var idx = _speedPool.shift();
+  var puzzle = _speedPattern.puzzles[idx];
+
+  // Build tiles with locked-shape support
+  var lockedShape = _speedPattern.lockedShape || null;
+  if (lockedShape && lockedShape.length === puzzle.tokens.length) {
+    var locked = lockedShape.filter(function(x){ return x !== null; });
+    var digits = puzzle.tokens.slice();
+    locked.forEach(function(face){
+      var i = digits.indexOf(face);
+      if (i !== -1) digits.splice(i, 1);
+    });
+    var di = 0;
+    _speedCurrentOriginal = lockedShape.map(function(slot, i){
+      if (slot !== null) {
+        return { face: slot, id: 'st' + i + '_lock_' + Math.random().toString(36).slice(2,5), locked: true };
+      } else {
+        var face = digits[di++];
+        return { face: face, id: 'st' + i + '_' + Math.random().toString(36).slice(2,5), locked: false };
+      }
+    });
+  } else {
+    _speedCurrentOriginal = puzzle.tokens.map(function(face, i){
+      return { face: face, id: 'st' + i + '_' + Math.random().toString(36).slice(2,5), locked: false };
+    });
+  }
+  _speedCurrentTiles = _speedCurrentOriginal.slice();
+  _speedCurrentPuzzleStartT = Date.now();
+  
+  applyRackTileSize('speed-rack-area', _speedCurrentTiles.length);
+  
+  document.getElementById('speed-result').textContent = '';
+  document.getElementById('speed-result').className = 'eq-result';
+  renderSpeedRack();
+}
+
+function renderSpeedRack() {
+  var rackEl = document.getElementById('speed-rack-area');
+  rackEl.innerHTML = '';
+  _speedCurrentTiles.forEach(function(tile, i){
+    rackEl.appendChild(makeSpeedTileEl(tile, i));
+  });
+}
+
+function makeSpeedTileEl(tile, idx) {
+  var el = document.createElement('div');
+  el.className = 'eq-tile rack-tile' + (tile.locked ? ' locked' : '');
+  el.textContent = tile.face === 'BLANK' ? '?' : tile.face;
+  el.dataset.tileId = tile.id;
+  el.dataset.idx = idx;
+  el.dataset.prefix = 'speed';
+  el.draggable = !tile.locked;
+  if (tile.locked) return el;
+
+  el.addEventListener('dragstart', function(e){
+    _speedDragTileId = tile.id;
+    _sfxClick();
+    el.classList.add('dragging');
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', tile.id);
+    }
+  });
+  el.addEventListener('dragend', function(){
+    el.classList.remove('dragging');
+    _speedDragTileId = null;
+    document.querySelectorAll('.rack-tile.drop-target').forEach(function(t){ t.classList.remove('drop-target'); });
+  });
+  el.addEventListener('dragover', function(e){
+    e.preventDefault();
+    el.classList.add('drop-target');
+  });
+  el.addEventListener('dragleave', function(){ el.classList.remove('drop-target'); });
+  el.addEventListener('drop', function(e){
+    e.preventDefault();
+    el.classList.remove('drop-target');
+    if (!_speedDragTileId) return;
+    var draggedTileId = e.dataTransfer ? e.dataTransfer.getData('text/plain') : _speedDragTileId;
+    if (!draggedTileId || draggedTileId === tile.id) return;
+    reorderSpeedTile(draggedTileId, idx);
+    _sfxPlace();
+  });
+
+  el.addEventListener('touchstart', function(){
+    _speedDragTileId = tile.id;
+    _sfxClick();
+    el.classList.add('dragging');
+    el._dragHalfW = el.offsetWidth / 2;
+    el._dragHalfH = el.offsetHeight / 2;
+    el.style.position = 'fixed';
+    el.style.zIndex = '10001';
+    el.style.pointerEvents = 'none';
+  }, { passive: true });
+  el.addEventListener('touchmove', function(e){
+    if (!_speedDragTileId) return;
+    e.preventDefault();
+    var t = e.touches[0];
+    el.style.left = (t.clientX - el._dragHalfW) + 'px';
+    el.style.top = (t.clientY - el._dragHalfH) + 'px';
+    el._dragMoved = true;
+  }, { passive: false });
+  el.addEventListener('touchend', function(e){
+    el.classList.remove('dragging');
+    el.style.position = ''; el.style.left = ''; el.style.top = ''; el.style.zIndex = ''; el.style.pointerEvents = '';
+    if (!_speedDragTileId) return;
+    var pt = e.changedTouches[0];
+    var dropEl = document.elementFromPoint(pt.clientX, pt.clientY);
+    var didReorder = false;
+    while (dropEl && dropEl !== document.body) {
+      if (dropEl.classList && dropEl.classList.contains('rack-tile') && dropEl.dataset.tileId !== tile.id) {
+        var toIdx = parseInt(dropEl.dataset.idx, 10);
+        if (dropEl.dataset.prefix === 'speed') {
+          reorderSpeedTile(tile.id, toIdx);
+          didReorder = true;
+        }
+        break;
+      }
+      dropEl = dropEl.parentNode;
+    }
+    _speedDragTileId = null;
+    if (didReorder) _sfxPlace();
+    if (!didReorder && !el._dragMoved) handleSpeedClick(tile.id, idx);
+    el._dragMoved = false;
+  });
+
+  el.addEventListener('click', function(){
+    if (el._dragMoved) { el._dragMoved = false; return; }
+    handleSpeedClick(tile.id, idx);
+  });
+
+  return el;
+}
+
+function handleSpeedClick(tileId, idx) {
+  if (_speedSelectedTileId === tileId) {
+    _speedSelectedTileId = null;
+    _sfxClick();
+    refreshSpeedSelection();
+    return;
+  }
+  if (_speedSelectedTileId === null) {
+    _speedSelectedTileId = tileId;
+    _sfxClick();
+    refreshSpeedSelection();
+    return;
+  }
+  var selectedId = _speedSelectedTileId;
+  _speedSelectedTileId = null;
+  reorderSpeedTile(selectedId, idx);
+  _sfxPlace();
+  refreshSpeedSelection();
+}
+
+function refreshSpeedSelection() {
+  document.querySelectorAll('#speed-rack-area .rack-tile').forEach(function(el){
+    if (_speedSelectedTileId && el.dataset.tileId === _speedSelectedTileId) {
+      el.classList.add('selected');
+    } else {
+      el.classList.remove('selected');
+    }
+  });
+}
+
+function reorderSpeedTile(draggedTileId, toIdx) {
+  var fromIdx = _speedCurrentTiles.findIndex(function(t){ return t.id === draggedTileId; });
+  if (fromIdx === -1 || fromIdx === toIdx) return;
+  var dragged = _speedCurrentTiles[fromIdx];
+  if (dragged.locked) return;
+  while (toIdx >= 0 && toIdx < _speedCurrentTiles.length && _speedCurrentTiles[toIdx] && _speedCurrentTiles[toIdx].locked) {
+    if (toIdx < fromIdx) toIdx--;
+    else toIdx++;
+  }
+  if (toIdx < 0 || toIdx >= _speedCurrentTiles.length || toIdx === fromIdx) return;
+  var unlockedIndices = [];
+  for (var i = 0; i < _speedCurrentTiles.length; i++) {
+    if (!_speedCurrentTiles[i].locked) unlockedIndices.push(i);
+  }
+  var fromRank = unlockedIndices.indexOf(fromIdx);
+  var toRank = unlockedIndices.indexOf(toIdx);
+  if (fromRank === -1 || toRank === -1) return;
+  var digitTiles = unlockedIndices.map(function(idx){ return _speedCurrentTiles[idx]; });
+  var moved = digitTiles.splice(fromRank, 1)[0];
+  digitTiles.splice(toRank, 0, moved);
+  var di = 0;
+  for (var j = 0; j < _speedCurrentTiles.length; j++) {
+    if (!_speedCurrentTiles[j].locked) _speedCurrentTiles[j] = digitTiles[di++];
+  }
+  renderSpeedRack();
+}
+
+window.speedSubmit = function() {
+  _speedStats.attempts++;
+  _speedStats.total++;
+  var tokens = _speedCurrentTiles.map(function(t){ return t.face; });
+  var r = tryAllAssignments(tokens, _speedPattern.patternRegex || null);
+  if (r.valid) {
+    var solveTime = Math.round((Date.now() - _speedCurrentPuzzleStartT) / 1000);
+    _speedStats.solved++;
+    _speedStats.times.push(solveTime);
+    if (_speedStats.best === null || solveTime < _speedStats.best) _speedStats.best = solveTime;
+    _sfxWin();
+    showSpeedBanner(true, '✓ ' + solveTime + 's');
+    updateSpeedStats();
+    setTimeout(drawNextSpeedPuzzle, 600);
+  } else {
+    _sfxFail();
+    showSpeedBanner(false, '✗ ' + (r.reason || 'Invalid'));
+    updateSpeedStats();
+  }
+};
+
+window.speedSkip = function() {
+  _speedStats.total++;
+  updateSpeedStats();
+  drawNextSpeedPuzzle();
+};
+
+function showSpeedBanner(isCorrect, msg) {
+  var el = document.getElementById('speed-result');
+  el.textContent = msg;
+  el.className = 'eq-result ' + (isCorrect ? 'correct' : 'incorrect');
+}
+
+function updateSpeedStats() {
+  document.getElementById('speed-solved').textContent = _speedStats.solved;
+  document.getElementById('speed-attempts').textContent = _speedStats.attempts;
+  document.getElementById('speed-best').textContent = _speedStats.best === null ? '—' : _speedStats.best + 's';
+}
+
+function endSpeedRound() {
+  if (_speedTimer) { clearInterval(_speedTimer); _speedTimer = null; }
+  document.getElementById('speed-round-overlay').style.display = 'none';
+
+  // Show results
+  document.getElementById('speed-results-overlay').style.display = 'flex';
+  document.getElementById('speed-results-pattern').textContent =
+    _speedSectionId.toUpperCase() + ' · ' + _speedPattern.label;
+  document.getElementById('speed-results-solved').textContent = _speedStats.solved;
+  var acc = _speedStats.attempts > 0 ? Math.round((_speedStats.solved / _speedStats.attempts) * 100) : 0;
+  document.getElementById('speed-results-accuracy').textContent = _speedStats.attempts > 0 ? acc + '%' : '—';
+  document.getElementById('speed-results-best').textContent = _speedStats.best === null ? '—' : _speedStats.best;
+  var avg = _speedStats.times.length > 0 ? Math.round(_speedStats.times.reduce(function(a,b){return a+b;}, 0) / _speedStats.times.length) : 0;
+  document.getElementById('speed-results-avg').textContent = _speedStats.times.length > 0 ? avg : '—';
+
+  // Personal best check
+  var pbKey = 'amath_speed_pb_' + _speedSectionId + '_' + _speedPatternId;
+  var prevPB = null;
+  try { prevPB = JSON.parse(localStorage.getItem(pbKey) || 'null'); } catch(e){}
+  var pbBeaten = false;
+  if (!prevPB || _speedStats.solved > prevPB.solved) {
+    pbBeaten = true;
+    try {
+      localStorage.setItem(pbKey, JSON.stringify({
+        solved: _speedStats.solved, accuracy: acc, best: _speedStats.best,
+        avg: avg, date: new Date().toISOString()
+      }));
+    } catch(e){}
+  }
+  document.getElementById('speed-results-pb').style.display = pbBeaten ? 'block' : 'none';
+
+  if (window.AMath.progress) window.AMath.progress.addActivity();
+}
+
+window.cancelSpeedRound = function() {
+  if (_speedTimer) { clearInterval(_speedTimer); _speedTimer = null; }
+  document.getElementById('speed-round-overlay').style.display = 'none';
+};
+
+window.closeSpeedResults = function() {
+  document.getElementById('speed-results-overlay').style.display = 'none';
+  // also refresh stats on main page in case user goes back
+};
+
+window.restartSpeedRound = function() {
+  document.getElementById('speed-results-overlay').style.display = 'none';
+  startSpeedRound();
 };
 
 // ============== SET 4 — TARGET DRILLS (single-rack reorder) ==============
