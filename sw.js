@@ -1,5 +1,5 @@
 // Bump CACHE_NAME whenever ANY asset changes to force update.
-const CACHE_NAME = 'amath-v82-multipass';
+const CACHE_NAME = 'amath-v83-anchor';
 const ASSETS = [
   '/Agame/',
   '/Agame/lobby.html',

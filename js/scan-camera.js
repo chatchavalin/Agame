@@ -158,39 +158,86 @@
 
   // ---- orchestration --------------------------------------------------------
   var PASSES = 3;
+
+  // Ask the model for the playing grid's bounding box (fractions of the image),
+  // so we can crop tightly to the board before reading — bigger tiles, no frame
+  // or score-sheet distractions, and a steadier grid alignment.
+  function detectBoard(base64) {
+    var p = 'This is a photo of an A-Math / Scrabble-style board. Find the 15x15 grid of PLAYING SQUARES only. ' +
+      'Exclude the outer plastic frame, the tile racks/trays, dice, and any paper or score sheets. ' +
+      'Return ONLY JSON: {"x":<left>,"y":<top>,"w":<width>,"h":<height>} as fractions of the image size (0..1) for the tight bounding box of the grid. If unsure, return {"x":0,"y":0,"w":1,"h":1}.';
+    return analyze2(base64, p).then(function (text) {
+      try { var o = JSON.parse(extractJson(text) || 'null'); if (o && typeof o.x === 'number' && typeof o.w === 'number') return o; } catch (e) {}
+      return null;
+    }).catch(function () { return null; });
+  }
+
+  // Crop the image to the detected box (with a little padding) and scale the
+  // crop up so tiles are large. Falls back to the original on any problem.
+  function cropToBox(base64, box, cb) {
+    if (!box) return cb(base64);
+    var img = new Image();
+    img.onload = function () {
+      try {
+        var W = img.width, H = img.height;
+        var pad = 0.015;
+        var x = Math.max(0, (box.x - pad)) * W, y = Math.max(0, (box.y - pad)) * H;
+        var w = Math.min(1, (box.w + pad * 2)) * W, h = Math.min(1, (box.h + pad * 2)) * H;
+        if (x + w > W) w = W - x; if (y + h > H) h = H - y;
+        if (w < W * 0.30 || h < H * 0.30) return cb(base64); // implausible box → skip crop
+        var scale = Math.min(2.0, 1800 / Math.max(w, h)); if (scale < 1) scale = 1;
+        var cw = Math.round(w * scale), ch = Math.round(h * scale);
+        var cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
+        cv.getContext('2d').drawImage(img, x, y, w, h, 0, 0, cw, ch);
+        cb(cv.toDataURL('image/jpeg', 0.9).split(',')[1]);
+      } catch (e) { cb(base64); }
+    };
+    img.onerror = function () { cb(base64); };
+    img.src = 'data:image/jpeg;base64,' + base64;
+  }
+
+  // Run PASSES reads on an image and merge them, then apply.
+  function runScanPasses(image) {
+    var prompt = buildPrompt();
+    var done = 0, jobs = [];
+    for (var i = 0; i < PASSES; i++) {
+      jobs.push(
+        analyze2(image, prompt).then(function (text) {
+          status('⏳ Reading board — pass ' + (++done) + '/' + PASSES + '…');
+          try { var o = JSON.parse(extractJson(text) || 'null'); return (o && Array.isArray(o.grid)) ? o.grid : null; }
+          catch (e) { return null; }
+        }).catch(function () { return null; })
+      );
+    }
+    Promise.all(jobs).then(function (results) {
+      var grids = results.filter(function (g) { return g; });
+      if (!grids.length) { status('❌ The model did not return readable board data. Try a flatter, well-lit photo.', '#f87171'); return; }
+      var json = JSON.stringify({ v: 2, grid: mergeGrids(grids) });
+      var ok = window.AMath.scanApply ? window.AMath.scanApply(json, 'Scanned (' + grids.length + ' passes merged)') : false;
+      if (ok) status('✅ Scanned (' + grids.length + ' passes merged). Check the grid below and fix any misreads.', '#34d399');
+      else status('⚠️ Scanned, but some cells need fixing — see the message below the grid.', '#fbbf24');
+    }).catch(function (err) {
+      var m = String(err && err.message || err);
+      if (m === 'NO_BACKEND') m = 'Set up Firebase AI Logic in the console (recommended) or paste a Gemini key above.';
+      else if (/api key|API_KEY|invalid|permission|PERMISSION/i.test(m)) m = 'Access rejected — check your Firebase AI Logic setup (or key).';
+      else if (/quota|rate|RESOURCE_EXHAUSTED/i.test(m)) m = 'Free quota hit — wait a bit and try again.';
+      else if (/failed to fetch|networkerror|CORS/i.test(m)) m = 'Network error reaching the AI service.';
+      else if (/app.?check|APP_CHECK/i.test(m)) m = 'Blocked by App Check — disable enforcement for now, or register this domain.';
+      status('❌ ' + m, '#f87171');
+    });
+  }
+
   function onPhoto(file) {
     if (!file) return;
     status('⏳ Reading photo…');
     fileToBase64(file, function (base64) {
       if (!base64) { status('❌ Could not read that image.', '#f87171'); return; }
-      var prompt = buildPrompt();
-      var done = 0;
-      var jobs = [];
-      for (var i = 0; i < PASSES; i++) {
-        jobs.push(
-          analyze2(base64, prompt).then(function (text) {
-            status('⏳ Reading board — pass ' + (++done) + '/' + PASSES + '…');
-            try { var o = JSON.parse(extractJson(text) || 'null'); return (o && Array.isArray(o.grid)) ? o.grid : null; }
-            catch (e) { return null; }
-          }).catch(function () { return null; })
-        );
-      }
-      status('⏳ Reading board — ' + PASSES + ' passes for accuracy… (~20s)');
-      Promise.all(jobs).then(function (results) {
-        var grids = results.filter(function (g) { return g; });
-        if (!grids.length) { status('❌ The model did not return readable board data. Try a flatter, well-lit photo.', '#f87171'); return; }
-        var json = JSON.stringify({ v: 2, grid: mergeGrids(grids) });
-        var ok = window.AMath.scanApply ? window.AMath.scanApply(json, 'Scanned (' + grids.length + ' passes merged)') : false;
-        if (ok) status('✅ Scanned (' + grids.length + ' passes merged). Check the grid below and fix any misreads.', '#34d399');
-        else status('⚠️ Scanned, but some cells need fixing — see the message below the grid.', '#fbbf24');
-      }).catch(function (err) {
-        var m = String(err && err.message || err);
-        if (m === 'NO_BACKEND') m = 'Set up Firebase AI Logic in the console (recommended) or paste a Gemini key above.';
-        else if (/api key|API_KEY|invalid|permission|PERMISSION/i.test(m)) m = 'Access rejected — check your Firebase AI Logic setup (or key).';
-        else if (/quota|rate|RESOURCE_EXHAUSTED/i.test(m)) m = 'Free quota hit — wait a bit and try again.';
-        else if (/failed to fetch|networkerror|CORS/i.test(m)) m = 'Network error reaching the AI service.';
-        else if (/app.?check|APP_CHECK/i.test(m)) m = 'Blocked by App Check — disable enforcement for now, or register this domain.';
-        status('❌ ' + m, '#f87171');
+      status('⏳ Finding the board edges…');
+      detectBoard(base64).then(function (box) {
+        cropToBox(base64, box, function (cropped) {
+          status('⏳ Reading board — ' + PASSES + ' passes for accuracy… (~20s)');
+          runScanPasses(cropped);
+        });
       });
     });
   }
