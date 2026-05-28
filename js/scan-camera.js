@@ -132,8 +132,79 @@
     return callGemini(base64, key);                            // raw fallback (may hit CORS)
   }
 
+  // Merge several 15x15 grids: each cell = the most common non-empty reading
+  // across passes (so a tile any pass saw is kept, and disagreements are voted).
+  function normCell(s) { if (s == null) return ''; s = String(s).trim(); return (s === '.' || s === '-.') ? '' : s; }
+  function mergeGrids(grids) {
+    var out = [];
+    for (var r = 0; r < 15; r++) {
+      var row = [];
+      for (var c = 0; c < 15; c++) {
+        var counts = {}, order = [];
+        grids.forEach(function (g) {
+          var v = (g[r] && g[r][c] != null) ? normCell(g[r][c]) : '';
+          if (v === '') return;
+          if (!(v in counts)) { counts[v] = 0; order.push(v); }
+          counts[v]++;
+        });
+        var best = '', bestN = 0;
+        order.forEach(function (v) { if (counts[v] > bestN) { bestN = counts[v]; best = v; } });
+        row.push(best);
+      }
+      out.push(row);
+    }
+    return out;
+  }
+
   // ---- orchestration --------------------------------------------------------
+  var PASSES = 3;
   function onPhoto(file) {
+    if (!file) return;
+    status('⏳ Reading photo…');
+    fileToBase64(file, function (base64) {
+      if (!base64) { status('❌ Could not read that image.', '#f87171'); return; }
+      var prompt = buildPrompt();
+      var done = 0;
+      var jobs = [];
+      for (var i = 0; i < PASSES; i++) {
+        jobs.push(
+          analyze2(base64, prompt).then(function (text) {
+            status('⏳ Reading board — pass ' + (++done) + '/' + PASSES + '…');
+            try { var o = JSON.parse(extractJson(text) || 'null'); return (o && Array.isArray(o.grid)) ? o.grid : null; }
+            catch (e) { return null; }
+          }).catch(function () { return null; })
+        );
+      }
+      status('⏳ Reading board — ' + PASSES + ' passes for accuracy… (~20s)');
+      Promise.all(jobs).then(function (results) {
+        var grids = results.filter(function (g) { return g; });
+        if (!grids.length) { status('❌ The model did not return readable board data. Try a flatter, well-lit photo.', '#f87171'); return; }
+        var json = JSON.stringify({ v: 2, grid: mergeGrids(grids) });
+        var ok = window.AMath.scanApply ? window.AMath.scanApply(json, 'Scanned (' + grids.length + ' passes merged)') : false;
+        if (ok) status('✅ Scanned (' + grids.length + ' passes merged). Check the grid below and fix any misreads.', '#34d399');
+        else status('⚠️ Scanned, but some cells need fixing — see the message below the grid.', '#fbbf24');
+      }).catch(function (err) {
+        var m = String(err && err.message || err);
+        if (m === 'NO_BACKEND') m = 'Set up Firebase AI Logic in the console (recommended) or paste a Gemini key above.';
+        else if (/api key|API_KEY|invalid|permission|PERMISSION/i.test(m)) m = 'Access rejected — check your Firebase AI Logic setup (or key).';
+        else if (/quota|rate|RESOURCE_EXHAUSTED/i.test(m)) m = 'Free quota hit — wait a bit and try again.';
+        else if (/failed to fetch|networkerror|CORS/i.test(m)) m = 'Network error reaching the AI service.';
+        else if (/app.?check|APP_CHECK/i.test(m)) m = 'Blocked by App Check — disable enforcement for now, or register this domain.';
+        status('❌ ' + m, '#f87171');
+      });
+    });
+  }
+
+  // analyze() that takes an explicit prompt (so all passes share one prompt build)
+  function analyze2(base64, prompt) {
+    if (window.AMath && typeof window.AMath.geminiScan === 'function') {
+      return window.AMath.geminiScan(base64, prompt);
+    }
+    var key = getKey();
+    if (!key) return Promise.reject(new Error('NO_BACKEND'));
+    return callGemini(base64, key);
+  }
+  function _onPhoto_OLD(file) {
     if (!file) return;
     status('⏳ Reading photo…');
     fileToBase64(file, function (base64) {
