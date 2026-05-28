@@ -549,6 +549,18 @@
     if (!myRack.slotMap) myRack.slotMap = {};
     if (!oppRack.slotMap) oppRack.slotMap = {};
 
+    // Preserve the player's manual rack arrangement across snapshots: if the
+    // incoming rack holds the SAME tiles as the current one, keep the existing
+    // slotMap so a reorder isn't reset when (e.g.) the opponent moves. The
+    // server slotMap only takes over when the tile set actually changes.
+    if (localSession && localSession.playerRack && localSession.playerRack.slotMap) {
+      var _oldIds = (localSession.playerRack.tiles || []).filter(Boolean).map(function (t) { return t.id; }).sort().join(',');
+      var _newIds = (myRack.tiles || []).filter(Boolean).map(function (t) { return t.id; }).sort().join(',');
+      if (_oldIds && _oldIds === _newIds) {
+        myRack.slotMap = localSession.playerRack.slotMap;
+      }
+    }
+
     var myScore = (myRole === 'host') ? gs.hostScore : gs.guestScore;
     var oppScore = (myRole === 'host') ? gs.guestScore : gs.hostScore;
     var myTurn = (gs.turn === myRole);
@@ -804,17 +816,40 @@
       if (!tileEl._amathWired) {
         tileEl._amathWired = true;
         tileEl.addEventListener('click', function () {
-          if (!localSession.isPlayerTurn) return;
           if (tileEl.dataset.didDrag === '1') { tileEl.dataset.didDrag = '0'; return; }
           if (swapMode) {
+            // Swap mode is a turn action (exchanges tiles with the bag).
+            if (!localSession.isPlayerTurn) return;
             if (swapSelected[tileId]) delete swapSelected[tileId];
             else swapSelected[tileId] = true;
             refreshRackVisuals();
             updateActionButtonStates();
             return;
           }
-          selectedTileId = (selectedTileId === tileId) ? null : tileId;
-          refreshRackVisuals();
+          // NORMAL MODE — rack rearrangement is allowed ANY TIME (even while
+          // waiting for the opponent), matching PvA. Placement on the board is
+          // still turn-gated separately (see onCellClick).
+          if (window.AMath.sounds && window.AMath.sounds.tileClick) window.AMath.sounds.tileClick();
+          if (selectedTileId === null) {
+            selectedTileId = tileId;            // first tap: select
+            refreshRackVisuals();
+            return;
+          }
+          if (selectedTileId === tileId) {
+            selectedTileId = null;              // tap same tile: deselect
+            refreshRackVisuals();
+            return;
+          }
+          // Tap a DIFFERENT rack tile while one is selected → swap positions.
+          var Rack = window.AMath.rack;
+          var swapped = Rack && Rack.swapTiles(localSession.playerRack, selectedTileId, tileId);
+          selectedTileId = null;
+          if (swapped && window.AMath.ui && window.AMath.ui.renderRack) {
+            window.AMath.ui.renderRack(localSession.playerRack, _uiParts.playerRack, false);
+            wireRackTileHandlers();
+          } else {
+            refreshRackVisuals();
+          }
         });
         // Drag handlers also attach only once per tile
         attachDragHandlers(tileEl, tileId);
@@ -837,7 +872,7 @@
     tileEls.forEach(function (tileEl) {
       var tileId = tileEl.dataset.tileId;
       if (!tileId) return;
-      tileEl.style.cursor = localSession.isPlayerTurn ? 'pointer' : 'default';
+      tileEl.style.cursor = 'pointer';   // rack is reorderable any time
       tileEl.style.touchAction = 'none';
       if (swapMode && swapSelected[tileId]) {
         tileEl.classList.add('tile-swap-selected');
@@ -1184,7 +1219,9 @@
     var moved = false;
 
     function onPointerDown(ev) {
-      if (!localSession || !localSession.isPlayerTurn) return;
+      if (!localSession) return;
+      // Dragging is allowed any time for rack reordering. (Dropping onto the
+      // BOARD to place is still turn-gated downstream in onCellClick.)
       // In swap mode, taps select for swap (handled by the click listener).
       // We must NOT start a drag here — the pointerup→onCellClick path
       // would try to place the tile, which is wrong in swap mode.
@@ -1225,7 +1262,29 @@
       try { tileEl.releasePointerCapture(ev.pointerId); } catch (e) {}
       if (!didMove) return;
       tileEl.dataset.didDrag = '1';
-      var dropTarget = document.elementFromPoint(ev.clientX, ev.clientY);
+      var hit = document.elementFromPoint(ev.clientX, ev.clientY);
+
+      // 1) Dropped onto another RACK tile → reorder (swap positions). Allowed
+      //    any time, like PvA — purely cosmetic, doesn't depend on the turn.
+      var rackTileEl = hit;
+      while (rackTileEl && !(rackTileEl.classList && rackTileEl.classList.contains('amath-tile'))) {
+        rackTileEl = rackTileEl.parentElement;
+      }
+      if (rackTileEl && _uiParts.playerRack && _uiParts.playerRack.contains(rackTileEl)) {
+        var targetId = rackTileEl.dataset.tileId;
+        if (targetId && targetId !== tileId) {
+          var Rack = window.AMath.rack;
+          if (Rack && Rack.swapTiles(localSession.playerRack, tileId, targetId)
+              && window.AMath.ui && window.AMath.ui.renderRack) {
+            window.AMath.ui.renderRack(localSession.playerRack, _uiParts.playerRack, false);
+            wireRackTileHandlers();
+          }
+        }
+        return;
+      }
+
+      // 2) Dropped on a BOARD cell → place the tile (onCellClick is turn-gated).
+      var dropTarget = hit;
       while (dropTarget && !dropTarget.classList.contains('amath-cell')) {
         dropTarget = dropTarget.parentElement;
       }

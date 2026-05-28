@@ -175,18 +175,46 @@
   <script src="js/tile-tracker.js?v=20260526m"></script>
   <script src="js/score-sheet.js?v=20260526m"></script>
   <script src="js/challenge.js?v=20260526m"></script>
-  <script src="js/online-game.js?v=v60-clocksync"></script>
+  <script src="js/online-game.js?v=v69-rackreorder"></script>
   <script>
     var roomCode = new URLSearchParams(window.location.search).get('room');
     var role = new URLSearchParams(window.location.search).get('role');
 
     function copyRoomCode() {
       if (!roomCode) return;
-      navigator.clipboard.writeText(roomCode).then(function () {
+      // Build a shareable invite link the recipient can tap to join as guest.
+      var inviteUrl = window.location.origin + window.location.pathname +
+        '?room=' + encodeURIComponent(roomCode) + '&role=guest';
+      var toast = function (msg) {
         var fb = document.getElementById('copy-feedback');
+        if (msg) fb.textContent = msg;
         fb.classList.add('show');
-        setTimeout(function () { fb.classList.remove('show'); }, 1500);
-      });
+        setTimeout(function () { fb.classList.remove('show'); }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(inviteUrl).then(
+          function () { toast('Invite link copied!'); },
+          function () { fallbackCopy(inviteUrl, toast); }
+        );
+      } else {
+        fallbackCopy(inviteUrl, toast);
+      }
+    }
+
+    function fallbackCopy(text, toast) {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        toast('Invite link copied!');
+      } catch (e) {
+        toast('Could not copy — try long-pressing the code');
+      }
     }
 
     function renderHeader(data) {
