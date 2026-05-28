@@ -256,6 +256,11 @@
         card.appendChild(pos);
         res.appendChild(card);
       });
+      if (best.truncated) {
+        var t = document.createElement('p'); t.className = 'muted';
+        t.textContent = '⚠️ The search was very large and stopped early, so a higher-scoring play might exist. Locking another board tile narrows the search and helps.';
+        res.appendChild(t);
+      }
     }, 30);
   }
 
@@ -264,30 +269,21 @@
   // premiums (+ bingo bonus when all 8 rack tiles are used). Returns top plays.
   function solveRow0(tiles, fixed) {
     var prem = premiumRow0(), m = pointsMap(), bonusVal = bingoBonus(), rsize = rackSize();
+    var sorted = tiles.slice().sort();   // sort so identical tiles are adjacent (correct dedup)
     var minF = Math.min.apply(null, fixed.map(function (x) { return x.col; }));
     var maxF = Math.max.apply(null, fixed.map(function (x) { return x.col; }));
     var fixedMap = {}; fixed.forEach(function (x) { fixedMap[x.col] = x.face; });
-    var results = [], seen = {};
-    var BS = window.AMath.bingoSolver;
+    var results = [], seen = {}, truncated = false;
 
-    // For each contiguous window [start..end] on row 0 that covers all fixed cols,
-    // the free (non-fixed) cells must be filled by a subset of rack tiles, in order.
     for (var start = 0; start <= minF; start++) {
       for (var end = maxF; end < 15; end++) {
-        var len = end - start + 1;
         var freeCols = [];
         for (var c = start; c <= end; c++) if (fixedMap[c] == null) freeCols.push(c);
         if (freeCols.length === 0) continue;            // need at least one rack tile placed
-        if (freeCols.length > tiles.length) continue;   // not enough rack tiles to fill the gaps
-        // choose an ordered selection of rack tiles for the free cells; defer to a
-        // permutation search via the solver's primitives by brute force over subsets.
-        enumerateFills(tiles, freeCols.length, function (pick) {
-          // pick = array of rack faces (resolved choices) for freeCols in order
-          var faces = [];
-          var fi = 0;
-          for (var c = start; c <= end; c++) {
-            faces.push(fixedMap[c] != null ? fixedMap[c] : pick[fi++]);
-          }
+        if (freeCols.length > sorted.length) continue;  // not enough rack tiles to fill the gaps
+        var r = enumerateFills(sorted, freeCols.length, function (pick) {
+          var faces = [], fi = 0;
+          for (var c2 = start; c2 <= end; c2++) faces.push(fixedMap[c2] != null ? fixedMap[c2] : pick[fi++]);
           if (!validate(faces)) return;
           var key = start + ':' + faces.join(',');
           if (seen[key]) return; seen[key] = true;
@@ -299,31 +295,35 @@
           results.push({ faces: faces, start: start, score: sc + bonus, bonus: bonus,
                          usedCount: used, usedAll: used === rsize, blankIdx: [], fixedIdx: fIdx });
         });
+        if (r.truncated) truncated = true;
       }
     }
     results.sort(function (a, b) { return b.score - a.score; });
-    return results.slice(0, 6);
+    var top = results.slice(0, 6);
+    top.truncated = truncated;
+    return top;
   }
 
-  // Enumerate ordered selections of `k` rack tiles (resolving choice/blank faces),
-  // pruning with the solver's choice expansion. Calls cb(pickArray) for each.
+  // Enumerate ordered selections of `k` rack tiles (resolving choice/blank faces).
+  // Returns { truncated } so callers can warn when the search hit its cap.
   function enumerateFills(tiles, k, cb) {
     var BS = window.AMath.bingoSolver;
-    var n = tiles.length, used = new Array(n).fill(false), pick = [], CAP = 200000, count = 0;
+    var n = tiles.length, used = new Array(n).fill(false), pick = [], CAP = 400000, count = 0, truncated = false;
     function rec() {
-      if (count > CAP) return;
+      if (count > CAP) { truncated = true; return; }
       if (pick.length === k) { count++; cb(pick.slice()); return; }
       for (var i = 0; i < n; i++) {
         if (used[i]) continue;
-        if (i > 0 && tiles[i] === tiles[i - 1] && !used[i - 1]) continue; // skip dup tiles
+        if (i > 0 && tiles[i] === tiles[i - 1] && !used[i - 1]) continue; // skip dup tiles (tiles is sorted)
         var cs = BS.choicesFor(tiles[i]);
         for (var ci = 0; ci < cs.length; ci++) {
           used[i] = true; pick.push(cs[ci]); rec(); pick.pop(); used[i] = false;
-          if (count > CAP) return;
+          if (count > CAP) { truncated = true; return; }
         }
       }
     }
     rec();
+    return { truncated: truncated };
   }
 
   // Score a row-0 line with premium squares (tile + equation multipliers).
