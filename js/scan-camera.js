@@ -21,7 +21,7 @@
   var KEY_LS = 'amath_gemini_key';
   var MODEL = 'gemini-3.5-flash';
   var ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODEL + ':generateContent';
-  var MAX_DIM = 1280;   // downscale longest side before upload (keeps request small)
+  var MAX_DIM = 2200;   // cap longest side; large enough to keep small tiles legible
 
   function getKey() { try { return localStorage.getItem(KEY_LS) || ''; } catch (e) { return ''; } }
   function saveKey(k) { try { localStorage.setItem(KEY_LS, k); } catch (e) {} }
@@ -66,7 +66,9 @@
       '1. ONE tile per cell maximum. Never output two entries for the same (r,c).',
       '2. The small number in the CORNER of a tile is its POINT VALUE, not a tile. IGNORE it completely. Read only the LARGE symbol in the middle of the tile.',
       '3. Two-digit tiles (10, 11, 12, 13, 14, 15, 16, 20) are SINGLE tiles occupying ONE cell. NEVER split them into two single-digit tiles. If a cell shows "20", output one {"f":"20"} — not a "2" and a "0".',
-      '4. Read ONLY tiles sitting inside the 15x15 grid. IGNORE everything else in the photo: the plastic frame, the player racks/trays, the dice, score sheets, and any printed tile-frequency tables or text on paper.',
+      '4. Read ONLY tiles sitting inside the 15x15 grid. IGNORE everything else: the plastic frame, player racks/trays, dice, score sheets, and printed tile-frequency tables.',
+      '4b. IGNORE the coordinate labels around the edges — column letters a–o and row numbers 1–15. They are NOT tiles.',
+      '4c. IGNORE the premium-square markings printed inside empty squares: "2X", "3X", "2T", "3T", "2E", "3E", "DOUBLE", "TRIPLE", "EQUATION", "PIECE". These are square bonuses, NOT tiles. In particular an "X" inside a bonus label (like "2X"/"3X") is NOT a ×/÷ tile. A real tile sits on top of a square and shows a number or operator with a small point-value subscript.',
       '5. "f" MUST be exactly one of: "0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","20","+","-","+/-","×/÷","=","BLANK". (Tiles 17,18,19 do NOT exist.)',
       '6. A ± tile is "+/-"; a combined ×÷ tile is "×/÷". If you can tell which operation it is used as, add "a":"+"/"-"/"×"/"÷"; else omit "a". A blank tile is "BLANK".',
       '6b. IMPORTANT: there is no standalone × or ÷ tile. If a cell shows a multiply "×", output {"f":"×/÷","a":"×"}. If it shows a divide "÷", output {"f":"×/÷","a":"÷"}.',
