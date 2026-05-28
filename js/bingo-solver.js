@@ -65,7 +65,8 @@
     var n = descs.length;
     var choices = descs.map(choicesFor);
     var used = new Array(n).fill(false);
-    var seq = [];
+    var seq = [];   // resolved faces
+    var blk = [];   // parallel: was this position a BLANK tile?
     var out = [];
     var seen = {};
     var nodes = 0;
@@ -78,17 +79,23 @@
         if (seq.indexOf('=') < 0) return;        // must be an equation
         var key = seq.join(' ');
         if (seen[key]) return;
-        if (validate(seq)) { seen[key] = true; out.push(seq.slice()); }
+        if (validate(seq)) {
+          seen[key] = true;
+          var blankVals = [];
+          for (var k = 0; k < n; k++) if (blk[k]) blankVals.push(seq[k]);
+          out.push({ faces: seq.slice(), blankVals: blankVals });
+        }
         return;
       }
       for (var i = 0; i < n; i++) {
         if (used[i]) continue;
         if (i > 0 && descs[i] === descs[i - 1] && !used[i - 1]) continue; // skip duplicate tiles
+        var isBlank = descs[i] === 'BLANK';
         var cs = choices[i];
         for (var ci = 0; ci < cs.length; ci++) {
-          seq.push(cs[ci]);
+          seq.push(cs[ci]); blk.push(isBlank);
           if (partialOk(seq)) { used[i] = true; dfs(); used[i] = false; }
-          seq.pop();
+          seq.pop(); blk.pop();
           if (out.length >= maxSol || capped) return;
         }
       }

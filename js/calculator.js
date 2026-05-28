@@ -19,11 +19,11 @@
     return !!(v && v.valid);
   }
 
-  // Display label for a stored face.
+  // Display label for a stored face (matches PvA: blank shows as "?").
   function label(face) {
     if (face === '+/-') return '±';
     if (face === '×/÷') return '×÷';
-    if (face === 'BLANK') return '▢';
+    if (face === 'BLANK') return '?';
     return face;
   }
 
@@ -91,6 +91,17 @@
     return parts.join(' ');
   }
 
+  // Render one solution (with blank-assignment note) as an .eqline.
+  function solutionHtml(sol) {
+    var s = formatEq(sol.faces);
+    var note = '';
+    if (sol.blankVals && sol.blankVals.length) {
+      note = ' <span class="muted">(blank ? = ' +
+        sol.blankVals.map(function (v) { return label(v); }).join(', ') + ')</span>';
+    }
+    return '<div class="eqline">' + s + note + '</div>';
+  }
+
   // ----- solving -----
   function currentTiles() { return rack.filter(function (f) { return f; }); }
 
@@ -104,7 +115,7 @@
       var html = '<h2 style="font-size:15px;">8-tile bingo (' + tiles.length + ' tiles)</h2>';
       if (sols.length) {
         html += '<p class="muted">✅ Yes — these tiles can form an equation:</p>';
-        sols.forEach(function (s) { html += '<div class="eqline">' + formatEq(s) + '</div>'; });
+        sols.forEach(function (s) { html += solutionHtml(s); });
         if (sols.capped) html += '<p class="muted">(search stopped early; more may exist)</p>';
       } else {
         html += '<p class="muted">❌ No bingo using all ' + tiles.length + ' tiles. Try the 9-tile option (add one hook tile).</p>';
@@ -125,7 +136,11 @@
         html += '<p class="muted">✅ These board tiles let you bingo (hook → example):</p>';
         report.nine.forEach(function (item) {
           html += '<div class="hook-card"><span class="hook-face">' + label(item.hook) + '</span>';
-          html += item.examples.map(function (s) { return formatEq(s); }).join('<br>');
+          html += item.examples.map(function (s) {
+            var note = (s.blankVals && s.blankVals.length)
+              ? ' <span class="muted">(blank ? = ' + s.blankVals.map(label).join(', ') + ')</span>' : '';
+            return formatEq(s.faces) + note;
+          }).join('<br>');
           html += '</div>';
         });
       } else {
