@@ -30,10 +30,10 @@
     var el = document.createElement('div');
     el.className = 'gtile' + (opts.blank ? ' blank' : '');
     if (face === '+/-' || face === '×/÷') {
-      el.classList.add('stacked');
-      var t = document.createElement('span'); t.className = 't'; t.textContent = face === '×/÷' ? '×' : '+';
-      var b = document.createElement('span'); b.className = 'b'; b.textContent = face === '×/÷' ? '÷' : '-';
-      el.appendChild(t); el.appendChild(b);
+      el.classList.add('choice');
+      var s = document.createElement('span');
+      s.textContent = (face === '×/÷') ? '×÷' : '+−';
+      el.appendChild(s);
     } else {
       var s = document.createElement('span'); s.textContent = (face === 'BLANK') ? '?' : face; el.appendChild(s);
     }
