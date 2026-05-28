@@ -33,7 +33,7 @@
   function makeTile(face, opts) {
     opts = opts || {};
     var el = document.createElement('div');
-    el.className = 'gtile' + (opts.blank ? ' blank' : '');
+    el.className = 'gtile' + (opts.blank ? ' blank' : '') + (opts.fixed ? ' fixed' : '');
     if (face === '+/-' || face === '×/÷') {
       el.classList.add('choice');
       var s = document.createElement('span');
@@ -95,16 +95,17 @@
   }
 
   // ----- equation rendering -----
-  function eqRow(faces, blankIdx) {
+  function eqRow(faces, blankIdx, fixedIdx) {
     var row = document.createElement('div'); row.className = 'eqrow';
     var blanks = {}; (blankIdx || []).forEach(function (x) { blanks[x] = 1; });
+    var fixed = {}; (fixedIdx || []).forEach(function (x) { fixed[x] = 1; });
     var i = 0;
     while (i < faces.length) {
       if (/^[0-9]$/.test(faces[i])) {
         var g = document.createElement('div'); g.className = 'numgroup';
-        while (i < faces.length && /^[0-9]$/.test(faces[i])) { g.appendChild(makeTile(faces[i], { blank: !!blanks[i] })); i++; }
+        while (i < faces.length && /^[0-9]$/.test(faces[i])) { g.appendChild(makeTile(faces[i], { blank: !!blanks[i], fixed: !!fixed[i] })); i++; }
         row.appendChild(g);
-      } else { row.appendChild(makeTile(faces[i], { blank: !!blanks[i] })); i++; }
+      } else { row.appendChild(makeTile(faces[i], { blank: !!blanks[i], fixed: !!fixed[i] })); i++; }
     }
     return row;
   }
@@ -206,7 +207,7 @@
         cell.className = 'bcell' + (prem[col] ? ' p' + prem[col] : '') + (col === selCol ? ' sel' : '');
         var f = board0[col];
         if (f != null) {
-          cell.appendChild(makeTile(f, { points: tilePts(f, m) }));
+          cell.appendChild(makeTile(f, { points: tilePts(f, m), fixed: true }));
         } else if (prem[col]) {
           var l = document.createElement('span'); l.className = 'lbl'; l.textContent = prem[col]; cell.appendChild(l);
         }
@@ -248,9 +249,8 @@
         var rn = document.createElement('div'); rn.className = 'rank-num' + (idx < 3 ? ' r' + (idx + 1) : ''); rn.textContent = '#' + (idx + 1);
         rrow.appendChild(rn);
         var badge = document.createElement('span'); badge.className = 'score-badge'; badge.textContent = b.score + ' pts'; rrow.appendChild(badge);
-        if (b.bonus) { var bb = document.createElement('span'); bb.className = 'muted'; bb.textContent = '(incl. ' + b.bonus + ' bingo bonus)'; rrow.appendChild(bb); }
         card.appendChild(rrow);
-        card.appendChild(eqRow(b.faces, b.blankIdx));
+        card.appendChild(eqRow(b.faces, b.blankIdx, b.fixedIdx));
         var pos = document.createElement('div'); pos.className = 'muted'; pos.style.marginTop = '4px';
         pos.textContent = 'Columns ' + b.start + '–' + (b.start + b.faces.length - 1) + (b.usedAll ? ' • uses all 8 rack tiles' : ' • uses ' + b.usedCount + ' rack tile(s)');
         card.appendChild(pos);
@@ -294,8 +294,10 @@
           var used = pick.length;
           var sc = scoreRow0(faces, start, prem, m, fixedMap);
           var bonus = (used === rsize) ? bonusVal : 0;
+          var fIdx = [];
+          for (var cc = start; cc <= end; cc++) if (fixedMap[cc] != null) fIdx.push(cc - start);
           results.push({ faces: faces, start: start, score: sc + bonus, bonus: bonus,
-                         usedCount: used, usedAll: used === rsize, blankIdx: [] });
+                         usedCount: used, usedAll: used === rsize, blankIdx: [], fixedIdx: fIdx });
         });
       }
     }
