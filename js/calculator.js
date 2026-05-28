@@ -49,7 +49,7 @@
     var digits = byType('digit').sort(function (a, b) { return (+a) - (+b); });
     var two = byType('twodigit').sort(function (a, b) { return (+a) - (+b); });
     var order = ['+', '-', '+/-', '×', '÷', '×/÷'];
-    var ops = byType('op').sort(function (a, b) { return order.indexOf(a) - order.indexOf(b); });
+    var ops = byType('op').concat(byType('choice')).sort(function (a, b) { return order.indexOf(a) - order.indexOf(b); });
     return digits.concat(two).concat(ops).concat(byType('equals')).concat(byType('blank'));
   }
 
@@ -105,9 +105,9 @@
     return n;
   }
   function eqLine(sol) {
-    var line = document.createElement('div'); line.style.display = 'flex'; line.style.alignItems = 'center'; line.style.flexWrap = 'wrap';
+    var line = document.createElement('div');
     line.appendChild(eqRow(sol.faces, sol.blankIdx));
-    var bn = blankNote(sol); if (bn) line.appendChild(bn);
+    var bn = blankNote(sol); if (bn) { var w = document.createElement('div'); w.style.marginTop = '2px'; w.appendChild(bn); line.appendChild(w); }
     return line;
   }
 
@@ -162,7 +162,7 @@
       report.nine.forEach(function (item, idx) {
         var card = document.createElement('div'); card.className = 'hook-card';
         var rrow = document.createElement('div'); rrow.className = 'rank-row';
-        var rn = document.createElement('div'); rn.className = 'rank-num' + (idx < 3 ? ' r' + (idx + 1) : ''); rn.textContent = (idx + 1);
+        var rn = document.createElement('div'); rn.className = 'rank-num' + (idx < 3 ? ' r' + (idx + 1) : ''); rn.textContent = '#' + (idx + 1);
         rrow.appendChild(rn);
         var lab = document.createElement('span'); lab.className = 'muted'; lab.textContent = 'hook'; rrow.appendChild(lab);
         rrow.appendChild(makeTile(item.hook, { points: tilePts(item.hook, m) }));
