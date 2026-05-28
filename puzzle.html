@@ -320,7 +320,7 @@ body.theme-dark .player-area .amath-tile-rack {
 
 <div class="pz-header">
   <button class="back-btn" onclick="goBack()">←</button>
-  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v46</span></h1>
+  <h1>🧩 Puzzle Mode <span style="font-size:10px;color:#34d399;font-weight:400;vertical-align:super;">v47</span></h1>
   <button class="back-btn" id="theme-toggle-btn" onclick="cycleTheme()" title="Change theme">🎨</button>
 </div>
 
@@ -329,11 +329,41 @@ body.theme-dark .player-area .amath-tile-rack {
 
   <!-- Header -->
   <header style="padding:14px 16px 8px;text-align:center;">
-    <h2 style="margin:0 0 4px;font-size:18px;color:#fbbf24;font-weight:800;letter-spacing:0.5px;">🧩 Puzzle Mode<span style="font-size:9px;font-weight:400;vertical-align:super;margin-left:4px;color:#94a3b8;">v34</span></h2>
+    <h2 style="margin:0 0 4px;font-size:18px;color:#fbbf24;font-weight:800;letter-spacing:0.5px;">🧩 Puzzle Mode<span style="font-size:9px;font-weight:400;vertical-align:super;margin-left:4px;color:#94a3b8;">v47</span></h2>
     <p style="margin:0;font-size:11px;color:#94a3b8;">Train your A-Math instincts</p>
   </header>
 
-  <!-- Practice Sets (includes Set 5 — Board Puzzles, formerly the Missed-Move Trainer) -->
+  <!-- Stats summary row — solved / accuracy / streak -->
+  <div id="stats-row" style="margin:8px 12px;padding:10px 12px;background:linear-gradient(135deg,#1e293b,#0f172a);border-radius:12px;border:1px solid #334155;display:flex;justify-content:space-around;align-items:center;">
+    <div style="text-align:center;flex:1;">
+      <div id="stats-solved" style="font-size:18px;font-weight:800;color:#10b981;">0</div>
+      <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">Solved</div>
+    </div>
+    <div style="width:1px;height:32px;background:#334155;"></div>
+    <div style="text-align:center;flex:1;">
+      <div id="stats-accuracy" style="font-size:18px;font-weight:800;color:#fbbf24;">—</div>
+      <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">Accuracy</div>
+    </div>
+    <div style="width:1px;height:32px;background:#334155;"></div>
+    <div style="text-align:center;flex:1;">
+      <div id="stats-streak" style="font-size:18px;font-weight:800;color:#f87171;">🔥 0</div>
+      <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">Day Streak</div>
+    </div>
+  </div>
+
+  <!-- Daily challenge card -->
+  <div id="daily-card" style="margin:8px 12px;padding:12px;background:linear-gradient(135deg,#7c3aed,#a855f7);border-radius:12px;display:none;cursor:pointer;" onclick="openDailyChallenge()">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div style="font-size:24px;">⚡</div>
+      <div style="flex:1;">
+        <div style="font-size:10px;color:#e9d5ff;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Daily Challenge</div>
+        <div id="daily-label" style="font-size:13px;color:#fff;font-weight:700;">Loading...</div>
+      </div>
+      <div id="daily-status" style="font-size:11px;color:#fff;font-weight:700;background:rgba(255,255,255,0.2);padding:3px 8px;border-radius:8px;">Play</div>
+    </div>
+  </div>
+
+  <!-- Practice Sets (includes Set 5 — Board Puzzles) -->
   <section style="margin:12px 12px 0;padding:14px;background:linear-gradient(145deg,#1e293b,#0f172a);border-radius:14px;border:1px solid #334155;">
     <h3 style="margin:0 0 4px;font-size:13px;color:#fbbf24;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">📚 Practice Sets</h3>
     <p style="margin:0 0 10px;font-size:11px;color:#94a3b8;line-height:1.5;">Five sets of training problems. Set 5 (Board Puzzles) auto-captures from your live games.</p>
@@ -509,33 +539,34 @@ body.theme-dark .player-area .amath-tile-rack {
 </div>
 
 <!-- Load main game JS modules in dependency order (same as index.html) -->
-<script src="js/constants.js?v=v46-2026-05-27"></script>
-<script src="js/utils.js?v=v46-2026-05-27"></script>
-<script src="js/evaluator.js?v=v46-2026-05-27"></script>
-<script src="js/bag.js?v=v46-2026-05-27"></script>
-<script src="js/rack.js?v=v46-2026-05-27"></script>
-<script src="js/board.js?v=v46-2026-05-27"></script>
-<script src="js/tile-tracker.js?v=v46-2026-05-27"></script>
-<script src="js/scoring.js?v=v46-2026-05-27"></script>
-<script src="js/placement.js?v=v46-2026-05-27"></script>
+<script src="js/constants.js?v=v47-2026-05-27"></script>
+<script src="js/utils.js?v=v47-2026-05-27"></script>
+<script src="js/evaluator.js?v=v47-2026-05-27"></script>
+<script src="js/bag.js?v=v47-2026-05-27"></script>
+<script src="js/rack.js?v=v47-2026-05-27"></script>
+<script src="js/board.js?v=v47-2026-05-27"></script>
+<script src="js/tile-tracker.js?v=v47-2026-05-27"></script>
+<script src="js/scoring.js?v=v47-2026-05-27"></script>
+<script src="js/placement.js?v=v47-2026-05-27"></script>
 <!-- AI modules for the in-browser puzzle generator -->
-<script src="js/ai-x9.js?v=v46-2026-05-27"></script>
-<script src="js/ai-x4.js?v=v46-2026-05-27"></script>
-<script src="js/ai-bingo-fast.js?v=v46-2026-05-27"></script>
-<script src="js/ai-bingo-grammar.js?v=v46-2026-05-27"></script>
-<script src="js/ai-yoyo.js?v=v46-2026-05-27"></script>
-<script src="js/ai-patterns-data.js?v=v46-2026-05-27"></script>
-<script src="js/ai-patterns-engine.js?v=v46-2026-05-27"></script>
-<script src="js/ai-swap.js?v=v46-2026-05-27"></script>
-<script src="js/ai-swap-brain2.js?v=v46-2026-05-27"></script>
-<script src="js/ai-player.js?v=v46-2026-05-27"></script>
-<script src="js/puzzle-generator.js?v=v46-2026-05-27"></script>
-<script src="js/book-puzzle-generator.js?v=v46-2026-05-27"></script>
-<script src="js/ton4-solver.js?v=v46-2026-05-27"></script>
-<script src="js/sounds.js?v=v46-2026-05-27"></script>
-<script src="js/settings.js?v=v46-2026-05-27"></script>
-<script src="js/ui.js?v=v46-2026-05-27"></script>
-<script src="js/interactions.js?v=v46-2026-05-27"></script>
+<script src="js/ai-x9.js?v=v47-2026-05-27"></script>
+<script src="js/ai-x4.js?v=v47-2026-05-27"></script>
+<script src="js/ai-bingo-fast.js?v=v47-2026-05-27"></script>
+<script src="js/ai-bingo-grammar.js?v=v47-2026-05-27"></script>
+<script src="js/ai-yoyo.js?v=v47-2026-05-27"></script>
+<script src="js/ai-patterns-data.js?v=v47-2026-05-27"></script>
+<script src="js/ai-patterns-engine.js?v=v47-2026-05-27"></script>
+<script src="js/ai-swap.js?v=v47-2026-05-27"></script>
+<script src="js/ai-swap-brain2.js?v=v47-2026-05-27"></script>
+<script src="js/ai-player.js?v=v47-2026-05-27"></script>
+<script src="js/puzzle-generator.js?v=v47-2026-05-27"></script>
+<script src="js/book-puzzle-generator.js?v=v47-2026-05-27"></script>
+<script src="js/ton4-solver.js?v=v47-2026-05-27"></script>
+<script src="js/sounds.js?v=v47-2026-05-27"></script>
+<script src="js/progress.js?v=v47-2026-05-27"></script>
+<script src="js/settings.js?v=v47-2026-05-27"></script>
+<script src="js/ui.js?v=v47-2026-05-27"></script>
+<script src="js/interactions.js?v=v47-2026-05-27"></script>
 
 <script>
 (function(){
@@ -1164,8 +1195,7 @@ window.clearBank = function(){
 
 function refreshBankStatus(){
   var stored = loadPuzzlesFromStorage();
-  var badge = document.getElementById('captured-count-badge');
-  if (badge) badge.textContent = stored.length;
+  // (captured-count-badge element removed when MMT was unified into Set 5)
   var btn = document.getElementById('captured-practice-btn');
   if (btn) {
     if (stored.length === 0) {
@@ -1205,61 +1235,182 @@ function initBookSections() {
   const container = document.getElementById('book-section-cards');
   if (!container) return;
 
+  refreshStatsRow();
+
   window.AMath.bookGenerator.loadBookData().then(function(data){
     container.innerHTML = '';
+    const prog = window.AMath.progress;
+
+    // Show daily challenge card
+    refreshDailyCard(data);
+
     ['ton1','ton2','ton3','ton4'].forEach(function(sid){
       const section = data[sid];
       if (!section) return;
-      const totalProblems = (sid === 'ton4') ? section.targets.length :
+      const totalProblems = (sid === 'ton4') ? section.targets.length * (section.puzzles ? section.puzzles.length : 1) :
         section.patterns.reduce(function(s,p){ return s + p.puzzles.length; }, 0);
-      // Sets 1-3 are always "ready" because they read directly from book-data.json.
-      // Set 4 (ton4) used to be gated on a separate solver cache; keep that check.
-      let cachedCount = 0;
-      if (sid !== 'ton4') {
-        cachedCount = totalProblems;  // always ready
-      } else {
-        try { cachedCount = (JSON.parse(localStorage.getItem('amath_book_ton4_cache')||'null') ? 1 : 0); } catch(e){}
-      }
+      const isSeen = prog ? prog.isSeen(sid) : true;
+      const solvedCount = prog ? prog.countSolved(sid) : 0;
+      const isMastered = solvedCount >= totalProblems && totalProblems > 0;
+      const isReady = (sid !== 'ton4') || (function(){
+        try { return !!JSON.parse(localStorage.getItem('amath_book_ton4_cache')||'null'); } catch(e){ return false; }
+      })();
       const card = document.createElement('div');
-      const isReady = cachedCount > 0;
-      card.style.cssText = 'background:#0f172a;border:1px solid ' + (isReady ? '#10b981' : '#334155') + ';border-radius:10px;padding:12px;margin-bottom:8px;';
+      const borderColor = isMastered ? '#fbbf24' : (solvedCount > 0 ? '#10b981' : '#334155');
+      card.style.cssText = 'background:#0f172a;border:1px solid ' + borderColor + ';border-radius:10px;padding:12px;margin-bottom:8px;position:relative;';
+
+      // Top-right badges
+      let topBadges = '<div style="position:absolute;top:8px;right:8px;display:flex;gap:4px;align-items:center;">';
+      if (!isSeen) {
+        topBadges += '<span style="background:#fbbf24;color:#1f2937;padding:2px 7px;border-radius:8px;font-size:9px;font-weight:800;letter-spacing:0.5px;">NEW</span>';
+      }
+      if (isMastered) {
+        topBadges += '<span style="background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1f2937;padding:2px 7px;border-radius:8px;font-size:9px;font-weight:800;letter-spacing:0.5px;">🏆 MASTERED</span>';
+      }
+      topBadges += '</div>';
+
+      // Progress bar (only if not Set 4 since ton4 has its own UI)
+      let progressBar = '';
+      if (sid !== 'ton4' && totalProblems > 0) {
+        const pct = Math.min(100, Math.round((solvedCount / totalProblems) * 100));
+        progressBar =
+          '<div style="margin:6px 0 4px;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">' +
+              '<span style="font-size:10px;color:#94a3b8;">' + solvedCount + ' / ' + totalProblems + ' solved</span>' +
+              '<span style="font-size:10px;color:' + (isMastered ? '#fbbf24' : '#10b981') + ';font-weight:700;">' + pct + '%</span>' +
+            '</div>' +
+            '<div style="background:#0f172a;border:1px solid #334155;border-radius:4px;height:6px;overflow:hidden;">' +
+              '<div style="background:' + (isMastered ? 'linear-gradient(90deg,#fbbf24,#f59e0b)' : '#10b981') + ';height:100%;width:' + pct + '%;transition:width 0.3s;"></div>' +
+            '</div>' +
+          '</div>';
+      }
+
       const statusLine = (sid === 'ton4')
-        ? '<div style="font-size:10px;color:' + (isReady ? '#10b981' : '#94a3b8') + ';">' + (isReady ? '✓ ready' : totalProblems + ' targets — not generated') + '</div>'
-        : '<div style="font-size:10px;color:#10b981;">✓ ' + totalProblems + ' problems</div>';
-      // Sets 1-3 just need Practice (no generate step since we pull from book-data live).
-      // Set 4 opens its dedicated target-drills screen.
+        ? '<div style="font-size:10px;color:' + (isReady ? '#10b981' : '#94a3b8') + ';">' + (isReady ? '✓ ready' : section.targets.length + ' targets per set') + '</div>'
+        : '';
+
       const actionButtons = (sid === 'ton4')
         ? '<button class="book-btn-primary" onclick="openTon4()">▶ Open</button>'
         : '<button class="book-btn-primary" onclick="practiceBookSection(\'' + sid + '\')">▶ Practice</button>';
+
       card.innerHTML =
-        '<div style="font-size:12px;font-weight:700;color:#e2e8f0;">' + section.title + '</div>' +
+        topBadges +
+        '<div style="font-size:12px;font-weight:700;color:#e2e8f0;padding-right:80px;">' + section.title + '</div>' +
         '<div style="font-size:11px;color:#94a3b8;margin:2px 0 6px;line-height:1.4;">' + section.description + '</div>' +
         statusLine +
+        progressBar +
         '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">' + actionButtons + '</div>';
       container.appendChild(card);
     });
 
-    // === Set 5 — Board Puzzles (the former Missed-Move Trainer) ===
+    // === Set 5 — Board Puzzles ===
     let ton5Count = 0;
     try {
       const bank = JSON.parse(localStorage.getItem('amath_puzzle_bank') || '[]');
       ton5Count = Array.isArray(bank) ? bank.length : 0;
     } catch(e) {}
     const ton5Ready = ton5Count > 0;
+    const ton5Seen = prog ? prog.isSeen('ton5') : true;
     const ton5Card = document.createElement('div');
-    ton5Card.style.cssText = 'background:#0f172a;border:1px solid ' + (ton5Ready ? '#10b981' : '#334155') + ';border-radius:10px;padding:12px;margin-bottom:8px;';
+    ton5Card.style.cssText = 'background:#0f172a;border:1px solid ' + (ton5Ready ? '#10b981' : '#334155') + ';border-radius:10px;padding:12px;margin-bottom:8px;position:relative;';
+
+    let ton5Badges = '<div style="position:absolute;top:8px;right:8px;display:flex;gap:4px;align-items:center;">';
+    if (!ton5Seen) {
+      ton5Badges += '<span style="background:#fbbf24;color:#1f2937;padding:2px 7px;border-radius:8px;font-size:9px;font-weight:800;letter-spacing:0.5px;">NEW</span>';
+    }
+    if (ton5Count > 0) {
+      ton5Badges += '<span style="background:#10b981;color:#fff;padding:2px 7px;border-radius:8px;font-size:9px;font-weight:800;">' + ton5Count + '</span>';
+    }
+    ton5Badges += '</div>';
+
     const ton5Status = '<div style="font-size:10px;color:' + (ton5Ready ? '#10b981' : '#94a3b8') + ';">' + (ton5Ready ? '✓ ' + ton5Count + ' captured ready' : 'no puzzles captured yet — play PvA games or auto-generate') + '</div>';
     const ton5Actions = ton5Ready
       ? '<button class="book-btn-primary" onclick="startPuzzle(\'mixed\')">▶ Practice</button><button class="book-btn-secondary" onclick="toggleAutoGen()">⚙ Auto-gen</button>'
       : '<button class="book-btn-secondary" onclick="toggleAutoGen()">⚙ Auto-gen</button>';
     ton5Card.innerHTML =
-      '<div style="font-size:12px;font-weight:700;color:#e2e8f0;">Set 5 — Board Puzzles</div>' +
+      ton5Badges +
+      '<div style="font-size:12px;font-weight:700;color:#e2e8f0;padding-right:80px;">Set 5 — Board Puzzles</div>' +
       '<div style="font-size:11px;color:#94a3b8;margin:2px 0 6px;line-height:1.4;">Mid-game board positions auto-captured from your Player-vs-AI games (or auto-generated). Find the best move on the real 15×15 board.</div>' +
       ton5Status +
       '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">' + ton5Actions + '</div>';
     container.appendChild(ton5Card);
   });
 }
+
+function refreshStatsRow() {
+  const prog = window.AMath && window.AMath.progress;
+  if (!prog) return;
+  const stats = prog.totalStats();
+  const streak = prog.streak();
+  const solvedEl = document.getElementById('stats-solved');
+  const accEl = document.getElementById('stats-accuracy');
+  const streakEl = document.getElementById('stats-streak');
+  if (solvedEl) solvedEl.textContent = stats.solved;
+  if (accEl) accEl.textContent = stats.attempts > 0 ? stats.accuracy + '%' : '—';
+  if (streakEl) {
+    if (streak === 0) {
+      streakEl.textContent = '·';
+      streakEl.style.color = '#64748b';
+    } else {
+      streakEl.textContent = '🔥 ' + streak;
+      streakEl.style.color = '#f87171';
+    }
+  }
+}
+
+function refreshDailyCard(bookData) {
+  const prog = window.AMath && window.AMath.progress;
+  const card = document.getElementById('daily-card');
+  if (!prog || !card || !bookData) return;
+  const challenge = prog.todaysDailyChallenge(bookData);
+  if (!challenge) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  const labelEl = document.getElementById('daily-label');
+  const statusEl = document.getElementById('daily-status');
+  const sectionTitleMap = {
+    'ton1': 'Set 1', 'ton2': 'Set 2', 'ton3': 'Set 3'
+  };
+  if (labelEl) labelEl.textContent = (sectionTitleMap[challenge.sid] || challenge.sid) + ' · ' + challenge.label;
+  const solved = prog.isDailySolved();
+  if (statusEl) {
+    statusEl.textContent = solved ? '✓ Solved' : 'Play';
+    statusEl.style.background = solved ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.2)';
+  }
+}
+
+window.openDailyChallenge = async function() {
+  const prog = window.AMath && window.AMath.progress;
+  if (!prog) return;
+  if (!window.AMath._bookData && window.AMath.bookGenerator) {
+    await window.AMath.bookGenerator.loadBookData();
+  }
+  const bookData = window.AMath._bookData;
+  if (!bookData) return;
+  const c = prog.todaysDailyChallenge(bookData);
+  if (!c) return;
+  // Navigate to the relevant section, then jump to the specific problem
+  const section = bookData[c.sid];
+  if (!section) return;
+  const puzzles = [];
+  (section.patterns || []).forEach(function(pat){
+    (pat.puzzles || []).forEach(function(pz){
+      puzzles.push({
+        sectionId: c.sid, patternId: pat.id, patternLabel: pat.label,
+        tokens: pz.rack.slice(), hasSolution: true,
+      });
+    });
+  });
+  openEquationPractice(c.sid, puzzles).then(function(){
+    // Jump to the specific puzzle within its pattern
+    setTimeout(function(){
+      _eqActivePattern = c.pid;
+      _eqActiveIdx = c.idx;
+      var sel = document.getElementById('eq-pattern-select');
+      if (sel) sel.value = c.pid;
+      renderCurrentProblem();
+    }, 50);
+  });
+};
 
 window.generateBookSection = async function(sid) {
   if (!window.AMath || !window.AMath.bookGenerator) return;
@@ -1388,6 +1539,7 @@ window.openEquationPractice = async function(sid, cache) {
   if (!window.AMath._bookData && window.AMath.bookGenerator) {
     await window.AMath.bookGenerator.loadBookData();
   }
+  if (window.AMath.progress) window.AMath.progress.markSeen(sid);
   _eqSectionId = sid;
   _eqPatterns = {};
   cache.forEach(function(p){
@@ -1787,10 +1939,18 @@ window.eqSubmit = function() {
   var tokens = _eqTiles.map(function(t){ return t.face; });
   var pattern = _eqPatterns[_eqActivePattern].patternRegex || null;
   var r = tryAllAssignments(tokens, pattern);
+  // Record this attempt globally
+  if (window.AMath.progress) {
+    window.AMath.progress.recordAttempt(_eqSectionId, _eqActivePattern, _eqActiveIdx);
+  }
   if (r.valid) {
     _eqResults[_eqResultKey()] = 'correct';
     _sfxWin();
     showResultBanner(true, '✓ Correct! ' + r.canonical.join(' '));
+    // Persist solved state
+    if (window.AMath.progress) {
+      window.AMath.progress.markSolved(_eqSectionId, _eqActivePattern, _eqActiveIdx);
+    }
     var ps = _eqPatterns[_eqActivePattern].puzzles;
     var solvedCount = 0;
     for (var i = 0; i < ps.length; i++) {
@@ -1880,6 +2040,7 @@ window.openTon4 = async function() {
     alert('No Set 4 data loaded.');
     return;
   }
+  if (window.AMath.progress) window.AMath.progress.markSeen('ton4');
   try {
     const cached = localStorage.getItem('amath_book_ton4_state');
     if (cached) {
@@ -2031,6 +2192,10 @@ window.ton4Submit = function() {
       if (matches) {
         _ton4Results[_ton4ActiveSet + ':' + _ton4ActiveTargetIdx] = 'correct';
         _ton4SaveState();
+        if (window.AMath.progress) {
+          window.AMath.progress.recordAttempt('ton4', 'set' + _ton4ActiveSet, _ton4ActiveTargetIdx);
+          window.AMath.progress.markSolved('ton4', 'set' + _ton4ActiveSet, _ton4ActiveTargetIdx);
+        }
         _sfxWin();
         showTon4Banner(true, '✓ Correct! ' + combo.join(' '));
         var solvedCount = 0;
@@ -2055,6 +2220,9 @@ window.ton4Submit = function() {
   }
   _ton4Results[_ton4ActiveSet + ':' + _ton4ActiveTargetIdx] = 'incorrect';
   _ton4SaveState();
+  if (window.AMath.progress) {
+    window.AMath.progress.recordAttempt('ton4', 'set' + _ton4ActiveSet, _ton4ActiveTargetIdx);
+  }
   _sfxFail();
   showTon4Banner(false, isOperatorTarget
     ? '✗ Equation does not include the target operator ' + target
