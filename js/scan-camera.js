@@ -219,9 +219,18 @@
     img.src = 'data:image/jpeg;base64,' + base64;
   }
 
-  var PASSES = 5;
   var PASS_TEMPS = [0.0, 0.2, 0.35, 0.5, 0.65];  // diverse reads → meaningful vote
-  var RACK_PASSES = 3;
+  // Scan quality controls how many AI passes per scan (more passes = better
+  // accuracy but more requests against the free quota). Default 'balanced'.
+  // window.AMath.scanQuality can be set to 'fast' | 'balanced' | 'accurate'.
+  function boardPasses() {
+    var q = (window.AMath && window.AMath.scanQuality) || 'balanced';
+    return q === 'fast' ? 1 : q === 'accurate' ? 5 : 3;
+  }
+  function rackPassCount() {
+    var q = (window.AMath && window.AMath.scanQuality) || 'balanced';
+    return q === 'accurate' ? 3 : 1;   // rack is a small read; 1 is usually plenty
+  }
 
   function friendlyErr(err) {
     var m = String(err && err.message || err);
@@ -237,12 +246,13 @@
   // Resolves to { grid, n } or { grid:null, err }.
   function runScanPasses(image) {
     var prompt = buildPrompt();
+    var P = boardPasses();
     var done = 0, lastErr = null, jobs = [];
-    for (var i = 0; i < PASSES; i++) {
+    for (var i = 0; i < P; i++) {
       var temp = PASS_TEMPS[i % PASS_TEMPS.length];
       jobs.push(
         analyze2(image, prompt, temp).then(function (text) {
-          status('⏳ Reading board — pass ' + (++done) + '/' + PASSES + '…');
+          status('⏳ Reading board — pass ' + (++done) + '/' + P + '…');
           try { var o = JSON.parse(extractJson(text) || 'null'); return (o && Array.isArray(o.grid)) ? o.grid : null; }
           catch (e) { return null; }
         }).catch(function (e) { lastErr = e; return null; })
@@ -289,7 +299,8 @@
   }
   function runRackPasses(image) {
     var jobs = [];
-    for (var i = 0; i < RACK_PASSES; i++) {
+    var RP = rackPassCount();
+    for (var i = 0; i < RP; i++) {
       var temp = PASS_TEMPS[i % PASS_TEMPS.length];
       jobs.push(
         analyze2(image, rackPrompt(), temp).then(function (text) {
@@ -331,7 +342,7 @@
       status('⏳ Finding the board edges…');
       detectBoard(base64).then(function (box) {
         cropToBox(base64, box, function (cropped) {
-          status('⏳ Reading board — ' + PASSES + ' passes for accuracy… (~30s)');
+          status('⏳ Reading board — ' + boardPasses() + ' pass(es)…');
           runScanPasses(cropped).then(function (r) {
             if (!r.grid) { status('❌ ' + (r.err ? friendlyErr(r.err) : 'The model did not return readable board data. Try a flatter, well-lit photo.'), '#f87171'); return; }
             if (!wantRack) { applyScan(r.grid, null); return; }
