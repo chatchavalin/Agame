@@ -132,10 +132,12 @@
     return callGemini(base64, key);                            // raw fallback (may hit CORS)
   }
 
-  // Merge several 15x15 grids: each cell = the most common non-empty reading
-  // across passes (so a tile any pass saw is kept, and disagreements are voted).
+  // Merge several 15x15 grids by VOTE: a cell is kept only if a strict majority
+  // of passes agree on the same tile there. Real tiles appear in most passes;
+  // one-off misreads/hallucinations from a single pass are voted out.
   function normCell(s) { if (s == null) return ''; s = String(s).trim(); return (s === '.' || s === '-.') ? '' : s; }
   function mergeGrids(grids) {
+    var need = grids.length <= 1 ? 1 : Math.floor(grids.length / 2) + 1; // 3→2, 2→2, 1→1
     var out = [];
     for (var r = 0; r < 15; r++) {
       var row = [];
@@ -149,7 +151,7 @@
         });
         var best = '', bestN = 0;
         order.forEach(function (v) { if (counts[v] > bestN) { bestN = counts[v]; best = v; } });
-        row.push(best);
+        row.push(bestN >= need ? best : '');   // require majority agreement
       }
       out.push(row);
     }
