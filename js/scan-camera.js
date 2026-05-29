@@ -328,10 +328,13 @@
     return [
       'This photo shows a player\'s tile RACK / TRAY: a single row of up to 8 game tiles sitting in a holder (often a close-up of just the tray; a 15x15 board may or may not also be visible).',
       'Read ONLY the rack/tray tiles, in order from LEFT to RIGHT. If a 15x15 board is visible, ignore it.',
-      'Each tile has a large face and a tiny corner number (its point value — IGNORE the corner number).',
-      'BLANK tile: a tile with NO symbol in the center (plain/empty face) and only a small "0" in the corner is "BLANK" (a wildcard). Do not confuse it with the digit zero — the "0" digit tile has a large "0" printed in the CENTER. If the center is empty, it is "BLANK".',
-      'Output ONLY JSON: {"rack":[ up to 8 strings ]}. Each string is the tile FACE: "0".."9","10","11","12","13","14","15","16","20","+","-","=","±" (the +/- tile), "×" or "÷" (the ×/÷ tile), "BLANK" (empty face, corner value 0).',
-      'Include every tile in the tray, including a BLANK tile (a plain tile with an empty face). Do not skip any slot that holds a tile.',
+      'CRITICAL — BLANK vs the digit 0. Every tile has a small point-value number in a CORNER; that corner number is NOT the tile\'s face — ignore it. Decide each tile by looking ONLY at the CENTER of the tile:',
+      '  • If the CENTER has a big bold "0" printed in the middle → face is "0".',
+      '  • If the CENTER is EMPTY / blank / has no printed symbol at all (even though there is a tiny "0" in the corner as its point value) → face is "BLANK". A blank tile looks like a plain colored tile with nothing in the middle.',
+      '  When unsure between "0" and "BLANK": if the middle of the tile looks empty/plain, choose "BLANK". A real "0" digit is large and centered and unmistakable.',
+      'Each tile has a large center face and a tiny corner number (the point value — IGNORE the corner number).',
+      'Output ONLY JSON: {"rack":[ up to 8 strings ]}. Each string is the tile FACE: "0".."9","10","11","12","13","14","15","16","20","+","-","=","±" (the +/- tile), "×" or "÷" (the ×/÷ tile), "BLANK" (empty center).',
+      'Include every tile in the tray, including a BLANK tile (a plain tile with an empty center). Do not skip any slot that holds a tile.',
       'If you truly see no rack/tray tiles at all, return {"rack":[]}.'
     ].join('\n');
   }
@@ -461,7 +464,7 @@
   };
 
   // ---- wire UI --------------------------------------------------------------
-  var JS_VERSION = 'v140';
+  var JS_VERSION = 'v141';
   function init() {
     var stamp = document.getElementById('build-stamp');
     if (stamp) stamp.textContent = JS_VERSION + ' js✓';   // proves the current scan-camera.js actually ran
