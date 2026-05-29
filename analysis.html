@@ -331,6 +331,11 @@ body {
     <input type="text" id="p2-name-input" value="Player 2" placeholder="e.g. Opponent">
     <div style="margin-top:12px; font-size:11px; color:#64748b;">Then paste your board code below and enter moves.</div>
     <button class="setup-start" onclick="startAnalysis()">▶ Start Analysis</button>
+    <div style="margin-top:14px;border-top:1px solid #1e2d3d;padding-top:12px;">
+      <div style="font-size:11px;color:#64748b;margin-bottom:6px;font-weight:700;">⚡ OR — paste a full game code (board + all plays pre-loaded)</div>
+      <textarea id="full-game-input" rows="3" placeholder='Paste game JSON here and tap Load...' style="width:100%;padding:8px;border-radius:8px;background:#080d14;border:1px solid #334155;color:#e2e8f0;font-family:'Courier New',monospace;font-size:11px;resize:vertical;"></textarea>
+      <button onclick="loadGameJSON(document.getElementById('full-game-input').value)" style="margin-top:6px;width:100%;padding:10px;border:none;border-radius:9px;background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;font-family:inherit;font-weight:900;font-size:14px;cursor:pointer;">⚡ Load Full Game</button>
+    </div>
   </div>
 </div>
 
@@ -875,10 +880,66 @@ function renderBoard() {
   }
 }
 
+// ===================== FULL GAME LOADER =====================
+function loadGameJSON(raw) {
+  let data;
+  try {
+    let clean = raw.replace(/```[a-z]*\n?/gi,'').replace(/```/g,'').trim();
+    const match = clean.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('No JSON found');
+    data = JSON.parse(match[0]);
+  } catch(e) { alert('Could not parse: ' + e.message); return; }
+
+  state.p1Name = data.p1 || 'Player 1';
+  state.p2Name = data.p2 || 'Player 2';
+
+  if (data.grid && Array.isArray(data.grid)) {
+    const newBoard = Array.from({length:15}, () => Array(15).fill(null));
+    for (let r = 0; r < 15 && r < data.grid.length; r++) {
+      for (let c = 0; c < 15 && c < (data.grid[r]||[]).length; c++) {
+        const val = data.grid[r][c];
+        if (val && val !== '') newBoard[r][c] = { face: val, player: 'unknown', turnIdx: -1 };
+      }
+    }
+    state.board = newBoard;
+  }
+
+  state.plays = [];
+  if (data.plays && Array.isArray(data.plays)) {
+    data.plays.forEach((play, idx) => {
+      const p = { player: play.player||'p1', equation: play.equation||'',
+        score: play.score||0, type: play.type||'yoyo',
+        cells: play.cells||[], notes: play.notes||'', turnIdx: idx };
+      state.plays.push(p);
+      (p.cells||[]).forEach(([r,c]) => {
+        if (r>=0&&r<15&&c>=0&&c<15&&state.board[r]&&state.board[r][c]) {
+          state.board[r][c].player = p.player;
+          state.board[r][c].turnIdx = idx;
+        }
+      });
+    });
+  }
+
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('main-view').style.display = 'flex';
+  document.getElementById('p1-legend-name').textContent = state.p1Name;
+  document.getElementById('p2-legend-name').textContent = state.p2Name;
+  document.getElementById('p1-score-label').textContent = state.p1Name;
+  document.getElementById('p2-score-label').textContent = state.p2Name;
+  document.getElementById('modal-p1-name').textContent = state.p1Name;
+  document.getElementById('modal-p2-name').textContent = state.p2Name;
+  document.getElementById('game-subtitle').textContent =
+    state.p1Name + ' (\uD83D\uDD34) vs ' + state.p2Name + ' (\uD83D\uDD35)';
+  renderBoard();
+  renderSidebar();
+}
+
 // ===================== BOOT =====================
-// Render empty board on load for setup screen preview (hidden)
 window.addEventListener('DOMContentLoaded', () => {
-  // nothing until startAnalysis()
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('game')) {
+    try { loadGameJSON(decodeURIComponent(params.get('game'))); } catch(e) {}
+  }
 });
 </script>
 </body>
