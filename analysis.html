@@ -515,7 +515,8 @@ body {
       <button class="an-load-btn" style="background:linear-gradient(135deg,#22d3ee,#3b82f6)" onclick="importScoreSheet()">📋 Import Score Sheet</button>
     </div>
     <div class="an-paste-section">
-      <div class="hint">⚡ Or paste a full game code to load board + all plays instantly</div>
+      <div class="hint">⚡ Or paste a full game code (board + all turns + scores)</div>
+      <div style="font-size:10px;color:#475569;margin-bottom:6px;line-height:1.4;">The complete game in one code — usually what I generate for you from a photo. Loads everything at once.</div>
       <textarea id="full-game-input" placeholder='{"v":2,"p1":"...","p2":"...","grid":[...],"plays":[...]}'></textarea>
       <button class="an-load-btn" onclick="loadGameJSON(document.getElementById('full-game-input').value)">⚡ Load Full Game</button>
     </div>
@@ -619,9 +620,10 @@ body {
         <div style="color:#475569;font-size:12px;padding:6px 2px">No plays yet — tap + Play or load a game.</div>
       </div>
       <div style="border-top:1px solid #1e2d3d;padding-top:8px;margin-top:4px;">
-        <div class="an-sec-title">Import Board Code</div>
-        <textarea id="board-code-input" rows="3" placeholder='{"v":2,"grid":[...]}' style="width:100%;padding:7px;border-radius:7px;background:#080d14;border:1px solid #334155;color:#e2e8f0;font-family:Courier New,monospace;font-size:10px;resize:vertical;"></textarea>
-        <button onclick="importBoardCode()" style="margin-top:5px;width:100%;padding:7px;border:none;border-radius:7px;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;">Load Board</button>
+        <div class="an-sec-title">🔲 Load board tiles only</div>
+        <div style="font-size:10px;color:#475569;margin-bottom:5px;line-height:1.4;">Drops in just the tile layout, keeping the turns/scores you already imported. (To load a whole game incl. plays, use the start screen.)</div>
+        <textarea id="board-code-input" rows="3" placeholder='{"grid":[[...15 rows of faces...]]}' style="width:100%;padding:7px;border-radius:7px;background:#080d14;border:1px solid #334155;color:#e2e8f0;font-family:Courier New,monospace;font-size:10px;resize:vertical;"></textarea>
+        <button onclick="importBoardCode()" style="margin-top:5px;width:100%;padding:7px;border:none;border-radius:7px;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;">Load board tiles</button>
         <div id="import-msg" style="font-size:11px;margin-top:4px;color:#94a3b8;"></div>
       </div>
     </div>
