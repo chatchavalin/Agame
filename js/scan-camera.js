@@ -19,7 +19,7 @@
   'use strict';
 
   var KEY_LS = 'amath_gemini_key';
-  var MODEL = 'gemini-3.5-flash';
+  var MODEL = 'gemini-2.5-flash-lite';
   var ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODEL + ':generateContent';
   var MAX_DIM = 2200;   // cap longest side; large enough to keep small tiles legible
 
@@ -461,7 +461,7 @@
   };
 
   // ---- wire UI --------------------------------------------------------------
-  var JS_VERSION = 'v139';
+  var JS_VERSION = 'v140';
   function init() {
     var stamp = document.getElementById('build-stamp');
     if (stamp) stamp.textContent = JS_VERSION + ' js✓';   // proves the current scan-camera.js actually ran

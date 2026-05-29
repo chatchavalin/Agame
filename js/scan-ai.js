@@ -29,9 +29,11 @@ const firebaseConfig = {
   measurementId: "G-F0W9005PMC"
 };
 
-// Vision-capable model on the free Gemini Developer API tier. Swappable here if
-// Google retires it (see firebase.google.com/docs/ai-logic/models).
-const MODEL = "gemini-2.5-flash";
+// Vision-capable model on the free Gemini Developer API tier. Using flash-lite
+// because it has a much higher free daily request quota than flash (the full
+// flash model's tiny daily cap was exhausting and causing scan failures).
+// Swappable here if Google retires it (see firebase.google.com/docs/ai-logic/models).
+const MODEL = "gemini-2.5-flash-lite";
 
 let _models = {};
 function ensureModel(temp) {
