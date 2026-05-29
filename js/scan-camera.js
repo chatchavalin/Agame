@@ -245,7 +245,48 @@
     img.src = 'data:image/jpeg;base64,' + base64;
   }
 
-  var PASS_TEMPS = [0.0, 0.2, 0.35, 0.5, 0.65];  // diverse reads → meaningful vote
+  // Normalize lighting before reading: stretch contrast per-channel (ignoring
+  // the extreme 1% tails) and gently roll off blown-out highlights. This makes
+  // the white tile glyphs stand out against the blue tiles under uneven light /
+  // mild glare. Conservative on purpose — strong filters make the model
+  // hallucinate. Falls back to the input on any problem.
+  function normalizeImage(base64, cb) {
+    var img = new Image();
+    img.onerror = function () { cb(base64); };
+    img.onload = function () {
+      try {
+        var w = img.width, h = img.height;
+        var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        var ctx = cv.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        var data = ctx.getImageData(0, 0, w, h), px = data.data, n = px.length;
+        // luminance histogram to find robust black/white points (1st/99th pct)
+        var hist = new Array(256).fill(0), total = (n / 4) | 0;
+        for (var i = 0; i < n; i += 4) {
+          var l = (px[i] * 299 + px[i + 1] * 587 + px[i + 2] * 114) / 1000 | 0;
+          hist[l]++;
+        }
+        var lo = 0, hi = 255, cum = 0, loCut = total * 0.01, hiCut = total * 0.99;
+        for (var b = 0; b < 256; b++) { cum += hist[b]; if (cum >= loCut) { lo = b; break; } }
+        cum = 0;
+        for (var b2 = 0; b2 < 256; b2++) { cum += hist[b2]; if (cum >= hiCut) { hi = b2; break; } }
+        if (hi - lo < 32) { cb(base64); return; }   // already low-contrast/flat → leave alone
+        var range = hi - lo;
+        for (var j = 0; j < n; j += 4) {
+          for (var k = 0; k < 3; k++) {
+            var v = (px[j + k] - lo) * 255 / range;
+            if (v < 0) v = 0; else if (v > 255) v = 255;
+            px[j + k] = v;
+          }
+        }
+        ctx.putImageData(data, 0, 0);
+        cb(cv.toDataURL('image/jpeg', 0.9).split(',')[1]);
+      } catch (e) { cb(base64); }
+    };
+    img.src = 'data:image/jpeg;base64,' + base64;
+  }
+
+
   // Scan quality controls how many AI passes per scan (more passes = better
   // accuracy but more requests against the free quota). Default 'balanced'.
   // window.AMath.scanQuality can be set to 'fast' | 'balanced' | 'accurate'.
@@ -324,6 +365,13 @@
     return out;
   }
   function runRackPasses(image) {
+    return new Promise(function (resolveOuter, rejectOuter) {
+      normalizeImage(image, function (prepped) {
+        _runRackPasses(prepped).then(resolveOuter, rejectOuter);
+      });
+    });
+  }
+  function _runRackPasses(image) {
     var jobs = [];
     var RP = rackPassCount();
     for (var i = 0; i < RP; i++) {
@@ -368,14 +416,16 @@
       status('⏳ Finding the board edges…');
       detectBoard(base64).then(function (box) {
         cropToBox(base64, box, function (cropped) {
-          status('⏳ Reading board — ' + boardPasses() + ' pass(es)…');
-          runScanPasses(cropped).then(function (r) {
-            if (!r.grid) { status('❌ ' + (r.err ? friendlyErr(r.err) : 'The model did not return readable board data. Try a flatter, well-lit photo.'), '#f87171'); return; }
-            if (!wantRack) { applyScan(r.grid, null); return; }
-            status('⏳ Reading your rack…');
-            runRackPasses(base64).then(function (rack) { applyScan(r.grid, rack); })
-              .catch(function () { applyScan(r.grid, null); });
-          }).catch(function (err) { status('❌ ' + friendlyErr(err), '#f87171'); });
+          normalizeImage(cropped, function (prepped) {
+            status('⏳ Reading board — ' + boardPasses() + ' pass(es)…');
+            runScanPasses(prepped).then(function (r) {
+              if (!r.grid) { status('❌ ' + (r.err ? friendlyErr(r.err) : 'The model did not return readable board data. Try a flatter, well-lit photo.'), '#f87171'); return; }
+              if (!wantRack) { applyScan(r.grid, null); return; }
+              status('⏳ Reading your rack…');
+              runRackPasses(base64).then(function (rack) { applyScan(r.grid, rack); })
+                .catch(function () { applyScan(r.grid, null); });
+            }).catch(function (err) { status('❌ ' + friendlyErr(err), '#f87171'); });
+          });
         });
       });
     });
