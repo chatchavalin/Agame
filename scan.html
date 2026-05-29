@@ -82,7 +82,7 @@
       <div id="import-status"></div>
 
       <div style="border-top:1px solid #334155; margin-top:16px; padding-top:14px;">
-        <h2 style="margin-top:0;">Or scan a photo <span id="build-stamp" style="font-size:11px;color:#475569;font-weight:400;">v143</span></h2>
+        <h2 style="margin-top:0;">Or scan a photo <span id="build-stamp" style="font-size:11px;color:#475569;font-weight:400;">v144</span></h2>
         <p class="hint">Once Firebase AI Logic is set up on the project, you don't need a key — just take a flat, well-lit, straight-on photo and tap below. (The key field is only a fallback if Firebase isn't set up.)</p>
         <div class="btn-row">
           <button class="btn btn-amber" id="btn-photo">📷 Take / choose photo</button>
@@ -101,7 +101,7 @@
           <select id="scan-quality" style="flex:1; min-width:0; background:#0f172a; color:#e2e8f0; border:1px solid #475569; border-radius:10px; padding:8px; font-size:13px; font-family:inherit;">
             <option value="fast">Fast — 1 pass (lowest quota use)</option>
             <option value="balanced" selected>Balanced — 3 passes</option>
-            <option value="accurate">Accurate — 5 passes (most quota)</option>
+            <option value="accurate">Accurate — reads board in strips (best for full boards)</option>
           </select>
         </label>
         <p class="hint" style="margin-top:6px;">More passes = better accuracy but more AI requests. Google's free tier allows ~250 reads/day and ~10/minute (resets midnight US Pacific time). If you see "Free quota hit", use Fast (1 request per scan) and wait a minute.</p>
@@ -165,7 +165,7 @@
   <script src="js/ui.js?v=v61-saveexit"></script>
   <script src="js/board-import.js?v=v85-assign"></script>
   <script src="js/scan.js?v=v117-quality"></script>
-  <script src="js/scan-camera.js?v=v143-nonormalize"></script>
+  <script src="js/scan-camera.js?v=v144-bands"></script>
   <script type="module" src="js/scan-ai.js?v=v140-flashlite"></script>
 </body>
 </html>
