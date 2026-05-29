@@ -37,13 +37,16 @@ body {
 .an-back:hover { background:#1e293b; color:#e2e8f0; }
 
 /* Layout */
-.an-layout { display:flex; flex-direction:column; height:calc(100vh - 46px); }
-@media(min-width:900px){ .an-layout { flex-direction:row; } }
-
-/* Board column */
+/* Layout — on mobile, page scrolls naturally (board never gets clipped).
+   On desktop, two columns each scroll independently. */
+.an-layout { display:flex; flex-direction:column; }
 .an-board-col {
   flex:1; display:flex; flex-direction:column; align-items:center;
-  padding:8px 8px 4px; gap:8px; overflow-y:auto; min-width:0;
+  padding:8px 8px 4px; gap:8px; min-width:0;
+}
+@media(min-width:900px){
+  .an-layout { flex-direction:row; height:calc(100vh - 46px); }
+  .an-board-col { overflow-y:auto; }
 }
 
 /* Player cards — score + tappable filter in one */
@@ -227,23 +230,29 @@ body {
   width:100%; background:#0d1520;
   border-top:1px solid #1e2d3d; padding:8px;
   display:flex; flex-direction:column; gap:6px;
-  max-height:42vh; overflow-y:auto;
 }
 @media(min-width:900px){
   .an-sidebar {
-    width:280px; min-width:260px; max-height:none;
+    width:280px; min-width:260px;
     border-top:none; border-left:1px solid #1e2d3d; overflow-y:auto;
   }
 }
 .an-sec-title {
   font-size:10px; font-weight:700; text-transform:uppercase;
   color:#475569; letter-spacing:.8px; margin-bottom:4px;
+  display:flex; justify-content:space-between; align-items:center;
 }
+.an-sec-title .an-count { color:#64748b; font-weight:600; }
 
-/* Turn list */
-.an-turn-list { display:flex; flex-direction:column; gap:2px; }
+/* Turn list — scrollable so it never pushes the page huge on mobile */
+.an-turn-list {
+  display:flex; flex-direction:column; gap:2px;
+  max-height:280px; overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+}
+@media(min-width:900px){ .an-turn-list { max-height:none; } }
 .an-turn-item {
-  display:flex; align-items:center; gap:5px; padding:5px 7px;
+  display:flex; align-items:center; gap:5px; padding:4px 6px;
   border-radius:6px; cursor:pointer; border:1px solid transparent;
   transition:background .1s;
 }
@@ -252,7 +261,7 @@ body {
 .an-turn-item.p1-t { border-left:3px solid #ef4444; }
 .an-turn-item.p2-t { border-left:3px solid #3b82f6; }
 .an-turn-nbadge {
-  width:18px; height:18px; border-radius:50%;
+  width:16px; height:16px; border-radius:50%;
   font-size:9px; font-weight:900; flex-shrink:0;
   display:flex; align-items:center; justify-content:center;
 }
@@ -260,8 +269,8 @@ body {
 .p2-t .an-turn-nbadge { background:#0c1a3a; color:#93c5fd; }
 .an-turn-info { flex:1; min-width:0; }
 .an-turn-eq { font-size:11px; font-weight:700; color:#e2e8f0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.an-turn-meta { font-size:10px; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.an-turn-sc { font-size:12px; font-weight:900; padding:2px 5px; border-radius:4px; flex-shrink:0; }
+.an-turn-meta { font-size:9px; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.an-turn-sc { font-size:12px; font-weight:900; padding:1px 5px; border-radius:4px; flex-shrink:0; }
 .p1-t .an-turn-sc { background:#450a0a; color:#fca5a5; }
 .p2-t .an-turn-sc { background:#0c1a3a; color:#93c5fd; }
 /* Edit icon on turn item */
@@ -477,7 +486,7 @@ body {
 
     <!-- RIGHT: sidebar -->
     <div class="an-sidebar" id="an-sidebar">
-      <div class="an-sec-title">Play-by-Play</div>
+      <div class="an-sec-title"><span>Play-by-Play</span><span class="an-count" id="an-play-count"></span></div>
       <div class="an-turn-list" id="an-turn-list">
         <div style="color:#475569;font-size:12px;padding:6px 2px">No plays yet — tap + Play or load a game.</div>
       </div>
@@ -586,7 +595,7 @@ const PREM_LABEL = {'3E':'3E','2E':'2E','3T':'3T','2T':'2T'};
 // =====================================================================
 // STATE
 // =====================================================================
-const S = {
+var S = window.S = {
   p1Name:'Player 1', p2Name:'Player 2',
   board: Array.from({length:15},()=>Array(15).fill(null)),
   // board[r][c] = {face, player:'p1'|'p2'|'unknown', turnIdx:number(-1=unassigned)}
@@ -815,6 +824,8 @@ function renderSidebar() {
   updateScoreCards();
 
   const list=document.getElementById('an-turn-list');
+  const cnt=document.getElementById('an-play-count');
+  if(cnt) cnt.textContent = S.plays.length ? S.plays.length+' turns' : '';
   if(!S.plays.length){ list.innerHTML='<div style="color:#475569;font-size:12px;padding:6px 2px">No plays yet — tap + Play or load a game.</div>'; return; }
   list.innerHTML='';
   const icons={bingo:'🎯',yoyo:'🪀',swap:'🔄',other:'📝'};
@@ -824,11 +835,19 @@ function renderSidebar() {
     if(i===S.selectedTurn) it.classList.add('active');
     it.onclick=()=>highlightTurn(i);
     const pName=p.player==='p1'?S.p1Name:S.p2Name;
+    // Count tiles placed THIS turn (tiles on board with this turnIdx)
+    let placed=0;
+    for(let r=0;r<15;r++) for(let c=0;c<15;c++)
+      if(S.board[r][c]&&S.board[r][c].turnIdx===i) placed++;
+    const over = placed>8;
+    const tileTag = placed>0
+      ? `<span style="color:${over?'#f87171':'#64748b'};font-weight:${over?'800':'600'}">${placed}🎴${over?' ⚠️>8!':''}</span>`
+      : '';
     it.innerHTML=`
       <div class="an-turn-nbadge">${i+1}</div>
       <div class="an-turn-info">
         <div class="an-turn-eq">${icons[p.type]||'📝'} ${p.equation||p.type||'—'}</div>
-        <div class="an-turn-meta">${pName}${p.notes?' · '+p.notes:''}</div>
+        <div class="an-turn-meta">${pName} ${tileTag}${p.notes?' · '+p.notes:''}</div>
       </div>
       <div class="an-turn-sc">${p.score||0}</div>
       <div class="an-turn-edit" onclick="event.stopPropagation();openPlayEditor(${i})">✏️</div>
@@ -1005,17 +1024,21 @@ function loadGameJSON(raw) {
     S.board=nb;
   }
   S.plays=[];
+  let overPlays=[];
   if(data.plays) data.plays.forEach((p,i)=>{
     const play={player:p.player||'p1',equation:p.equation||'',
       score:p.score||0,type:p.type||'yoyo',cells:p.cells||[],
       notes:p.notes||'',turnIdx:i};
     S.plays.push(play);
+    if((p.cells||[]).length>8) overPlays.push(i+1);
     (p.cells||[]).forEach(([r,c])=>{
       if(r>=0&&r<15&&c>=0&&c<15&&S.board[r]&&S.board[r][c])
         Object.assign(S.board[r][c],{player:play.player,turnIdx:i});
     });
   });
   bootMainView();
+  if(overPlays.length) setTimeout(()=>alert('⚠️ Note: turn(s) '+overPlays.join(', ')+' have more than 8 tiles, which is impossible in A-Math (max 8 per turn). They are flagged ⚠️ in the play list — tap ✏️ on the board to fix.'),300);
+  return;
 }
 
 // =====================================================================
