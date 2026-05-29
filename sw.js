@@ -1,5 +1,5 @@
 // Bump CACHE_NAME whenever ANY asset changes to force update.
-const CACHE_NAME = 'amath-v144-bands';
+const CACHE_NAME = 'amath-v145-revertbands';
 const ASSETS = [
   '/Agame/',
   '/Agame/lobby.html',

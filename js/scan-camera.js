@@ -301,97 +301,6 @@
 
   // Read the board across PASSES (varied temperatures) and merge by vote.
   // Resolves to { grid, n } or { grid:null, err }.
-  // ---- Band (strip) scanning -------------------------------------------------
-  // Reading a whole 15x15 grid in one shot is where the model fails most. Instead
-  // slice the cropped board into horizontal strips and read each strip's rows
-  // separately (far fewer cells per call, and each row is larger in the image),
-  // then assemble the 15-row grid. BANDS rows must sum to 15.
-  var BANDS = [3, 3, 3, 3, 3];   // 5 strips of 3 rows
-
-  function bandPrompt(startRow, rowCount) {
-    var inv = activeInventory();
-    var twoDigits = inv ? inv.filter(function (d) { return d.type === 'twodigit'; }).map(function (d) { return d.face; })
-                        : ['10', '11', '12', '13', '14', '15', '16', '20'];
-    return [
-      'This image is a horizontal STRIP cut from an A-Math / MathSmith board. It contains EXACTLY ' + rowCount + ' rows of a 15-column grid (the full board has 15 columns).',
-      'Read left-to-right, top-to-bottom. Output ONLY JSON: {"rows":[ ' + rowCount + ' arrays ]}, each array EXACTLY 15 strings.',
-      'Each string is "" for an empty square, or the tile face on that square. Most squares are EMPTY — do not invent tiles; if a square has no physical tile, output "".',
-      'A tile shows ONE large symbol in the CENTER; the tiny corner number is its point value — IGNORE it (a large "8" with small "2" corner is "8").',
-      'A two-digit tile (e.g. ' + twoDigits.slice(0, 4).join(', ') + ') is ONE tile in ONE square; never split it. Two single digits in two squares stay separate.',
-      'Choice tiles: the +/- tile → "±"; the ×/÷ tile → "×" or "÷". Empty-center tile with only a corner 0 → "BLANK".',
-      'Allowed faces: "0".."9", ' + twoDigits.map(function (f) { return '"' + f + '"'; }).join(',') + ', "+","-","=","±","×","÷","BLANK".',
-      'Return EXACTLY ' + rowCount + ' rows of 15. If a row is entirely empty, return 15 empty strings.'
-    ].join('\n');
-  }
-
-  // Slice a base64 image into horizontal strips per BANDS (with a little vertical
-  // overlap for safety). Calls back with an array of base64 strips (same order).
-  function sliceBands(base64, cb) {
-    var img = new Image();
-    var settled = false;
-    function fail() { if (!settled) { settled = true; cb(null); } }
-    var timer = setTimeout(fail, 6000);
-    img.onerror = fail;
-    img.onload = function () {
-      try {
-        var W = img.width, H = img.height, strips = [], y0 = 0;
-        for (var b = 0; b < BANDS.length; b++) {
-          var frac = BANDS[b] / 15;
-          var top = Math.max(0, Math.round(y0 - H * 0.01));         // ~1% overlap up
-          var bot = Math.min(H, Math.round(y0 + H * frac + H * 0.01)); // ~1% overlap down
-          var sh = bot - top;
-          var cv = document.createElement('canvas');
-          var scale = Math.min(2, 1500 / W); if (scale < 1) scale = 1;
-          cv.width = Math.round(W * scale); cv.height = Math.round(sh * scale);
-          cv.getContext('2d').drawImage(img, 0, top, W, sh, 0, 0, cv.width, cv.height);
-          strips.push(cv.toDataURL('image/jpeg', 0.92).split(',')[1]);
-          y0 += H * frac;
-        }
-        clearTimeout(timer); if (!settled) { settled = true; cb(strips); }
-      } catch (e) { clearTimeout(timer); fail(); }
-    };
-    img.src = 'data:image/jpeg;base64,' + base64;
-  }
-
-  // Read each strip, assemble the 15-row grid. Resolves {grid} or {grid:null,err}.
-  function runBandScan(image) {
-    return new Promise(function (resolve) {
-      sliceBands(image, function (strips) {
-        if (!strips) { resolve({ grid: null, err: new Error('Could not slice the board image.') }); return; }
-        var startRows = [], acc = 0;
-        for (var b = 0; b < BANDS.length; b++) { startRows.push(acc); acc += BANDS[b]; }
-        var doneCount = 0, lastErr = null;
-        var jobs = strips.map(function (strip, bi) {
-          return analyze2(strip, bandPrompt(startRows[bi], BANDS[bi]), 0).then(function (text) {
-            status('⏳ Reading board — strip ' + (++doneCount) + '/' + strips.length + '…');
-            try {
-              var o = JSON.parse(extractJson(text) || 'null');
-              if (o && Array.isArray(o.rows)) return { bi: bi, rows: o.rows };
-            } catch (e) {}
-            return { bi: bi, rows: null };
-          }).catch(function (e) { lastErr = e; return { bi: bi, rows: null }; });
-        });
-        Promise.all(jobs).then(function (results) {
-          var grid = [], got = 0;
-          results.sort(function (a, c) { return a.bi - c.bi; });
-          results.forEach(function (res) {
-            var need = BANDS[res.bi];
-            var rows = (res.rows && res.rows.length) ? res.rows : [];
-            for (var r = 0; r < need; r++) {
-              var row = rows[r] && Array.isArray(rows[r]) ? rows[r].slice(0, 15) : [];
-              while (row.length < 15) row.push('');
-              grid.push(row);
-              if (rows[r]) got++;
-            }
-          });
-          while (grid.length < 15) grid.push(['', '', '', '', '', '', '', '', '', '', '', '', '', '', '']);
-          if (got === 0) { resolve({ grid: null, err: lastErr }); return; }
-          resolve({ grid: grid.slice(0, 15) });
-        });
-      });
-    });
-  }
-
   function runScanPasses(image) {
     var prompt = buildPrompt();
     var P = boardPasses();
@@ -490,15 +399,15 @@
       if (!base64) { status('❌ Could not read that image.', '#f87171'); return; }
       var rackEl = document.getElementById('read-rack');
       var wantRack = !!(rackEl && rackEl.checked);
-      var quality = (window.AMath && window.AMath.scanQuality) || 'balanced';
       status('⏳ Finding the board edges…');
       detectBoard(base64).then(function (box) {
         cropToBox(base64, box, function (cropped) {
-          status('⏳ Reading board…');
-          // Accurate mode reads the board in horizontal strips (far more reliable
-          // than one 225-cell read). Fast/Balanced do the single whole-board read.
-          var readP = (quality === 'accurate') ? runBandScan(cropped) : runScanPasses(cropped);
-          readP.then(function (r) {
+          // No contrast/sharpen preprocessing here: on board photos it tended to
+          // create artifacts the model read as phantom tiles. Send the cropped,
+          // EXIF-corrected image straight to the read (EXIF orientation is kept
+          // in fileToBase64 because that genuinely helps and has no downside).
+          status('⏳ Reading board — ' + boardPasses() + ' pass(es)…');
+          runScanPasses(cropped).then(function (r) {
             if (!r.grid) { status('❌ ' + (r.err ? friendlyErr(r.err) : 'The model did not return readable board data. Try a flatter, well-lit photo.'), '#f87171'); return; }
             if (!wantRack) { applyScan(r.grid, null); return; }
             status('⏳ Reading your rack…');
@@ -557,7 +466,7 @@
   };
 
   // ---- wire UI --------------------------------------------------------------
-  var JS_VERSION = 'v144';
+  var JS_VERSION = 'v145';
   function init() {
     var stamp = document.getElementById('build-stamp');
     if (stamp) stamp.textContent = JS_VERSION + ' js✓';   // proves the current scan-camera.js actually ran
