@@ -152,12 +152,14 @@
       generationConfig: { responseMimeType: 'application/json', temperature: (typeof temperature === 'number' ? temperature : 0) }
     };
     var ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
-    // AbortController is honored by the browser's network layer even when JS
-    // timers are throttled in a backgrounded tab — the only reliable hard stop.
     if (ctrl) { try { setTimeout(function () { ctrl.abort(); }, 30000); } catch (e) {} }
-    return fetch(ENDPOINT, {
+    // Send the key as a query param and use only a "simple" Content-Type so the
+    // request does NOT trigger a CORS preflight (OPTIONS). A custom header like
+    // x-goog-api-key forces a preflight that this endpoint can leave hanging.
+    var url = ENDPOINT + '?key=' + encodeURIComponent(key);
+    return fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(body),
       signal: ctrl ? ctrl.signal : undefined
     }).then(function (resp) {
@@ -616,7 +618,7 @@
     });
   };
 
-  var JS_VERSION = 'v136';
+  var JS_VERSION = 'v137';
   // ---- wire UI --------------------------------------------------------------
   function init() {
     var stamp = document.getElementById('build-stamp');
