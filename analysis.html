@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Game Analysis — A-Math</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* ===================== RESET & BASE ===================== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body {
+  font-family: 'Outfit', sans-serif;
+  background: #080d14;
+  color: #e2e8f0;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ===================== LAYOUT ===================== */
+.app-wrap { display: flex; flex-direction: column; min-height: 100vh; }
+
+.top-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  background: #0d1520;
+  border-bottom: 1px solid #1e2d3d;
+  position: sticky; top: 0; z-index: 50;
+}
+.top-bar .back-btn {
+  background: none; border: none; color: #64748b;
+  font-size: 20px; cursor: pointer; padding: 4px 8px;
+  border-radius: 6px;
+}
+.top-bar .back-btn:hover { background: #1e293b; color: #e2e8f0; }
+.top-bar h1 {
+  font-size: 16px; font-weight: 900;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  letter-spacing: -.3px;
+}
+.top-bar .subtitle { font-size: 11px; color: #475569; flex: 1; }
+
+.main-content {
+  display: flex; flex: 1; gap: 0;
+  flex-direction: column;
+}
+
+@media (min-width: 900px) {
+  .main-content { flex-direction: row; }
+}
+
+/* ===================== BOARD AREA ===================== */
+.board-area {
+  flex: 1; padding: 10px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+
+.player-legend {
+  display: flex; gap: 10px; width: 100%; max-width: 520px;
+}
+.legend-item {
+  flex: 1; display: flex; align-items: center; gap: 6px;
+  padding: 7px 10px; border-radius: 8px;
+  background: #0d1520; border: 1px solid #1e2d3d;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+  transition: all .15s;
+}
+.legend-item.p1 { border-color: #ef444440; }
+.legend-item.p2 { border-color: #3b82f640; }
+.legend-item.p1.active { background: #450a0a; border-color: #ef4444; }
+.legend-item.p2.active { background: #0c1a3a; border-color: #3b82f6; }
+.legend-item.all.active { background: #1a1a0a; border-color: #f59e0b; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.legend-dot.p1 { background: #ef4444; }
+.legend-dot.p2 { background: #3b82f6; }
+.legend-dot.all { background: #f59e0b; }
+.legend-name { flex: 1; }
+.legend-score { font-weight: 900; font-size: 14px; }
+
+/* ===================== BOARD GRID ===================== */
+.board-scroll { overflow: auto; width: 100%; max-width: 520px; }
+.board-grid {
+  display: grid;
+  grid-template-columns: repeat(15, 1fr);
+  gap: 1px;
+  background: #1e2d3d;
+  border: 2px solid #1e2d3d;
+  border-radius: 4px;
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+.cell {
+  position: relative;
+  background: #0d1a28;
+  display: flex; align-items: center; justify-content: center;
+  aspect-ratio: 1;
+  cursor: default;
+  transition: background .12s;
+  overflow: hidden;
+}
+
+/* Premium square colors */
+.cell.sq-3E { background: #3d0909; }
+.cell.sq-2E { background: #3d2a09; }
+.cell.sq-3T { background: #0a2b3d; }
+.cell.sq-2T { background: #0a1f30; }
+.cell.center { background: #1a2d1a; }
+
+.cell .sq-label {
+  font-size: 4px; font-weight: 700; color: rgba(255,255,255,.35);
+  text-align: center; line-height: 1.1;
+  position: absolute; top: 1px; left: 0; right: 0;
+  pointer-events: none;
+}
+
+/* Tile on cell */
+.cell.has-tile { cursor: default; }
+.cell .tile {
+  position: absolute; inset: 1px;
+  border-radius: 2px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 900;
+  font-size: clamp(6px, 1.8vw, 13px);
+  line-height: 1;
+  transition: all .2s;
+  user-select: none;
+}
+.tile .tile-face { display: block; line-height: 1; }
+.tile .tile-pts {
+  position: absolute; bottom: 1px; right: 1px;
+  font-size: clamp(3px, .8vw, 6px); font-weight: 700; opacity: .7;
+}
+.tile .turn-num {
+  position: absolute; top: 0; left: 0;
+  font-size: clamp(3px, .7vw, 5px);
+  font-weight: 900;
+  background: rgba(0,0,0,.6);
+  border-radius: 1px;
+  padding: 0 1px;
+  line-height: 1.4;
+  display: none;
+}
+
+/* Player tile colors */
+.tile.p1 {
+  background: linear-gradient(135deg, #dc2626, #991b1b);
+  color: #fff;
+  box-shadow: 0 0 0 1px #ef4444;
+}
+.tile.p2 {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #fff;
+  box-shadow: 0 0 0 1px #60a5fa;
+}
+.tile.p1.dimmed { opacity: .2; }
+.tile.p2.dimmed { opacity: .2; }
+.tile.highlighted { box-shadow: 0 0 0 2px #fbbf24, 0 0 6px #fbbf24; z-index: 2; }
+.tile.p1.highlighted { box-shadow: 0 0 0 2px #fca5a5, 0 0 6px #ef4444; }
+.tile.p2.highlighted { box-shadow: 0 0 0 2px #93c5fd, 0 0 6px #3b82f6; }
+
+/* Show turn numbers when toggled */
+.show-turns .tile .turn-num { display: block; }
+
+/* ===================== SIDEBAR ===================== */
+.sidebar {
+  width: 100%;
+  background: #0d1520;
+  border-top: 1px solid #1e2d3d;
+  padding: 10px;
+  display: flex; flex-direction: column; gap: 8px;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+@media (min-width: 900px) {
+  .sidebar {
+    width: 280px; min-width: 260px; max-height: none;
+    border-top: none; border-left: 1px solid #1e2d3d;
+    overflow-y: auto;
+  }
+}
+
+.sidebar-section { margin-bottom: 4px; }
+.sidebar-title {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  color: #475569; letter-spacing: .8px; margin-bottom: 6px;
+}
+
+/* Turn list */
+.turn-list { display: flex; flex-direction: column; gap: 3px; }
+.turn-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 8px; border-radius: 6px;
+  cursor: pointer; transition: background .1s;
+  border: 1px solid transparent;
+}
+.turn-item:hover { background: #1e2d3d; }
+.turn-item.active { background: #1e2d3d; border-color: #334155; }
+.turn-item.p1-turn { border-left: 3px solid #ef4444; }
+.turn-item.p2-turn { border-left: 3px solid #3b82f6; }
+.turn-num-badge {
+  width: 20px; height: 20px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 900; flex-shrink: 0;
+}
+.p1-turn .turn-num-badge { background: #450a0a; color: #fca5a5; }
+.p2-turn .turn-num-badge { background: #0c1a3a; color: #93c5fd; }
+.turn-info { flex: 1; min-width: 0; }
+.turn-play { font-size: 11px; font-weight: 700; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.turn-meta { font-size: 10px; color: #64748b; }
+.turn-score-badge {
+  font-size: 12px; font-weight: 900;
+  padding: 2px 6px; border-radius: 4px;
+}
+.p1-turn .turn-score-badge { background: #450a0a; color: #fca5a5; }
+.p2-turn .turn-score-badge { background: #0c1a3a; color: #93c5fd; }
+
+/* Controls */
+.ctrl-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.ctrl-btn {
+  flex: 1; padding: 8px 6px; border-radius: 8px; border: 1px solid #334155;
+  background: #0f172a; color: #94a3b8; font-family: inherit;
+  font-size: 11px; font-weight: 700; cursor: pointer; text-align: center;
+  transition: all .12s; min-width: 60px;
+}
+.ctrl-btn:hover { background: #1e293b; color: #e2e8f0; }
+.ctrl-btn.active { background: #1e3a1e; border-color: #22c55e; color: #86efac; }
+
+/* Import panel */
+.import-panel {
+  background: #0f172a; border: 1px solid #334155;
+  border-radius: 10px; padding: 10px;
+}
+.import-panel textarea {
+  width: 100%; min-height: 60px; resize: vertical;
+  background: #080d14; color: #e2e8f0; border: 1px solid #334155;
+  border-radius: 6px; padding: 7px; font-family: 'Courier New', monospace;
+  font-size: 10px;
+}
+.import-btn {
+  margin-top: 6px; width: 100%; padding: 8px; border: none;
+  border-radius: 7px; background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff; font-family: inherit; font-weight: 700; font-size: 12px;
+  cursor: pointer;
+}
+.import-msg { font-size: 11px; margin-top: 4px; color: #94a3b8; }
+
+/* Equation detail popup */
+.eq-detail {
+  position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
+  background: #1e293b; border: 1px solid #475569; border-radius: 12px;
+  padding: 12px 16px; min-width: 200px; max-width: 320px;
+  z-index: 100; pointer-events: none;
+  display: none;
+}
+.eq-detail.visible { display: block; }
+.eq-detail .eq-text { font-size: 16px; font-weight: 800; color: #fbbf24; }
+.eq-detail .eq-meta { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+
+/* Setup screen */
+.setup-screen {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  flex: 1; padding: 24px; gap: 16px; text-align: center;
+}
+.setup-screen h2 { font-size: 20px; font-weight: 900; color: #fbbf24; }
+.setup-screen p { font-size: 13px; color: #64748b; max-width: 320px; line-height: 1.5; }
+.setup-form { background: #0d1520; border: 1px solid #1e2d3d; border-radius: 14px; padding: 16px; width: 100%; max-width: 380px; }
+.setup-form label { font-size: 11px; font-weight: 700; color: #94a3b8; display: block; margin-bottom: 4px; margin-top: 10px; }
+.setup-form label:first-child { margin-top: 0; }
+.setup-form input[type=text] {
+  width: 100%; padding: 9px 12px; border-radius: 8px;
+  background: #080d14; border: 1px solid #334155; color: #e2e8f0;
+  font-family: inherit; font-size: 13px;
+}
+.setup-form input[type=text]:focus { outline: none; border-color: #3b82f6; }
+.setup-start {
+  margin-top: 14px; width: 100%; padding: 12px; border: none;
+  border-radius: 10px; background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: #fff; font-family: inherit; font-weight: 900; font-size: 15px;
+  cursor: pointer;
+}
+.setup-start:hover { opacity: .9; }
+.setup-or { font-size: 11px; color: #475569; margin: 4px 0; }
+
+/* Score totals bar */
+.score-bar {
+  display: flex; gap: 2px; align-items: stretch;
+  background: #0d1520; border: 1px solid #1e2d3d; border-radius: 8px;
+  overflow: hidden;
+}
+.score-seg {
+  flex: 1; padding: 8px 6px; text-align: center;
+}
+.score-seg.p1 { border-right: 1px solid #1e2d3d; }
+.score-seg .sc-label { font-size: 10px; color: #475569; font-weight: 600; }
+.score-seg .sc-val { font-size: 20px; font-weight: 900; }
+.score-seg.p1 .sc-val { color: #ef4444; }
+.score-seg.p2 .sc-val { color: #3b82f6; }
+.score-seg.diff .sc-val { color: #fbbf24; }
+
+/* Loading overlay */
+.loading { display: none; position: fixed; inset: 0; background: rgba(8,13,20,.8);
+  align-items: center; justify-content: center; z-index: 200; font-size: 16px; font-weight: 700; color: #fbbf24; }
+.loading.active { display: flex; }
+</style>
+</head>
+<body>
+
+<div class="app-wrap">
+
+<!-- TOP BAR -->
+<div class="top-bar">
+  <button class="back-btn" onclick="history.back()">←</button>
+  <div>
+    <h1>🔍 Game Analysis</h1>
+    <div class="subtitle" id="game-subtitle">Load a game to begin</div>
+  </div>
+  <button class="ctrl-btn" id="btn-turn-nums" onclick="toggleTurnNums()" style="margin-left:auto;min-width:90px">Turn #s: OFF</button>
+</div>
+
+<!-- SETUP SCREEN -->
+<div class="setup-screen" id="setup-screen">
+  <h2>Game Analysis Mode</h2>
+  <p>Analyze a completed game — see each player's moves highlighted, sequence numbers, and score progression.</p>
+  <div class="setup-form">
+    <label>Player 1 Name (Red)</label>
+    <input type="text" id="p1-name-input" value="Player 1" placeholder="e.g. Tanee">
+    <label>Player 2 Name (Blue)</label>
+    <input type="text" id="p2-name-input" value="Player 2" placeholder="e.g. Opponent">
+    <div style="margin-top:12px; font-size:11px; color:#64748b;">Then paste your board code below and enter moves.</div>
+    <button class="setup-start" onclick="startAnalysis()">▶ Start Analysis</button>
+  </div>
+</div>
+
+<!-- MAIN ANALYSIS VIEW (hidden until started) -->
+<div class="main-content" id="main-view" style="display:none">
+
+  <!-- BOARD AREA -->
+  <div class="board-area">
+
+    <!-- Player legend / filter -->
+    <div class="player-legend">
+      <div class="legend-item all active" id="filter-all" onclick="setFilter('all')">
+        <div class="legend-dot all"></div>
+        <span class="legend-name">All Moves</span>
+      </div>
+      <div class="legend-item p1" id="filter-p1" onclick="setFilter('p1')">
+        <div class="legend-dot p1"></div>
+        <span class="legend-name" id="p1-legend-name">Player 1</span>
+        <span class="legend-score p1" id="p1-total-score">0</span>
+      </div>
+      <div class="legend-item p2" id="filter-p2" onclick="setFilter('p2')">
+        <div class="legend-dot p2"></div>
+        <span class="legend-name" id="p2-legend-name">Player 2</span>
+        <span class="legend-score p2" id="p2-total-score">0</span>
+      </div>
+    </div>
+
+    <!-- Score bar -->
+    <div class="score-bar" style="width:100%;max-width:520px;">
+      <div class="score-seg p1">
+        <div class="sc-label" id="p1-score-label">P1</div>
+        <div class="sc-val" id="p1-score-disp">0</div>
+      </div>
+      <div class="score-seg diff">
+        <div class="sc-label">DIFF</div>
+        <div class="sc-val" id="diff-disp">—</div>
+      </div>
+      <div class="score-seg p2">
+        <div class="sc-label" id="p2-score-label">P2</div>
+        <div class="sc-val" id="p2-score-disp">0</div>
+      </div>
+    </div>
+
+    <!-- Board grid -->
+    <div class="board-scroll">
+      <div class="board-grid" id="board-grid"></div>
+    </div>
+
+    <!-- Tap mode banner -->
+    <div id="tap-mode-banner" style="display:none;width:100%;max-width:520px;background:#1a2d0a;border:1px solid #22c55e;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;color:#86efac;text-align:center;">
+      👆 Tap cells on the board to select tiles for this play
+    </div>
+
+    <!-- Add play button -->
+    <div style="display:flex;gap:6px;width:100%;max-width:520px;">
+      <button class="ctrl-btn" onclick="openAddPlay()" style="flex:2;padding:10px;background:#1a2d1a;border-color:#22c55e;color:#86efac">+ Add Play</button>
+      <button class="ctrl-btn" onclick="openImport()" style="flex:1">📋 Import</button>
+      <button class="ctrl-btn" onclick="undoLastPlay()" style="flex:1">↩ Undo</button>
+    </div>
+
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-title">Play-by-Play</div>
+      <div class="turn-list" id="turn-list">
+        <div style="color:#475569;font-size:12px;padding:8px 4px;">No plays recorded yet.<br>Use "+ Add Play" to log each turn.</div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-title">Import Board Code</div>
+      <div class="import-panel" id="import-panel">
+        <textarea id="board-code-input" placeholder='Paste board code here ({"v":2,"grid":[...]})'></textarea>
+        <button class="import-btn" onclick="importBoardCode()">Load Board</button>
+        <div class="import-msg" id="import-msg"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- app-wrap -->
+
+<!-- ADD PLAY MODAL -->
+<div id="add-play-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#0d1520;border:1px solid #334155;border-radius:16px;padding:18px;width:100%;max-width:360px;max-height:90vh;overflow:auto;">
+    <div style="font-size:15px;font-weight:900;color:#fbbf24;margin-bottom:12px;">Log a Play</div>
+
+    <label style="font-size:11px;font-weight:700;color:#94a3b8;display:block;margin-bottom:4px;">Player</label>
+    <div style="display:flex;gap:6px;margin-bottom:10px;">
+      <button id="play-p1-btn" onclick="selectPlayPlayer('p1')" style="flex:1;padding:9px;border-radius:8px;border:2px solid #ef4444;background:#450a0a;color:#fca5a5;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;">
+        🔴 <span id="modal-p1-name">Player 1</span>
+      </button>
+      <button id="play-p2-btn" onclick="selectPlayPlayer('p2')" style="flex:1;padding:9px;border-radius:8px;border:2px solid #334155;background:#0f172a;color:#64748b;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;">
+        🔵 <span id="modal-p2-name">Player 2</span>
+      </button>
+    </div>
+
+    <label style="font-size:11px;font-weight:700;color:#94a3b8;display:block;margin-bottom:4px;">Equation played (e.g. 2+8=10)</label>
+    <input type="text" id="play-eq-input" placeholder="e.g. 20+12=13+19" style="width:100%;padding:9px 12px;border-radius:8px;background:#080d14;border:1px solid #334155;color:#e2e8f0;font-family:inherit;font-size:13px;">
+
+    <label style="font-size:11px;font-weight:700;color:#94a3b8;display:block;margin-bottom:4px;margin-top:10px;">Score this play</label>
+    <input type="number" id="play-score-input" placeholder="e.g. 42" min="0" max="999" style="width:100%;padding:9px 12px;border-radius:8px;background:#080d14;border:1px solid #334155;color:#e2e8f0;font-family:inherit;font-size:13px;">
+
+    <label style="font-size:11px;font-weight:700;color:#94a3b8;display:block;margin-bottom:4px;margin-top:10px;">Play type</label>
+    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+      <button onclick="selectPlayType('bingo')" id="type-bingo" style="flex:1;padding:7px;border-radius:7px;border:1px solid #334155;background:#0f172a;color:#94a3b8;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">🎯 Bingo</button>
+      <button onclick="selectPlayType('yoyo')" id="type-yoyo" style="flex:1;padding:7px;border-radius:7px;border:1px solid #334155;background:#0f172a;color:#94a3b8;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">🪀 Yoyo</button>
+      <button onclick="selectPlayType('swap')" id="type-swap" style="flex:1;padding:7px;border-radius:7px;border:1px solid #334155;background:#0f172a;color:#94a3b8;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">🔄 Swap</button>
+      <button onclick="selectPlayType('other')" id="type-other" style="flex:1;padding:7px;border-radius:7px;border:1px solid #334155;background:#0f172a;color:#94a3b8;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;min-width:60px;">📝 Other</button>
+    </div>
+
+    <label style="font-size:11px;font-weight:700;color:#94a3b8;display:block;margin-bottom:4px;">Cells played (row,col pairs — e.g. 0,0 0,1 0,2)</label>
+    <input type="text" id="play-cells-input" placeholder="e.g. 0,0 0,1 0,2 0,3" style="width:100%;padding:9px 12px;border-radius:8px;background:#080d14;border:1px solid #334155;color:#e2e8f0;font-family:inherit;font-size:12px;font-family:'Courier New',monospace;">
+    <div style="font-size:10px;color:#475569;margin-top:3px;">Tap cells on the board to fill this automatically</div>
+
+    <label style="font-size:11px;font-weight:700;color:#94a3b8;display:block;margin-bottom:4px;margin-top:10px;">Notes (optional)</label>
+    <input type="text" id="play-notes-input" placeholder="e.g. missed bingo opportunity" style="width:100%;padding:9px 12px;border-radius:8px;background:#080d14;border:1px solid #334155;color:#e2e8f0;font-family:inherit;font-size:12px;">
+
+    <div style="display:flex;gap:8px;margin-top:14px;">
+      <button onclick="closeAddPlay()" style="flex:1;padding:10px;border-radius:9px;border:1px solid #334155;background:#0f172a;color:#94a3b8;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;">Cancel</button>
+      <button onclick="savePlay()" style="flex:2;padding:10px;border-radius:9px;border:none;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-family:inherit;font-weight:900;font-size:13px;cursor:pointer;">Save Play</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== CONSTANTS =====================
+const PREMIUM = [
+  ['3E','','','2T','','','','3E','','','','2T','','','3E'],
+  ['','2E','','','','3T','','','','3T','','','','2E',''],
+  ['','','2E','','','','2T','','2T','','','','2E','',''],
+  ['2T','','','2E','','','','2T','','','','2E','','','2T'],
+  ['','','','','3T','','','','','','3T','','','',''],
+  ['','3T','','','','3T','','','','3T','','','','3T',''],
+  ['','','2T','','','','2T','','2T','','','','2T','',''],
+  ['3E','','','2T','','','','3T','','','','2T','','','3E'],
+  ['','','2T','','','','2T','','2T','','','','2T','',''],
+  ['','3T','','','','3T','','','','3T','','','','3T',''],
+  ['','','','','3T','','','','','','3T','','','',''],
+  ['2T','','','2E','','','','2T','','','','2E','','','2T'],
+  ['','','2E','','','','2T','','2T','','','','2E','',''],
+  ['','2E','','','','3T','','','','3T','','','','2E',''],
+  ['3E','','','2T','','','','3E','','','','2T','','','3E'],
+];
+
+const TILE_PTS = {
+  '0':1,'1':1,'2':1,'3':1,'4':2,'5':2,'6':2,'7':2,'8':2,'9':2,
+  '10':3,'11':4,'12':3,'13':6,'14':4,'15':4,'16':4,'17':6,'18':4,'19':7,'20':5,
+  '+':2,'-':2,'+/-':1,'×':2,'÷':2,'×/÷':1,'=':1,'BLANK':0
+};
+
+// ===================== STATE =====================
+let state = {
+  p1Name: 'Player 1', p2Name: 'Player 2',
+  // board[row][col] = null | { face, player:'p1'|'p2', turnIdx:number }
+  board: Array.from({length:15}, () => Array(15).fill(null)),
+  plays: [], // [{player, equation, score, type, cells:[[r,c],...], notes}]
+  filter: 'all', // 'all'|'p1'|'p2'
+  showTurnNums: false,
+  selectedTurnIdx: -1,
+  addPlayMode: false,
+  addPlayPlayer: 'p1',
+  addPlayType: 'yoyo',
+  tapCells: [],
+};
+
+// ===================== INIT =====================
+function startAnalysis() {
+  state.p1Name = document.getElementById('p1-name-input').value.trim() || 'Player 1';
+  state.p2Name = document.getElementById('p2-name-input').value.trim() || 'Player 2';
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('main-view').style.display = 'flex';
+  document.getElementById('p1-legend-name').textContent = state.p1Name;
+  document.getElementById('p2-legend-name').textContent = state.p2Name;
+  document.getElementById('p1-score-label').textContent = state.p1Name;
+  document.getElementById('p2-score-label').textContent = state.p2Name;
+  document.getElementById('modal-p1-name').textContent = state.p1Name;
+  document.getElementById('modal-p2-name').textContent = state.p2Name;
+  document.getElementById('game-subtitle').textContent =
+    `${state.p1Name} (🔴) vs ${state.p2Name} (🔵)`;
+  renderBoard();
+  renderSidebar();
+}
+
+function onCellClick(r, c, tileData) {
+  if (!state.addPlayMode) {
+    // Highlight the turn this tile belongs to
+    if (tileData) {
+      highlightTurn(tileData.turnIdx);
+    }
+    return;
+  }
+  // Add-play mode: toggle cell selection
+  const key = `${r},${c}`;
+  const existing = state.tapCells.indexOf(key);
+  if (existing >= 0) {
+    state.tapCells.splice(existing, 1);
+  } else {
+    state.tapCells.push(key);
+  }
+  document.getElementById('play-cells-input').value = state.tapCells.join(' ');
+  // Flash feedback on cell
+  const cellEl = document.querySelector(`[data-r='${r}'][data-c='${c}']`);
+  if (cellEl) {
+    cellEl.style.outline = existing >= 0 ? '' : '2px solid #fbbf24';
+    setTimeout(() => { if(cellEl) cellEl.style.outline = ''; }, 400);
+  }
+}
+
+function highlightTurn(idx) {
+  state.selectedTurnIdx = state.selectedTurnIdx === idx ? -1 : idx;
+  renderBoard();
+  // Scroll turn list item into view
+  const items = document.querySelectorAll('.turn-item');
+  items.forEach((it, i) => {
+    it.classList.toggle('active', i === idx);
+  });
+  if (idx >= 0 && items[idx]) {
+    items[idx].scrollIntoView({block:'nearest',behavior:'smooth'});
+  }
+}
+
+// ===================== SIDEBAR =====================
+function renderSidebar() {
+  // Scores
+  const p1Total = state.plays.filter(p => p.player === 'p1').reduce((s, p) => s + (p.score||0), 0);
+  const p2Total = state.plays.filter(p => p.player === 'p2').reduce((s, p) => s + (p.score||0), 0);
+  document.getElementById('p1-total-score').textContent = p1Total;
+  document.getElementById('p2-total-score').textContent = p2Total;
+  document.getElementById('p1-score-disp').textContent = p1Total;
+  document.getElementById('p2-score-disp').textContent = p2Total;
+  const diff = p1Total - p2Total;
+  document.getElementById('diff-disp').textContent = diff === 0 ? '—' : (diff > 0 ? '+' + diff : diff);
+
+  const list = document.getElementById('turn-list');
+  if (state.plays.length === 0) {
+    list.innerHTML = '<div style="color:#475569;font-size:12px;padding:8px 4px;">No plays recorded yet.<br>Use "+ Add Play" to log each turn.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  state.plays.forEach((play, idx) => {
+    const item = document.createElement('div');
+    item.className = `turn-item ${play.player}-turn`;
+    if (idx === state.selectedTurnIdx) item.classList.add('active');
+    item.onclick = () => highlightTurn(idx);
+
+    const typeIcon = {bingo:'🎯',yoyo:'🪀',swap:'🔄',other:'📝'}[play.type] || '📝';
+    const playerName = play.player === 'p1' ? state.p1Name : state.p2Name;
+
+    item.innerHTML = `
+      <div class="turn-num-badge">${idx + 1}</div>
+      <div class="turn-info">
+        <div class="turn-play">${typeIcon} ${play.equation || play.type}</div>
+        <div class="turn-meta">${playerName}${play.notes ? ' · ' + play.notes : ''}</div>
+      </div>
+      <div class="turn-score-badge">${play.score || 0}</div>
+    `;
+    list.appendChild(item);
+  });
+}
+
+// ===================== FILTER =====================
+function setFilter(f) {
+  state.filter = f;
+  ['all','p1','p2'].forEach(id => {
+    document.getElementById('filter-' + id).classList.toggle('active', f === id);
+  });
+  renderBoard();
+}
+
+// ===================== TURN NUMS TOGGLE =====================
+function toggleTurnNums() {
+  state.showTurnNums = !state.showTurnNums;
+  document.getElementById('btn-turn-nums').textContent = 'Turn #s: ' + (state.showTurnNums ? 'ON' : 'OFF');
+  document.getElementById('btn-turn-nums').classList.toggle('active', state.showTurnNums);
+  renderBoard();
+}
+
+// ===================== ADD PLAY =====================
+function openAddPlay() {
+  state.addPlayMode = true;
+  state.tapCells = [];
+  document.getElementById('play-cells-input').value = '';
+  document.getElementById('play-eq-input').value = '';
+  document.getElementById('play-score-input').value = '';
+  document.getElementById('play-notes-input').value = '';
+  // Show tap-mode banner on board
+  const banner = document.getElementById('tap-mode-banner');
+  if (banner) banner.style.display = 'block';
+  selectPlayPlayer(state.plays.length % 2 === 0 ? 'p1' : 'p2');
+  selectPlayType('yoyo');
+  document.getElementById('add-play-modal').style.display = 'flex';
+}
+
+function closeAddPlay() {
+  state.addPlayMode = false;
+  state.tapCells = [];
+  document.getElementById('add-play-modal').style.display = 'none';
+  const banner = document.getElementById('tap-mode-banner');
+  if (banner) banner.style.display = 'none';
+}
+
+function selectPlayPlayer(p) {
+  state.addPlayPlayer = p;
+  const p1btn = document.getElementById('play-p1-btn');
+  const p2btn = document.getElementById('play-p2-btn');
+  if (p === 'p1') {
+    p1btn.style.borderColor = '#ef4444'; p1btn.style.background = '#450a0a'; p1btn.style.color = '#fca5a5';
+    p2btn.style.borderColor = '#334155'; p2btn.style.background = '#0f172a'; p2btn.style.color = '#64748b';
+  } else {
+    p2btn.style.borderColor = '#3b82f6'; p2btn.style.background = '#0c1a3a'; p2btn.style.color = '#93c5fd';
+    p1btn.style.borderColor = '#334155'; p1btn.style.background = '#0f172a'; p1btn.style.color = '#64748b';
+  }
+}
+
+function selectPlayType(t) {
+  state.addPlayType = t;
+  ['bingo','yoyo','swap','other'].forEach(id => {
+    const btn = document.getElementById('type-' + id);
+    if (!btn) return;
+    const isActive = id === t;
+    const colors = {bingo:'#f59e0b',yoyo:'#22c55e',swap:'#3b82f6',other:'#94a3b8'};
+    btn.style.borderColor = isActive ? colors[id] : '#334155';
+    btn.style.background = isActive ? (id==='bingo'?'#292200':id==='yoyo'?'#0a1f12':id==='swap'?'#0a1529':'#1a1a1a') : '#0f172a';
+    btn.style.color = isActive ? colors[id] : '#64748b';
+  });
+}
+
+function savePlay() {
+  const eq = document.getElementById('play-eq-input').value.trim();
+  const score = parseInt(document.getElementById('play-score-input').value) || 0;
+  const notes = document.getElementById('play-notes-input').value.trim();
+  const cellsRaw = document.getElementById('play-cells-input').value.trim();
+
+  // Parse cells
+  let cells = [];
+  if (cellsRaw) {
+    cells = cellsRaw.split(/\s+/).map(s => {
+      const parts = s.split(',');
+      return [parseInt(parts[0]), parseInt(parts[1])];
+    }).filter(([r,c]) => !isNaN(r) && !isNaN(c) && r >= 0 && r < 15 && c >= 0 && c < 15);
+  }
+
+  const play = {
+    player: state.addPlayPlayer,
+    equation: eq,
+    score: score,
+    type: state.addPlayType,
+    cells: cells,
+    notes: notes,
+    turnIdx: state.plays.length,
+  };
+  state.plays.push(play);
+
+  // Place tiles on board if cells provided and equation provided
+  if (cells.length > 0 && eq) {
+    // Extract tile faces from equation string
+    const faces = parseEquationFaces(eq);
+    cells.forEach(([r, c], i) => {
+      if (r >= 0 && r < 15 && c >= 0 && c < 15) {
+        // Use face at index, or last face if we run short, or '·' as placeholder
+        const face = faces[i] !== undefined ? faces[i] : (faces[faces.length - 1] || '·');
+        state.board[r][c] = {
+          face: face,
+          player: state.addPlayPlayer,
+          turnIdx: play.turnIdx,
+        };
+      }
+    });
+  } else if (cells.length > 0) {
+    // Cells provided but no equation — just mark the cells with player color
+    cells.forEach(([r, c]) => {
+      if (r >= 0 && r < 15 && c >= 0 && c < 15 && !state.board[r][c]) {
+        state.board[r][c] = {
+          face: '·',
+          player: state.addPlayPlayer,
+          turnIdx: play.turnIdx,
+        };
+      }
+    });
+  }
+
+  closeAddPlay();
+  renderBoard();
+  renderSidebar();
+  highlightTurn(play.turnIdx);
+}
+
+function parseEquationFaces(eq) {
+  // Split equation into tile faces (handles 2-digit numbers)
+  const faces = [];
+  let i = 0;
+  const s = eq.replace(/\s/g, '');
+  while (i < s.length) {
+    // Try two-digit number
+    if (i + 1 < s.length && /\d/.test(s[i]) && /\d/.test(s[i+1])) {
+      const n = parseInt(s.slice(i, i+2));
+      if (n >= 10 && n <= 20) { faces.push(String(n)); i += 2; continue; }
+    }
+    const ch = s[i];
+    if (ch === '+' && i+1 < s.length && s[i+1] === '/' && i+2 < s.length && s[i+2] === '-') {
+      faces.push('+/-'); i += 3; continue;
+    }
+    if ((ch === '×' || ch === 'x') && i+1 < s.length && s[i+1] === '/') {
+      faces.push('×/÷'); i += 3; continue;
+    }
+    faces.push(ch === 'x' || ch === '*' ? '×' :
+               ch === '/' ? '÷' : ch);
+    i++;
+  }
+  return faces;
+}
+
+// ===================== UNDO =====================
+function undoLastPlay() {
+  if (state.plays.length === 0) return;
+  const last = state.plays.pop();
+  // Remove tiles from board belonging to this turn
+  for (let r = 0; r < 15; r++) {
+    for (let c = 0; c < 15; c++) {
+      if (state.board[r][c] && state.board[r][c].turnIdx === last.turnIdx) {
+        state.board[r][c] = null;
+      }
+    }
+  }
+  state.selectedTurnIdx = -1;
+  renderBoard();
+  renderSidebar();
+}
+
+// ===================== IMPORT BOARD CODE =====================
+function openImport() {
+  document.getElementById('import-panel').scrollIntoView({behavior:'smooth'});
+}
+
+function importBoardCode() {
+  const raw = document.getElementById('board-code-input').value.trim();
+  const msg = document.getElementById('import-msg');
+  try {
+    // Strip fences
+    let clean = raw.replace(/```[a-z]*\n?/gi, '').replace(/```/g, '').trim();
+    const match = clean.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('No JSON object found');
+    const data = JSON.parse(match[0]);
+    if (!data.grid || !Array.isArray(data.grid)) throw new Error('Invalid board code format');
+
+    // Map grid to board — these are "existing" tiles, assign to no player (neutral/gray)
+    // User can then log plays on top
+    const grid = data.grid;
+    const newBoard = Array.from({length:15}, () => Array(15).fill(null));
+    for (let r = 0; r < 15 && r < grid.length; r++) {
+      for (let c = 0; c < 15 && c < (grid[r]||[]).length; c++) {
+        const val = grid[r][c];
+        if (val && val !== '') {
+          // We don't know player yet — store as 'unknown', user can log plays
+          newBoard[r][c] = { face: val, player: 'unknown', turnIdx: -1 };
+        }
+      }
+    }
+    state.board = newBoard;
+    msg.style.color = '#86efac';
+    msg.textContent = '✓ Board loaded! Now log each player\'s plays using "+ Add Play".';
+    renderBoard();
+  } catch(e) {
+    msg.style.color = '#fca5a5';
+    msg.textContent = '✗ ' + e.message;
+  }
+}
+
+// Board rendering — handles p1, p2, and unknown (imported) tiles
+function renderBoard() {
+  const grid = document.getElementById('board-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  if (state.showTurnNums) grid.classList.add('show-turns');
+  else grid.classList.remove('show-turns');
+
+  for (let r = 0; r < 15; r++) {
+    for (let c = 0; c < 15; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.r = r; cell.dataset.c = c;
+
+      const prem = PREMIUM[r][c];
+      if (r === 7 && c === 7) cell.classList.add('center');
+      else if (prem) cell.classList.add('sq-' + prem);
+
+      if (prem) {
+        const lbl = document.createElement('div');
+        lbl.className = 'sq-label';
+        lbl.textContent = prem;
+        cell.appendChild(lbl);
+      }
+
+      const tileData = state.board[r][c];
+      if (tileData) {
+        cell.classList.add('has-tile');
+        const tile = document.createElement('div');
+
+        if (tileData.player === 'p1') tile.className = 'tile p1';
+        else if (tileData.player === 'p2') tile.className = 'tile p2';
+        else {
+          // Unknown / unassigned tile — neutral style
+          tile.className = 'tile';
+          tile.style.background = 'linear-gradient(135deg,#334155,#1e293b)';
+          tile.style.color = '#94a3b8';
+          tile.style.boxShadow = '0 0 0 1px #475569';
+        }
+
+        if (state.filter !== 'all' && tileData.player !== 'unknown' && tileData.player !== state.filter) {
+          tile.classList.add('dimmed');
+        }
+        if (state.selectedTurnIdx >= 0 && tileData.turnIdx === state.selectedTurnIdx) {
+          tile.classList.add('highlighted');
+        }
+
+        const face = document.createElement('span');
+        face.className = 'tile-face';
+        face.textContent = tileData.face;
+        tile.appendChild(face);
+
+        const pts = document.createElement('span');
+        pts.className = 'tile-pts';
+        pts.textContent = TILE_PTS[tileData.face] !== undefined ? TILE_PTS[tileData.face] : '';
+        tile.appendChild(pts);
+
+        if (tileData.turnIdx >= 0) {
+          const tn = document.createElement('span');
+          tn.className = 'turn-num';
+          tn.textContent = tileData.turnIdx + 1;
+          tile.appendChild(tn);
+        }
+
+        cell.appendChild(tile);
+      }
+
+      cell.addEventListener('click', () => onCellClick(r, c, tileData));
+      grid.appendChild(cell);
+    }
+  }
+}
+
+// ===================== BOOT =====================
+// Render empty board on load for setup screen preview (hidden)
+window.addEventListener('DOMContentLoaded', () => {
+  // nothing until startAnalysis()
+});
+</script>
+</body>
+</html>
