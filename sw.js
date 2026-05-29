@@ -1,5 +1,5 @@
 // Bump CACHE_NAME whenever ANY asset changes to force update.
-const CACHE_NAME = 'amath-v142-sharpen';
+const CACHE_NAME = 'amath-v143-nonormalize';
 const ASSETS = [
   '/Agame/',
   '/Agame/lobby.html',
