@@ -498,6 +498,23 @@ body {
     <input type="text" id="p2-name-input" value="Player 2" placeholder="e.g. Opponent">
     <button class="an-start-btn" onclick="startAnalysis()">▶ Start (empty board)</button>
     <div class="an-paste-section">
+      <div class="hint">📋 Or import a score sheet — one turn per line</div>
+      <div style="font-size:10px;color:#475569;margin-bottom:6px;line-height:1.5;">
+        Type each turn's score, one per line, in play order. Players alternate (P1 first) automatically.
+        Add <b>s</b> for swap, <b>b</b> for bingo. Examples:<br>
+        <code style="color:#64748b">133 b</code> · <code style="color:#64748b">110 b</code> · <code style="color:#64748b">0 s</code> · <code style="color:#64748b">18</code>
+      </div>
+      <textarea id="scoresheet-input" placeholder="133 b&#10;110 b&#10;100&#10;96&#10;0 s&#10;18"></textarea>
+      <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+        <label style="font-size:11px;color:#94a3b8;margin:0">First turn:</label>
+        <select id="scoresheet-first" style="flex:1;padding:8px;border-radius:7px;background:#080d14;border:1px solid #334155;color:#e2e8f0;font-family:inherit;font-size:12px;">
+          <option value="p1">🔴 Player 1</option>
+          <option value="p2">🔵 Player 2</option>
+        </select>
+      </div>
+      <button class="an-load-btn" style="background:linear-gradient(135deg,#22d3ee,#3b82f6)" onclick="importScoreSheet()">📋 Import Score Sheet</button>
+    </div>
+    <div class="an-paste-section">
       <div class="hint">⚡ Or paste a full game code to load board + all plays instantly</div>
       <textarea id="full-game-input" placeholder='{"v":2,"p1":"...","p2":"...","grid":[...],"plays":[...]}'></textarea>
       <button class="an-load-btn" onclick="loadGameJSON(document.getElementById('full-game-input').value)">⚡ Load Full Game</button>
@@ -806,6 +823,44 @@ function startAnalysis() {
   S.p1Name = document.getElementById('p1-name-input').value.trim()||'Player 1';
   S.p2Name = document.getElementById('p2-name-input').value.trim()||'Player 2';
   bootMainView();
+}
+
+// Import a score sheet: one turn per line. "133 b" = 133 bingo, "0 s" = swap.
+// Players alternate starting from the chosen first player. Cells left empty so
+// the user can run 🪄 Auto-build to place tiles from scores.
+function importScoreSheet() {
+  const raw = document.getElementById('scoresheet-input').value.trim();
+  if(!raw){ alert('Type at least one score, one per line.'); return; }
+  const first = document.getElementById('scoresheet-first').value || 'p1';
+  S.p1Name = document.getElementById('p1-name-input').value.trim()||'Player 1';
+  S.p2Name = document.getElementById('p2-name-input').value.trim()||'Player 2';
+
+  const lines = raw.split(/\n+/).map(l=>l.trim()).filter(l=>l);
+  const plays = [];
+  let bad = [];
+  lines.forEach((line, i)=>{
+    // formats: "133", "133 b", "0 s", "18 yoyo"
+    const m = line.match(/^(-?\d+)\s*([a-zA-Z]*)$/);
+    if(!m){ bad.push(i+1); return; }
+    const score = parseInt(m[1]);
+    const tag = (m[2]||'').toLowerCase();
+    let type='yoyo';
+    if(tag.startsWith('s')) type='swap';
+    else if(tag.startsWith('b')) type='bingo';
+    else if(tag.startsWith('y')) type='yoyo';
+    else if(score===0) type='swap';
+    const player = (i % 2 === 0) ? first : (first==='p1'?'p2':'p1');
+    plays.push({player, equation:'', score, type, cells:[], notes:'', turnIdx:i});
+  });
+  if(bad.length){ alert('Could not read line(s): '+bad.join(', ')+'. Use "score" or "score b/s/y" (e.g. 133 b).'); return; }
+  if(!plays.length){ alert('No valid scores found.'); return; }
+
+  // fresh empty board + these plays
+  S.board = Array.from({length:15},()=>Array(15).fill(null));
+  S.plays = plays;
+  S._currentId = null;
+  bootMainView();
+  setTimeout(()=>alert('✅ Imported '+plays.length+' turns from the score sheet.\n\nNow: enter the board tiles (tap cells), then tap 🪄 Auto-build to place each turn from its score.'),250);
 }
 function bootMainView() {
   document.getElementById('an-setup').style.display = 'none';
