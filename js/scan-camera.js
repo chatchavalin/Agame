@@ -469,7 +469,7 @@
   };
 
   // ---- wire UI --------------------------------------------------------------
-  var JS_VERSION = 'v146';
+  var JS_VERSION = 'v147';
   function init() {
     var stamp = document.getElementById('build-stamp');
     if (stamp) stamp.textContent = JS_VERSION + ' js✓';   // proves the current scan-camera.js actually ran

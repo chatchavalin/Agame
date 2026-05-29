@@ -73,7 +73,8 @@
         </select>
       </label>
       <h2>1 · Import</h2>
-      <p class="hint">Paste a board code here. (Take a photo of your physical board, send it to Claude in chat, and paste the code it gives you.) Camera import is coming next.</p>
+      <p class="hint">Take a photo of your board, send it to Claude (or any AI) with the prompt below, and paste the code it gives you here.</p>
+      <button class="btn btn-ghost" id="btn-copy-prompt" style="margin-bottom:10px;">📋 Copy prompt for AI</button>
       <textarea id="code-input" placeholder='{"v":1,"board":[{"r":0,"c":0,"f":"2"}],"rack":["13","5"]}'></textarea>
       <div class="btn-row">
         <button class="btn btn-primary" id="btn-load-code">Load code</button>
@@ -82,7 +83,7 @@
       <div id="import-status"></div>
 
       <div style="border-top:1px solid #334155; margin-top:16px; padding-top:14px;">
-        <h2 style="margin-top:0;">Or scan a photo <span id="build-stamp" style="font-size:11px;color:#475569;font-weight:400;">v146</span></h2>
+        <h2 style="margin-top:0;">Or scan a photo <span id="build-stamp" style="font-size:11px;color:#475569;font-weight:400;">v147</span></h2>
         <p class="hint">Once Firebase AI Logic is set up on the project, you don't need a key — just take a flat, well-lit, straight-on photo and tap below. (The key field is only a fallback if Firebase isn't set up.)</p>
         <div class="btn-row">
           <button class="btn btn-amber" id="btn-photo">📷 Take / choose photo</button>
@@ -163,8 +164,8 @@
   <script src="js/settings.js?v=v90-en"></script>
   <script src="js/ui.js?v=v61-saveexit"></script>
   <script src="js/board-import.js?v=v85-assign"></script>
-  <script src="js/scan.js?v=v146-modelpick"></script>
-  <script src="js/scan-camera.js?v=v146-modelpick"></script>
+  <script src="js/scan.js?v=v147-copyprompt"></script>
+  <script src="js/scan-camera.js?v=v147-copyprompt"></script>
   <script type="module" src="js/scan-ai.js?v=v146-modelpick"></script>
 </body>
 </html>

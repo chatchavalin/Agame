@@ -512,6 +512,21 @@
     renderEditor();
     var byId = function (id) { return document.getElementById(id); };
     byId('btn-load-code').addEventListener('click', loadCode);
+    var copyBtn = byId('btn-copy-prompt');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', function () {
+        var prompt = 'Read this A-Math (Thai math crossword) board photo into JSON. Output ONLY:\n' +
+          '{"v":2,"grid":[15 rows of 15 strings]}\n' +
+          'Each cell is "" if empty, else the tile face: "0"-"9", two-digit "10".."16","20", "+","-","=", "×/÷" for the multiply/divide tile, "+/-" for the plus/minus tile, "BLANK" for an empty-faced wildcard tile. Ignore the small corner point-number. Most cells are empty.';
+        var done = function (ok) {
+          copyBtn.textContent = ok ? '✅ Copied — paste it into your AI with the photo' : '⚠️ Copy failed — long-press to select';
+          setTimeout(function () { copyBtn.textContent = '📋 Copy prompt for AI'; }, 2500);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(prompt).then(function () { done(true); }, function () { done(false); });
+        } else { done(false); }
+      });
+    }
     byId('btn-clear-all').addEventListener('click', function () { blankModel(); _problemCells = {}; renderEditor(); var s = byId('import-status'); if (s) s.textContent = ''; });
     byId('btn-start-play').addEventListener('click', startPlay);
     byId('btn-back-edit').addEventListener('click', backToEdit);
