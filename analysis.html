@@ -376,6 +376,19 @@ body {
 .an-rep-issue .ico { flex-shrink:0; }
 .an-rep-clean { text-align:center; padding:24px; color:#4ade80; font-size:14px; font-weight:700; }
 .an-rep-note { font-size:11px; color:#64748b; line-height:1.5; margin-top:12px; padding:10px; background:#0f172a; border-radius:8px; }
+.an-rep-fix {
+  display:inline-block; margin-top:5px; padding:5px 11px; border-radius:7px;
+  background:#1e293b; border:1px solid #475569; color:#fbbf24;
+  font-family:inherit; font-size:11px; font-weight:700; cursor:pointer;
+}
+.an-rep-fix:hover { background:#334155; border-color:#fbbf24; }
+.an-rep-actions { margin-top:14px; }
+.an-rep-rerun {
+  width:100%; padding:11px; border:none; border-radius:10px;
+  background:linear-gradient(135deg,#22c55e,#16a34a); color:#fff;
+  font-family:inherit; font-weight:800; font-size:14px; cursor:pointer;
+}
+.an-rep-rerun:hover { opacity:.9; }
 
 /* ── Play editor overlay ──────────────────────────────── */
 .an-play-editor {
@@ -1398,15 +1411,24 @@ function openReport() {
   let html=`<div class="an-rep-cards">${card('p1')}${card('p2')}</div>`;
 
   if(findings.length===0){
-    html+=`<div class="an-rep-clean">✅ No issues detected.<br><span style="font-size:11px;color:#64748b;font-weight:400">Both players' equations compute and scores look consistent with the board.</span></div>`;
+    html+=`<div class="an-rep-clean">✅ No issues detected.<br><span style="font-size:11px;color:#64748b;font-weight:400">Both players' equations compute and scores look consistent with the board you built.</span></div>`;
   } else {
-    html+=`<div class="an-rep-section-title">Detailed findings (${findings.length} turn${findings.length>1?'s':''})</div>`;
+    html+=`<div class="an-rep-section-title">Tap any issue to fix it (${findings.length} turn${findings.length>1?'s':''})</div>`;
     findings.forEach(f=>{
       const name=f.player==='p1'?S.p1Name:S.p2Name;
       const p=S.plays[f.turn-1];
       let issuesHtml='';
       f.issues.forEach(iss=>{
-        issuesHtml+=`<div class="an-rep-issue"><span class="ico">${icons[iss.type]||'⚠️'}</span><span>${iss.msg}</span></div>`;
+        // Decide the fix action for this issue type
+        let action, btnLabel;
+        if(iss.type==='illegal'){ action=`fixFromReport(${f.turn-1},'tiles')`; btnLabel='Show tiles on board →'; }
+        else if(iss.type==='invalid-eq'){ action=`fixFromReport(${f.turn-1},'tiles')`; btnLabel='Check the tiles →'; }
+        else if(iss.type==='score'){ action=`fixFromReport(${f.turn-1},'play')`; btnLabel='Edit score →'; }
+        else { action=`fixFromReport(${f.turn-1},'play')`; btnLabel='Review play →'; }
+        issuesHtml+=`<div class="an-rep-issue">
+          <span class="ico">${icons[iss.type]||'⚠️'}</span>
+          <span>${iss.msg}<br><button class="an-rep-fix" onclick="${action}">${btnLabel}</button></span>
+        </div>`;
       });
       html+=`<div class="an-rep-finding ${f.player}">
         <div class="an-rep-finding-head">
@@ -1418,12 +1440,51 @@ function openReport() {
     });
   }
 
-  html+=`<div class="an-rep-note">⚠️ This report is only as accurate as the board you built. Equation and score checks rely on tiles being correctly placed and assigned to the right turn. Tap ✏️ Edit and fix any tiles first, then re-run the report. "Possible missed bingo" is a heuristic, not a certainty.</div>`;
+  html+=`<div class="an-rep-actions"><button class="an-rep-rerun" onclick="openReport()">🔄 Re-check after fixing</button></div>`;
+  html+=`<div class="an-rep-note">⚠️ This report is only as accurate as the board you built. Tap an issue above to jump straight to its fix, correct it, then tap "Re-check". "Possible missed bingo" is a heuristic, not a certainty.</div>`;
 
   body.innerHTML=html;
   document.getElementById('an-report').classList.add('visible');
 }
 function closeReport(){ document.getElementById('an-report').classList.remove('visible'); }
+
+// Jump from a report finding straight to where you fix it.
+// mode 'play'  → open the play editor for that turn (fix score/equation/type)
+// mode 'tiles' → close report, highlight that turn's tiles on the board, scroll to board
+function fixFromReport(turnIdx, mode) {
+  closeReport();
+  if(mode==='play'){
+    openPlayEditor(turnIdx);
+    return;
+  }
+  // tiles mode: highlight the turn on the board and show turn numbers so user sees which tiles
+  S.selectedTurn = turnIdx;
+  if(!S.showTurnNums){
+    S.showTurnNums = true;
+    const btn=document.getElementById('btn-turnnums');
+    if(btn){ btn.textContent='#️⃣ ON'; btn.classList.add('active'); }
+  }
+  renderBoard();
+  renderSidebar();
+  // scroll the board into view
+  const bw=document.getElementById('an-board-wrap');
+  if(bw) bw.scrollIntoView({block:'start', behavior:'smooth'});
+  // brief toast
+  showToast(`Turn ${turnIdx+1} tiles highlighted — tap any to edit its face/player/turn`);
+}
+
+// Lightweight toast
+function showToast(msg){
+  let t=document.getElementById('an-toast');
+  if(!t){
+    t=document.createElement('div'); t.id='an-toast';
+    t.style.cssText='position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:#1e293b;border:1px solid #475569;color:#e2e8f0;padding:10px 16px;border-radius:10px;font-size:13px;font-weight:600;z-index:300;max-width:90%;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.5);transition:opacity .3s;';
+    document.body.appendChild(t);
+  }
+  t.textContent=msg; t.style.opacity='1';
+  clearTimeout(t._timer);
+  t._timer=setTimeout(()=>{ t.style.opacity='0'; },3500);
+}
 </script>
 </body>
 </html>
