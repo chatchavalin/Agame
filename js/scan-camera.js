@@ -425,24 +425,35 @@
   }
 
   // Live elapsed-time ticker so the user can see the scan is working (and tell
-  // "slow" from "stuck"). Call startTicker(prefix) and stopTicker().
-  var _ticker = null;
-  function startTicker(prefix) {
+  // "slow" from "stuck"). Call startTicker(prefix, onTimeout) and stopTicker().
+  var _ticker = null, _onTimeout = null, _abandoned = false;
+  var SCAN_DEADLINE = 35; // seconds of wall-clock before we abandon the read
+  function startTicker(prefix, onTimeout) {
     stopTicker();
+    _onTimeout = onTimeout || null;
     var t0 = Date.now();
     function tick() {
       var s = Math.round((Date.now() - t0) / 1000);
+      // The ticker demonstrably keeps firing (the number climbs), so use IT as
+      // the source of truth for abandoning a stuck read — independent of any
+      // setTimeout, which mobile browsers throttle/pause in backgrounded tabs.
+      if (s >= SCAN_DEADLINE) {
+        stopTicker();
+        var cb = _onTimeout; _onTimeout = null;
+        if (cb) cb(s);
+        return;
+      }
       var extra = '';
-      if (s >= 15) extra = ' &nbsp;<a href="#" onclick="window.AMath.cancelScan&&window.AMath.cancelScan();return false;" style="color:#fbbf24;">Taking too long? Tap to stop</a>';
-      if (s >= 45) extra = ' (giving up…)' + extra;
+      if (s >= 12) extra = ' &nbsp;<a href="#" onclick="window.AMath.cancelScan&&window.AMath.cancelScan();return false;" style="color:#fbbf24;">Taking too long? Tap to stop</a>';
       status('⏳ ' + prefix + ' — ' + s + 's' + extra);
     }
     tick();
     _ticker = setInterval(tick, 1000);
   }
-  function stopTicker() { if (_ticker) { clearInterval(_ticker); _ticker = null; } }
+  function stopTicker() { if (_ticker) { clearInterval(_ticker); _ticker = null; } _onTimeout = null; }
   window.AMath = window.AMath || {};
   window.AMath.cancelScan = function () {
+    _abandoned = true;
     stopTicker();
     status('⏹️ Stopped. Tap "Take / choose photo" to try again — try Fast quality and a flat, well-lit photo.', '#fbbf24');
   };
@@ -458,14 +469,23 @@
       var fast = (quality === 'fast');
 
       function readBoard(imageForBoard) {
-        startTicker('Reading board (' + boardPasses() + ' pass)');
+        var settled = false;
+        startTicker('Reading board (' + boardPasses() + ' pass)', function (secs) {
+          if (settled) return; settled = true;
+          var path = isOwner() ? 'owner/Firebase backend' : 'your pasted key';
+          var via = (isOwner() && !(window.AMath && typeof window.AMath.geminiScan === 'function'))
+            ? ' (note: the owner AI module did NOT load, so your phrase was sent as a raw API key — that will fail)'
+            : '';
+          status('❌ Gave up after ' + secs + 's using ' + path + via + '. The AI request never returned — likely slow connection, CORS block on the direct-key path, or a key/quota issue. Try Wi-Fi, or tap tiles in manually.', '#f87171');
+        });
         runScanPasses(imageForBoard).then(function (r) {
-          if (!r.grid) { stopTicker(); status('❌ ' + (r.err ? friendlyErr(r.err) : ('The model didn\'t return a board grid.' + (r.sample ? ' It said: "' + r.sample + '…"' : ' Try a flatter, well-lit photo.'))), '#f87171'); return; }
-          if (!wantRack) { stopTicker(); applyScan(r.grid, null); return; }
+          if (settled) return; settled = true; stopTicker();
+          if (!r.grid) { status('❌ ' + (r.err ? friendlyErr(r.err) : ('The model didn\'t return a board grid.' + (r.sample ? ' It said: "' + r.sample + '…"' : ' Try a flatter, well-lit photo.'))), '#f87171'); return; }
+          if (!wantRack) { applyScan(r.grid, null); return; }
           startTicker('Reading your rack');
           runRackPasses(base64).then(function (rack) { stopTicker(); applyScan(r.grid, rack); })
             .catch(function () { stopTicker(); applyScan(r.grid, null); });
-        }).catch(function (err) { stopTicker(); status('❌ ' + friendlyErr(err), '#f87171'); });
+        }).catch(function (err) { if (settled) return; settled = true; stopTicker(); status('❌ ' + friendlyErr(err), '#f87171'); });
       }
 
       if (fast) {
@@ -560,7 +580,7 @@
     });
   };
 
-  var JS_VERSION = 'v131';
+  var JS_VERSION = 'v132';
   // ---- wire UI --------------------------------------------------------------
   function init() {
     var stamp = document.getElementById('build-stamp');
