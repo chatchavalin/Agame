@@ -31,7 +31,8 @@ body {
   background: linear-gradient(135deg,#f59e0b,#ef4444);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
 }
-.an-topbar .sub { font-size: 11px; color: #475569; flex:1; }
+.an-topbar .sub { font-size: 11px; color: #475569; flex:1; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+@media(max-width:600px){ .an-topbar .sub { display:none; } }
 .an-back { background:none; border:none; color:#64748b; font-size:20px; cursor:pointer; padding:4px 8px; border-radius:6px; }
 .an-back:hover { background:#1e293b; color:#e2e8f0; }
 
@@ -42,45 +43,93 @@ body {
 /* Board column */
 .an-board-col {
   flex:1; display:flex; flex-direction:column; align-items:center;
-  padding:8px; gap:6px; overflow-y:auto; min-width:0;
+  padding:8px 8px 4px; gap:8px; overflow-y:auto; min-width:0;
 }
 
-/* Score bar */
-.an-scorebar {
-  display:flex; gap:2px; width:100%; max-width:600px;
-  border-radius:8px; overflow:hidden; border:1px solid #1e2d3d;
+/* Player cards — score + tappable filter in one */
+.an-players {
+  display:flex; align-items:stretch; gap:6px;
+  width:100%; max-width:560px;
 }
-.an-scorebar-seg { flex:1; padding:6px 8px; text-align:center; background:#0d1520; }
-.an-scorebar-seg.p1 { border-right:1px solid #1e2d3d; }
-.an-scorebar-seg .sc-lbl { font-size:10px; color:#475569; font-weight:600; }
-.an-scorebar-seg .sc-val { font-size:18px; font-weight:900; }
-.an-scorebar-seg.p1 .sc-val { color:#ef4444; }
-.an-scorebar-seg.p2 .sc-val { color:#3b82f6; }
-.an-scorebar-seg.diff .sc-val { color:#fbbf24; font-size:14px; padding-top:3px; }
-
-/* Player legend filter */
-.an-legend { display:flex; gap:6px; width:100%; max-width:600px; }
-.an-leg-btn {
-  flex:1; display:flex; align-items:center; gap:5px; padding:6px 8px;
-  border-radius:7px; background:#0d1520; border:1px solid #1e2d3d;
-  font-size:11px; font-weight:700; cursor:pointer; transition:all .12s;
+.an-pcard {
+  flex:1; min-width:0; padding:8px 10px; border-radius:12px;
+  background:#0d1520; border:2px solid #1e2d3d; cursor:pointer;
+  transition:all .15s; text-align:left;
 }
-.an-leg-btn.p1.on { background:#450a0a; border-color:#ef4444; }
-.an-leg-btn.p2.on { background:#0c1a3a; border-color:#3b82f6; }
-.an-leg-btn.all.on { background:#1a1a0a; border-color:#f59e0b; }
-.an-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
-.an-dot.p1 { background:#ef4444; }
-.an-dot.p2 { background:#3b82f6; }
-.an-dot.all { background:#f59e0b; }
+.an-pcard.p1.on { background:linear-gradient(135deg,#2d0a0a,#1a0606); border-color:#ef4444; }
+.an-pcard.p2.on { background:linear-gradient(135deg,#0a1530,#060a1a); border-color:#3b82f6; }
+.an-pcard:not(.on) { opacity:.5; }
+.an-pcard-top { display:flex; align-items:center; gap:5px; margin-bottom:2px; }
+.an-pcard-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+.an-pcard-dot.p1 { background:#ef4444; }
+.an-pcard-dot.p2 { background:#3b82f6; }
+.an-pcard-name {
+  font-size:12px; font-weight:700; color:#cbd5e1;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.an-pcard-score { font-size:30px; font-weight:900; line-height:1; font-variant-numeric:tabular-nums; }
+.an-pcard.p1 .an-pcard-score { color:#ef4444; }
+.an-pcard.p2 .an-pcard-score { color:#3b82f6; }
+.an-pcard-vs {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:3px; flex:0 0 auto; padding:0 2px;
+}
+.an-pcard-diff { font-size:16px; font-weight:900; color:#fbbf24; font-variant-numeric:tabular-nums; }
+.an-pcard-all {
+  font-size:9px; font-weight:800; letter-spacing:.5px;
+  padding:3px 7px; border-radius:6px; cursor:pointer; font-family:inherit;
+  background:#0f172a; border:1px solid #334155; color:#64748b;
+}
+.an-pcard-all.on { background:#292200; border-color:#fbbf24; color:#fbbf24; }
 
-/* Board wrapper — constrain to viewport */
+/* ── Board wrapper — fits screen width exactly, no horizontal scroll ── */
 .an-board-wrap {
-  width:100%; max-width:600px; overflow:auto;
+  width:100%; max-width:560px; margin:0 auto;
 }
-/* Override cell size for analysis (slightly smaller to fit mobile) */
-.an-board-wrap { --cell-size:34px; --tile-size:32px; --board-gap:1px; }
-@media(max-width:500px){ .an-board-wrap { --cell-size:26px; --tile-size:24px; } }
-@media(min-width:900px){ .an-board-wrap { --cell-size:36px; --tile-size:34px; } }
+.an-board-wrap .amath-board-with-ruler { display:block; width:100%; }
+.an-board-wrap .amath-ruler-top {
+  display:grid; grid-template-columns: 1.1em repeat(15, 1fr); gap:1px; margin-bottom:1px;
+}
+.an-board-wrap .amath-board-middle { display:grid; grid-template-columns:1.1em 1fr; gap:1px; }
+.an-board-wrap .amath-ruler-left { display:grid; grid-template-rows:repeat(15,1fr); gap:1px; }
+.an-board-wrap .amath-ruler-corner { width:1.1em; }
+.an-board-wrap .amath-ruler-cell {
+  display:flex; align-items:center; justify-content:center;
+  font-size:8px; font-weight:700; color:#475569; min-width:0;
+}
+.an-board-wrap .amath-ruler-cell.ruler-major { color:#fbbf24; }
+.an-board-wrap .amath-board {
+  display:grid !important;
+  grid-template-columns: repeat(15, 1fr) !important;
+  grid-template-rows: repeat(15, 1fr) !important;
+  gap:1px; width:100%; aspect-ratio:1;
+}
+.an-board-wrap .amath-cell {
+  width:auto !important; height:auto !important;
+  aspect-ratio:1; min-width:0; border-radius:2px;
+  font-size:0; padding:0; overflow:hidden;
+}
+.an-board-wrap .amath-cell .premium-label {
+  font-size:6px !important; line-height:1.05; font-weight:800;
+  text-align:center; padding:0 1px; white-space:normal;
+}
+@media(max-width:430px){ .an-board-wrap .amath-cell .premium-label { font-size:5px !important; } }
+.an-board-wrap .amath-cell .center-star { font-size:14px !important; }
+.an-board-wrap .amath-cell .amath-tile {
+  width:100% !important; height:100% !important; border-width:1px; border-radius:2px;
+}
+.an-board-wrap .tile-face { font-size:13px; }
+.an-board-wrap .amath-tile.tile-op .tile-face,
+.an-board-wrap .amath-tile.tile-equals .tile-face,
+.an-board-wrap .amath-tile.tile-choice .tile-face { font-size:11px; }
+.an-board-wrap .tile-points { font-size:6px; bottom:0; right:1px; }
+@media(max-width:430px){
+  .an-board-wrap .tile-face { font-size:10px; }
+  .an-board-wrap .amath-tile.tile-op .tile-face,
+  .an-board-wrap .amath-tile.tile-equals .tile-face,
+  .an-board-wrap .amath-tile.tile-choice .tile-face { font-size:8px; }
+}
+.an-board-wrap .coord-label { display:none !important; }
 
 /* Player-colored tiles in analysis */
 .amath-tile.an-p1 {
@@ -109,9 +158,9 @@ body {
 /* Turn number badge on tile */
 .an-turn-badge {
   position:absolute; top:0; left:0;
-  font-size:5px; font-weight:900; line-height:1.4;
-  background:rgba(0,0,0,.55); border-radius:1px; padding:0 1px;
-  display:none; color:#fff;
+  font-size:8px !important; font-weight:900; line-height:1.3;
+  background:rgba(0,0,0,.65); border-radius:0 0 3px 0; padding:0 2px;
+  display:none; color:#fde047; z-index:5;
 }
 .show-turns .an-turn-badge { display:block; }
 
@@ -133,12 +182,13 @@ body {
 
 /* ── Control bar ──────────────────────────────────────── */
 .an-ctrlbar {
-  display:flex; gap:5px; flex-wrap:wrap; width:100%; max-width:600px;
+  display:flex; gap:6px; width:100%; max-width:560px;
+  position:sticky; bottom:0; padding-bottom:4px;
 }
 .an-btn {
-  flex:1; min-width:56px; padding:8px 5px; border-radius:8px;
-  border:1px solid #334155; background:#0f172a; color:#94a3b8;
-  font-family:inherit; font-size:11px; font-weight:700; cursor:pointer;
+  flex:1; min-width:0; padding:11px 6px; border-radius:10px;
+  border:1px solid #334155; background:#0f172a; color:#cbd5e1;
+  font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;
   text-align:center; transition:all .12s; white-space:nowrap;
 }
 .an-btn:hover { background:#1e293b; color:#e2e8f0; }
@@ -368,11 +418,9 @@ body {
 <div id="an-main" style="display:none">
   <div class="an-topbar">
     <button class="an-back" onclick="history.back()">←</button>
-    <div>
-      <h1>🔍 Game Analysis</h1>
-    </div>
-    <div class="sub" id="an-subtitle">—</div>
-    <button class="an-btn" id="btn-turnnums" onclick="toggleTurnNums()" style="max-width:90px">Turn#: OFF</button>
+    <h1>🔍 Analysis</h1>
+    <div class="sub" id="an-subtitle"></div>
+    <button class="an-btn" id="btn-turnnums" onclick="toggleTurnNums()" style="max-width:84px;flex:0 0 auto">#️⃣ Turns</button>
   </div>
 
   <div class="an-layout">
@@ -380,30 +428,19 @@ body {
     <!-- LEFT: board -->
     <div class="an-board-col" id="an-board-col">
 
-      <div class="an-scorebar">
-        <div class="an-scorebar-seg p1">
-          <div class="sc-lbl" id="sc-p1-lbl">P1</div>
-          <div class="sc-val" id="sc-p1">0</div>
+      <!-- Score cards double as player filters -->
+      <div class="an-players">
+        <div class="an-pcard p1 on" id="flt-p1" onclick="setFilter('p1')">
+          <div class="an-pcard-top"><span class="an-pcard-dot p1"></span><span class="an-pcard-name" id="sc-p1-lbl">Player 1</span></div>
+          <div class="an-pcard-score" id="sc-p1">0</div>
         </div>
-        <div class="an-scorebar-seg diff">
-          <div class="sc-lbl">DIFF</div>
-          <div class="sc-val" id="sc-diff">—</div>
+        <div class="an-pcard-vs">
+          <div class="an-pcard-diff" id="sc-diff">—</div>
+          <button class="an-pcard-all on" id="flt-all" onclick="setFilter('all')">BOTH</button>
         </div>
-        <div class="an-scorebar-seg p2">
-          <div class="sc-lbl" id="sc-p2-lbl">P2</div>
-          <div class="sc-val" id="sc-p2">0</div>
-        </div>
-      </div>
-
-      <div class="an-legend">
-        <div class="an-leg-btn all on" id="flt-all" onclick="setFilter('all')">
-          <div class="an-dot all"></div><span id="flt-all-lbl">All</span>
-        </div>
-        <div class="an-leg-btn p1" id="flt-p1" onclick="setFilter('p1')">
-          <div class="an-dot p1"></div><span id="flt-p1-lbl">P1</span>
-        </div>
-        <div class="an-leg-btn p2" id="flt-p2" onclick="setFilter('p2')">
-          <div class="an-dot p2"></div><span id="flt-p2-lbl">P2</span>
+        <div class="an-pcard p2 on" id="flt-p2" onclick="setFilter('p2')">
+          <div class="an-pcard-top"><span class="an-pcard-dot p2"></span><span class="an-pcard-name" id="sc-p2-lbl">Player 2</span></div>
+          <div class="an-pcard-score" id="sc-p2">0</div>
         </div>
       </div>
 
@@ -544,7 +581,7 @@ const TILE_PTS = {
   '+':2,'-':2,'+/-':1,'×':2,'÷':2,'×/÷':1,'=':1,'BLANK':0
 };
 const ALL_FACES = ['0','1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','+','-','×','÷','=','+/-','×/÷','BLANK'];
-const PREM_LABEL = {'3E':'TRIPLE\nEQ 3×','2E':'DOUBLE\nEQ 2×','3T':'TRIPLE\nPC 3×','2T':'DOUBLE\nPC 2×'};
+const PREM_LABEL = {'3E':'3E','2E':'2E','3T':'3T','2T':'2T'};
 
 // =====================================================================
 // STATE
@@ -579,8 +616,6 @@ function bootMainView() {
     S.p1Name+' (🔴) vs '+S.p2Name+' (🔵)';
   document.getElementById('sc-p1-lbl').textContent = S.p1Name;
   document.getElementById('sc-p2-lbl').textContent = S.p2Name;
-  document.getElementById('flt-p1-lbl').textContent = S.p1Name;
-  document.getElementById('flt-p2-lbl').textContent = S.p2Name;
   document.getElementById('ppk-p1-name').textContent = S.p1Name;
   document.getElementById('ppk-p2-name').textContent = S.p2Name;
   document.getElementById('pe-p1-name').textContent = S.p1Name;
@@ -676,7 +711,7 @@ function renderBoard(opts) {
       if(prem) {
         cellEl.classList.add('premium-'+prem);
         const lbl=document.createElement('span'); lbl.className='premium-label';
-        lbl.innerHTML=(PREM_LABEL[prem]||prem).replace('\n','<br>'); cellEl.appendChild(lbl);
+        lbl.textContent=PREM_LABEL[prem]||prem; cellEl.appendChild(lbl);
       }
       if(r===7&&c===7){ cellEl.classList.add('center-cell'); const st=document.createElement('span'); st.className='center-star'; st.textContent='★'; cellEl.appendChild(st); }
 
@@ -737,15 +772,16 @@ function onCellClick(r,c,td) {
 // =====================================================================
 function setFilter(f) {
   S.filter=f;
-  ['all','p1','p2'].forEach(id=>{
-    document.getElementById('flt-'+id).classList.toggle('on',f===id);
-  });
+  // Visual: when filter=all, both cards lit + BOTH lit. When p1, only p1 lit. When p2, only p2 lit.
+  document.getElementById('flt-p1').classList.toggle('on', f==='all'||f==='p1');
+  document.getElementById('flt-p2').classList.toggle('on', f==='all'||f==='p2');
+  document.getElementById('flt-all').classList.toggle('on', f==='all');
   renderBoard();
 }
 function toggleTurnNums() {
   S.showTurnNums=!S.showTurnNums;
   const btn=document.getElementById('btn-turnnums');
-  btn.textContent='Turn#: '+(S.showTurnNums?'ON':'OFF');
+  btn.textContent=(S.showTurnNums?'#️⃣ ON':'#️⃣ Turns');
   btn.classList.toggle('active',S.showTurnNums);
   renderBoard();
 }
