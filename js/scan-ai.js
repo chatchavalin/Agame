@@ -29,20 +29,26 @@ const firebaseConfig = {
   measurementId: "G-F0W9005PMC"
 };
 
-// Vision-capable model on the free Gemini Developer API tier. Using flash-lite
-// because it has a much higher free daily request quota than flash (the full
-// flash model's tiny daily cap was exhausting and causing scan failures).
-// Swappable here if Google retires it (see firebase.google.com/docs/ai-logic/models).
-const MODEL = "gemini-2.5-flash-lite";
+// Vision-capable models on the free Gemini Developer API tier. The user can
+// choose between flash-lite (higher free daily quota) and flash (full model,
+// possibly more accurate but smaller daily cap). Default: flash-lite.
+function chosenModel() {
+  try {
+    var m = (window.AMath && window.AMath.scanModel) || localStorage.getItem("amath_scan_model");
+    if (m === "gemini-2.5-flash" || m === "gemini-2.5-flash-lite") return m;
+  } catch (e) {}
+  return "gemini-2.5-flash-lite";
+}
 
 let _models = {};
 function ensureModel(temp) {
-  var key = String(temp);
+  var model = chosenModel();
+  var key = model + "|" + String(temp);
   if (_models[key]) return _models[key];
   const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
   const ai = getAI(app, { backend: new GoogleAIBackend() });
   _models[key] = getGenerativeModel(ai, {
-    model: MODEL,
+    model: model,
     generationConfig: { responseMimeType: "application/json", temperature: temp }
   });
   return _models[key];

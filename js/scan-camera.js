@@ -19,8 +19,17 @@
   'use strict';
 
   var KEY_LS = 'amath_gemini_key';
-  var MODEL = 'gemini-2.5-flash-lite';
-  var ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODEL + ':generateContent';
+  var DEFAULT_MODEL = 'gemini-2.5-flash-lite';
+  function scanModel() {
+    try {
+      var m = (window.AMath && window.AMath.scanModel) || localStorage.getItem('amath_scan_model');
+      if (m === 'gemini-2.5-flash' || m === 'gemini-2.5-flash-lite') return m;
+    } catch (e) {}
+    return DEFAULT_MODEL;
+  }
+  function endpointFor(model) {
+    return 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent';
+  }
   var MAX_DIM = 2200;   // cap longest side; large enough to keep small tiles legible
 
   function getKey() { try { return localStorage.getItem(KEY_LS) || ''; } catch (e) { return ''; } }
@@ -178,7 +187,7 @@
       }],
       generationConfig: { responseMimeType: 'application/json', temperature: (typeof temperature === 'number' ? temperature : 0) }
     };
-    return fetch(ENDPOINT, {
+    return fetch(endpointFor(scanModel()), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify(body)
@@ -279,15 +288,9 @@
   var PASS_TEMPS = [0.0, 0.2, 0.35, 0.5, 0.65];  // diverse reads → meaningful vote
   // Scan quality controls how many AI passes per scan (more passes = better
   // accuracy but more requests against the free quota). Default 'balanced'.
-  // window.AMath.scanQuality can be set to 'fast' | 'balanced' | 'accurate'.
-  function boardPasses() {
-    var q = (window.AMath && window.AMath.scanQuality) || 'balanced';
-    return q === 'fast' ? 1 : q === 'accurate' ? 5 : 3;
-  }
-  function rackPassCount() {
-    var q = (window.AMath && window.AMath.scanQuality) || 'balanced';
-    return q === 'accurate' ? 3 : 1;   // rack is a small read; 1 is usually plenty
-  }
+  // Single-pass reads only (1 request each) to keep quota use minimal.
+  function boardPasses() { return 1; }
+  function rackPassCount() { return 1; }
 
   function friendlyErr(err) {
     var m = String(err && err.message || err);
@@ -406,7 +409,7 @@
           // create artifacts the model read as phantom tiles. Send the cropped,
           // EXIF-corrected image straight to the read (EXIF orientation is kept
           // in fileToBase64 because that genuinely helps and has no downside).
-          status('⏳ Reading board — ' + boardPasses() + ' pass(es)…');
+          status('⏳ Reading board…');
           runScanPasses(cropped).then(function (r) {
             if (!r.grid) { status('❌ ' + (r.err ? friendlyErr(r.err) : 'The model did not return readable board data. Try a flatter, well-lit photo.'), '#f87171'); return; }
             if (!wantRack) { applyScan(r.grid, null); return; }
@@ -466,7 +469,7 @@
   };
 
   // ---- wire UI --------------------------------------------------------------
-  var JS_VERSION = 'v145';
+  var JS_VERSION = 'v146';
   function init() {
     var stamp = document.getElementById('build-stamp');
     if (stamp) stamp.textContent = JS_VERSION + ' js✓';   // proves the current scan-camera.js actually ran

@@ -538,18 +538,19 @@
       });
     }
 
-    // Scan quality selector (controls AI passes per scan → quota usage).
-    var qsel = byId('scan-quality');
-    if (qsel) {
-      try {
-        var saved = (window.AMath && window.AMath.settings && window.AMath.settings.get) ? window.AMath.settings.get('scanQuality') : null;
-        if (saved) qsel.value = saved;
-      } catch (e) {}
+    // AI model selector (Flash-Lite vs Flash). Persisted in localStorage so both
+    // the owner/Firebase path (scan-ai.js) and the raw-key path read the choice.
+    var msel = byId('scan-model');
+    if (msel) {
       window.AMath = window.AMath || {};
-      window.AMath.scanQuality = qsel.value || 'balanced';
-      qsel.addEventListener('change', function () {
-        window.AMath.scanQuality = qsel.value;
-        try { if (window.AMath.settings && window.AMath.settings.set) window.AMath.settings.set('scanQuality', qsel.value); } catch (e) {}
+      try {
+        var savedM = localStorage.getItem('amath_scan_model');
+        if (savedM === 'gemini-2.5-flash' || savedM === 'gemini-2.5-flash-lite') msel.value = savedM;
+      } catch (e) {}
+      window.AMath.scanModel = msel.value || 'gemini-2.5-flash-lite';
+      msel.addEventListener('change', function () {
+        window.AMath.scanModel = msel.value;
+        try { localStorage.setItem('amath_scan_model', msel.value); } catch (e) {}
       });
     }
   }
