@@ -541,12 +541,24 @@ body {
       <!-- Control bar -->
       <div class="an-ctrlbar" id="an-ctrlbar">
         <button class="an-btn active" id="btn-edit" onclick="toggleEditMode()">✏️ Edit</button>
+        <button class="an-btn" id="btn-autobuild" onclick="runAutoBuild()" style="background:#0a2030;border-color:#22d3ee;color:#67e8f9">🪄 Auto-build</button>
         <button class="an-btn" onclick="openAddPlay()">+ Play</button>
         <button class="an-btn" onclick="undoLast()">↩ Undo</button>
         <button class="an-btn" id="btn-replay" onclick="startReplay()" style="display:none">▶ Replay</button>
         <button class="an-btn" id="btn-report" onclick="openReport()" style="display:none;background:#1a1430;border-color:#a855f7;color:#d8b4fe">📊 Report</button>
       </div>
 
+    </div>
+
+    <!-- AUTO-BUILD RESULTS OVERLAY -->
+    <div class="an-report" id="an-autobuild">
+      <div class="an-report-panel">
+        <div class="an-report-head">
+          <div class="an-report-title" style="color:#67e8f9">🪄 Auto-reconstruction</div>
+          <button class="an-report-close" onclick="closeAutoBuild()">✕</button>
+        </div>
+        <div id="an-autobuild-body"></div>
+      </div>
     </div>
 
     <!-- ANALYSIS REPORT OVERLAY -->
@@ -1260,6 +1272,112 @@ function solvePlacements(faces, target, opts) {
   return results;
 }
 
+// =====================================================================
+// AUTO-RECONSTRUCT ENGINE  (Step 2 of the pipeline)
+// Walks turns in order. For each turn, scans every row & column for windows
+// that (a) score exactly the recorded score, and (b) connect to the board
+// already built (touch an existing tile from a prior turn) — except turn 1,
+// which must cover center (7,7). Classifies each turn:
+//   'auto'      → exactly 1 legal window  → assign automatically
+//   'ambiguous' → 2+ windows              → ask user to choose
+//   'none'      → 0 windows               → ask user (score/tiles likely off)
+//   'skip'      → swap / 0 score / no cells available
+// Returns { results:[{turn,status,options}], appliedCount }
+// =====================================================================
+function lineFaces(lineIndex, isRow, boardState) {
+  const faces=[];
+  for(let i=0;i<15;i++){
+    const cell = isRow ? boardState[lineIndex][i] : boardState[i][lineIndex];
+    faces.push(cell?cell.face:null);
+  }
+  return faces;
+}
+
+// Does a window touch an already-placed tile (turnIdx < currentTurn)?
+function windowConnects(start, len, lineIndex, isRow, currentTurn, boardState) {
+  for(let k=0;k<len;k++){
+    const r = isRow ? lineIndex : start+k;
+    const c = isRow ? start+k : lineIndex;
+    // a cell in the window that was placed earlier = a connection (hook)
+    const cell=boardState[r][c];
+    if(cell && cell.turnIdx>=0 && cell.turnIdx<currentTurn) return true;
+    // also: adjacency to an earlier tile (perpendicular hook)
+    const nbrs=[[r-1,c],[r+1,c],[r,c-1],[r,c+1]];
+    for(const [nr,nc] of nbrs){
+      if(nr<0||nr>14||nc<0||nc>14) continue;
+      const ncell=boardState[nr][nc];
+      if(ncell && ncell.turnIdx>=0 && ncell.turnIdx<currentTurn) return true;
+    }
+  }
+  return false;
+}
+
+function autoReconstruct() {
+  const results=[];
+  let applied=0;
+  // Work on a fresh assignment: keep faces, clear all turn/player assignment first,
+  // so we rebuild from scratch deterministically.
+  for(let r=0;r<15;r++) for(let c=0;c<15;c++)
+    if(S.board[r][c]){ S.board[r][c].turnIdx=-1; S.board[r][c].player='unknown'; }
+
+  S.plays.forEach((p,t)=>{
+    // skip non-placing turns
+    if(p.type==='swap' || !p.score){ results.push({turn:t+1,status:'skip',options:[]}); return; }
+
+    const cand=[];
+    // scan all rows and cols
+    for(let li=0; li<15; li++){
+      for(const isRow of [true,false]){
+        const faces=lineFaces(li,isRow,S.board);
+        const opts={isRow, lineIndex:li};
+        if(t===0) opts.mustInclude=7; // turn 1 must cover center along the line
+        const wins=solvePlacements(faces, p.score, opts);
+        wins.forEach(w=>{
+          // connection rule
+          const connects = (t===0)
+            ? (isRow ? li===7 && w.start<=7 && 7<w.start+w.len   // covers (7,7)
+                     : li===7 && w.start<=7 && 7<w.start+w.len)
+            : windowConnects(w.start,w.len,li,isRow,t,S.board);
+          // turn 1: also require it literally covers center cell (7,7)
+          let coversCenter=true;
+          if(t===0){
+            coversCenter = isRow ? (li===7 && w.start<=7 && 7<w.start+w.len)
+                                 : (li===7 && w.start<=7 && 7<w.start+w.len);
+          }
+          if((t===0 && coversCenter) || (t>0 && connects)){
+            const cells=[];
+            for(let k=0;k<w.len;k++) cells.push(isRow?[li,w.start+k]:[w.start+k,li]);
+            cand.push({isRow,lineIndex:li,start:w.start,len:w.len,bingo:w.bingo,cells,
+              label:(isRow?'Row ':'Col ')+li+' c'+w.start+'–'+(w.start+w.len-1)});
+          }
+        });
+      }
+    }
+
+    // Deduplicate candidates by their cell-set signature
+    const seen=new Set(); const uniq=[];
+    cand.forEach(c=>{
+      const sig=c.cells.map(x=>x.join(',')).sort().join('|');
+      if(!seen.has(sig)){ seen.add(sig); uniq.push(c); }
+    });
+
+    if(uniq.length===1){
+      // auto-assign
+      uniq[0].cells.forEach(([r,c])=>{ if(S.board[r][c]){ S.board[r][c].turnIdx=t; S.board[r][c].player=p.player; }});
+      p.cells=uniq[0].cells;
+      applied++;
+      results.push({turn:t+1,status:'auto',options:uniq});
+    } else if(uniq.length>1){
+      results.push({turn:t+1,status:'ambiguous',options:uniq});
+    } else {
+      results.push({turn:t+1,status:'none',options:[]});
+    }
+  });
+
+  renderBoard(); renderSidebar();
+  return {results, applied};
+}
+
 // UI: solve from the score field on the chosen row/col.
 function solveFromScore() {
   const dir=document.getElementById('pe-solve-dir').value;
@@ -1603,6 +1721,81 @@ function showToast(msg){
   clearTimeout(t._timer);
   t._timer=setTimeout(()=>{ t.style.opacity='0'; },3500);
 }
+
+// ── Auto-build UI (Steps 2 & 3) ──
+function runAutoBuild() {
+  if(!S.plays.length){ alert('Load a game first.'); return; }
+  const {results, applied} = autoReconstruct();
+  const body=document.getElementById('an-autobuild-body');
+  const auto=results.filter(r=>r.status==='auto').length;
+  const amb=results.filter(r=>r.status==='ambiguous');
+  const none=results.filter(r=>r.status==='none');
+  const skip=results.filter(r=>r.status==='skip').length;
+
+  let html=`<div style="display:flex;gap:8px;margin-bottom:14px;">
+    <div style="flex:1;background:#0a2417;border:1px solid #22c55e;border-radius:10px;padding:10px;text-align:center">
+      <div style="font-size:26px;font-weight:900;color:#4ade80">${auto}</div>
+      <div style="font-size:10px;color:#86efac">auto-placed ✓</div>
+    </div>
+    <div style="flex:1;background:#2a2008;border:1px solid #f59e0b;border-radius:10px;padding:10px;text-align:center">
+      <div style="font-size:26px;font-weight:900;color:#fbbf24">${amb.length}</div>
+      <div style="font-size:10px;color:#fcd34d">need your pick</div>
+    </div>
+    <div style="flex:1;background:#2a0a0a;border:1px solid #ef4444;border-radius:10px;padding:10px;text-align:center">
+      <div style="font-size:26px;font-weight:900;color:#f87171">${none.length}</div>
+      <div style="font-size:10px;color:#fca5a5">no match</div>
+    </div>
+  </div>`;
+
+  if(amb.length===0 && none.length===0){
+    html+=`<div style="text-align:center;padding:20px;color:#4ade80;font-weight:700;font-size:14px">✅ Every scoring turn placed unambiguously!<br><span style="font-size:11px;color:#64748b;font-weight:400">Tap ✕ then ▶ Replay to watch it build, or 📊 Report to analyze.</span></div>`;
+  }
+
+  if(amb.length){
+    html+=`<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#fbbf24;margin:6px 0 8px">⚠️ Need your decision — multiple spots fit</div>`;
+    amb.forEach(r=>{
+      const p=S.plays[r.turn-1];
+      const name=p.player==='p1'?S.p1Name:S.p2Name;
+      html+=`<div style="background:#0f172a;border-left:3px solid #f59e0b;border-radius:8px;padding:9px 11px;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:5px">Turn ${r.turn} · ${name} · ${p.score}pts — which placement?</div>`;
+      r.options.slice(0,6).forEach(o=>{
+        const faces=o.cells.map(([rr,cc])=>S.board[rr][cc]?S.board[rr][cc].face:'?').join(' ');
+        html+=`<button onclick='pickAmbiguous(${r.turn-1}, ${JSON.stringify(o.cells)})' style="display:block;width:100%;text-align:left;margin-bottom:4px;padding:7px 10px;border-radius:7px;border:1px solid #334155;background:#080d14;color:#cbd5e1;font-family:inherit;font-size:12px;cursor:pointer">
+          <b style="color:#fbbf24">${o.label}</b> ${o.bingo?'🎯':''}: ${faces}</button>`;
+      });
+      html+=`</div>`;
+    });
+  }
+
+  if(none.length){
+    html+=`<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#f87171;margin:10px 0 8px">❌ No legal placement — check these</div>`;
+    none.forEach(r=>{
+      const p=S.plays[r.turn-1];
+      const name=p.player==='p1'?S.p1Name:S.p2Name;
+      html+=`<div style="background:#0f172a;border-left:3px solid #ef4444;border-radius:8px;padding:9px 11px;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:700;color:#e2e8f0">Turn ${r.turn} · ${name} · ${p.score}pts</div>
+        <div style="font-size:11px;color:#94a3b8;margin:3px 0">No window scoring exactly ${p.score} connects to the board. Likely a misread tile, a score that doesn't match, or a cross-equation play (extra points).</div>
+        <button onclick='fixFromAutoBuild(${r.turn-1})' style="margin-top:3px;padding:5px 11px;border-radius:7px;border:none;background:#7c3aed;color:#fff;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer">Open turn to fix →</button>
+      </div>`;
+    });
+  }
+
+  html+=`<div class="an-rep-note">🪄 Auto-build cleared all turn assignments and rebuilt from scores. ${auto} placed automatically, ${skip} skipped (swaps / 0-pts). Resolve flagged turns above, then ✕ and run 📊 Report.</div>`;
+  body.innerHTML=html;
+  document.getElementById('an-autobuild').classList.add('visible');
+}
+function closeAutoBuild(){ document.getElementById('an-autobuild').classList.remove('visible'); }
+function pickAmbiguous(turnIdx, cells){
+  for(let r=0;r<15;r++) for(let c=0;c<15;c++)
+    if(S.board[r][c] && S.board[r][c].turnIdx===turnIdx){ S.board[r][c].turnIdx=-1; S.board[r][c].player='unknown'; }
+  const p=S.plays[turnIdx];
+  cells.forEach(([r,c])=>{ if(S.board[r][c]){ S.board[r][c].turnIdx=turnIdx; S.board[r][c].player=p.player; }});
+  p.cells=cells;
+  renderBoard(); renderSidebar();
+  showToast(`Turn ${turnIdx+1} placement chosen ✓`);
+  runAutoBuild();
+}
+function fixFromAutoBuild(turnIdx){ closeAutoBuild(); openPlayEditor(turnIdx); }
 </script>
 </body>
 </html>
