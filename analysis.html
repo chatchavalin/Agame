@@ -300,6 +300,20 @@ body {
 .score-seg.p2 .sc-val { color: #3b82f6; }
 .score-seg.diff .sc-val { color: #fbbf24; }
 
+/* Tile appear animation */
+@keyframes tileAppear {
+  from { transform: scale(0) rotate(-15deg); opacity: 0; }
+  to   { transform: scale(1) rotate(0deg);   opacity: 1; }
+}
+.tile-new { animation: tileAppear .25s cubic-bezier(.34,1.56,.64,1) forwards; }
+
+/* Tile flash highlight for current turn */
+@keyframes tilePulse {
+  0%,100% { box-shadow: 0 0 0 2px #fbbf24, 0 0 8px #fbbf24; }
+  50%      { box-shadow: 0 0 0 3px #fbbf24, 0 0 16px #fbbf24; }
+}
+.tile-pulse { animation: tilePulse .6s ease-in-out 2; }
+
 /* Loading overlay */
 .loading { display: none; position: fixed; inset: 0; background: rgba(8,13,20,.8);
   align-items: center; justify-content: center; z-index: 200; font-size: 16px; font-weight: 700; color: #fbbf24; }
@@ -389,11 +403,29 @@ body {
       👆 Tap cells on the board to select tiles for this play
     </div>
 
+    <!-- Replay controls -->
+    <div id="replay-bar" style="display:none;width:100%;max-width:520px;background:#0d1520;border:1px solid #1e2d3d;border-radius:10px;padding:8px 10px;gap:6px;flex-direction:column;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+        <span style="font-size:11px;font-weight:700;color:#fbbf24;">⏮ Replay Mode</span>
+        <span id="replay-label" style="font-size:12px;font-weight:700;color:#e2e8f0;flex:1;text-align:center;">Turn 0 / 0</span>
+        <button onclick="exitReplay()" style="background:none;border:1px solid #334155;color:#64748b;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;font-family:inherit;">✕ Exit</button>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button onclick="replayGoto(0)" style="flex:1;padding:8px 4px;border-radius:7px;border:1px solid #334155;background:#0f172a;color:#94a3b8;font-size:16px;cursor:pointer;">⏮</button>
+        <button onclick="replayStep(-1)" style="flex:2;padding:8px 4px;border-radius:7px;border:1px solid #334155;background:#0f172a;color:#94a3b8;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">◀ Prev</button>
+        <button onclick="replayTogglePlay()" id="replay-play-btn" style="flex:2;padding:8px 4px;border-radius:7px;border:none;background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">▶ Play</button>
+        <button onclick="replayStep(1)" style="flex:2;padding:8px 4px;border-radius:7px;border:1px solid #334155;background:#0f172a;color:#94a3b8;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">Next ▶</button>
+        <button onclick="replayGoto(999)" style="flex:1;padding:8px 4px;border-radius:7px;border:1px solid #334155;background:#0f172a;color:#94a3b8;font-size:16px;cursor:pointer;">⏭</button>
+      </div>
+      <div id="replay-turn-info" style="font-size:11px;color:#94a3b8;text-align:center;min-height:16px;"></div>
+    </div>
+
     <!-- Add play button -->
     <div style="display:flex;gap:6px;width:100%;max-width:520px;">
       <button class="ctrl-btn" onclick="openAddPlay()" style="flex:2;padding:10px;background:#1a2d1a;border-color:#22c55e;color:#86efac">+ Add Play</button>
       <button class="ctrl-btn" onclick="openImport()" style="flex:1">📋 Import</button>
       <button class="ctrl-btn" onclick="undoLastPlay()" style="flex:1">↩ Undo</button>
+      <button class="ctrl-btn" onclick="startReplay()" id="replay-btn" style="flex:1;display:none;">▶ Replay</button>
     </div>
 
   </div>
@@ -724,6 +756,8 @@ function savePlay() {
   renderBoard();
   renderSidebar();
   highlightTurn(play.turnIdx);
+  const rb = document.getElementById('replay-btn');
+  if (rb && state.plays.length > 0) rb.style.display = 'block';
 }
 
 function parseEquationFaces(eq) {
@@ -880,6 +914,195 @@ function renderBoard() {
   }
 }
 
+// ===================== REPLAY ENGINE =====================
+let replayState = {
+  active: false,
+  step: 0,        // 0 = empty board, 1 = after turn 1, etc.
+  playing: false,
+  timer: null,
+};
+
+function startReplay() {
+  if (state.plays.length === 0) { alert('No plays loaded yet.'); return; }
+  replayState.active = true;
+  replayState.step = 0;
+  replayState.playing = false;
+  document.getElementById('replay-bar').style.display = 'flex';
+  document.getElementById('replay-bar').style.flexDirection = 'column';
+  document.getElementById('replay-btn').style.display = 'none';
+  renderReplayBoard();
+  updateReplayLabel();
+}
+
+function exitReplay() {
+  clearInterval(replayState.timer);
+  replayState.active = false;
+  replayState.playing = false;
+  document.getElementById('replay-bar').style.display = 'none';
+  document.getElementById('replay-btn').style.display = 'block';
+  document.getElementById('replay-play-btn').textContent = '▶ Play';
+  renderBoard();   // restore full board
+  renderSidebar();
+}
+
+function replayStep(dir) {
+  const max = state.plays.length;
+  replayState.step = Math.max(0, Math.min(max, replayState.step + dir));
+  renderReplayBoard();
+  updateReplayLabel();
+}
+
+function replayGoto(n) {
+  replayState.step = n === 999 ? state.plays.length : Math.max(0, n);
+  renderReplayBoard();
+  updateReplayLabel();
+}
+
+function replayTogglePlay() {
+  if (replayState.playing) {
+    clearInterval(replayState.timer);
+    replayState.playing = false;
+    document.getElementById('replay-play-btn').textContent = '▶ Play';
+  } else {
+    replayState.playing = true;
+    document.getElementById('replay-play-btn').textContent = '⏸ Pause';
+    replayState.timer = setInterval(() => {
+      if (replayState.step >= state.plays.length) {
+        clearInterval(replayState.timer);
+        replayState.playing = false;
+        document.getElementById('replay-play-btn').textContent = '▶ Play';
+        return;
+      }
+      replayState.step++;
+      renderReplayBoard();
+      updateReplayLabel();
+    }, 1800);
+  }
+}
+
+function updateReplayLabel() {
+  const s = replayState.step;
+  const max = state.plays.length;
+  const lbl = document.getElementById('replay-label');
+  const info = document.getElementById('replay-turn-info');
+  if (s === 0) {
+    lbl.textContent = 'Start — empty board';
+    info.textContent = '';
+    return;
+  }
+  const play = state.plays[s - 1];
+  const pName = play.player === 'p1' ? state.p1Name : state.p2Name;
+  const pColor = play.player === 'p1' ? '#fca5a5' : '#93c5fd';
+  const typeIcon = {bingo:'🎯',yoyo:'🪀',swap:'🔄',other:'📝'}[play.type] || '📝';
+  lbl.innerHTML = `Turn <b>${s}</b> / ${max} — <span style="color:${pColor}">${pName}</span>`;
+  const runScore = state.plays.slice(0, s)
+    .filter(p => p.player === play.player)
+    .reduce((a, p) => a + (p.score||0), 0);
+  info.innerHTML = `${typeIcon} ${play.equation||play.type||''} &nbsp;|&nbsp; +<b>${play.score||0}</b>pts &nbsp;|&nbsp; Total: <b style="color:${pColor}">${runScore}</b> &nbsp;${play.notes ? '· ' + play.notes : ''}`;
+}
+
+// Build the board state at a given replay step (0 = empty, n = after n turns)
+function buildBoardAtStep(step) {
+  const board = Array.from({length:15}, () => Array(15).fill(null));
+  // Place ALL tiles from grid (base board) first — but only those claimed by plays up to step
+  // Start with the raw grid data and figure out which tiles were placed when.
+  // Tiles with turnIdx < step are shown; current step tiles get pulse animation.
+  for (let r = 0; r < 15; r++) {
+    for (let c = 0; c < 15; c++) {
+      // We need to know: which play placed this tile?
+      // Find it from state.board cell's turnIdx
+      const cell = state.board[r] && state.board[r][c];
+      if (!cell) continue;
+      if (cell.turnIdx === -1) {
+        // Unassigned tile — show after all plays? or always? Show always as ghost.
+        if (step >= state.plays.length) {
+          board[r][c] = { ...cell, isGhost: true };
+        }
+        continue;
+      }
+      if (cell.turnIdx < step) {
+        board[r][c] = { ...cell, isNew: false, isPulse: false };
+      } else if (cell.turnIdx === step - 1) {
+        board[r][c] = { ...cell, isNew: true, isPulse: true };
+      }
+    }
+  }
+  return board;
+}
+
+function renderReplayBoard() {
+  const step = replayState.step;
+  const boardData = buildBoardAtStep(step);
+  const grid = document.getElementById('board-grid');
+  grid.innerHTML = '';
+
+  for (let r = 0; r < 15; r++) {
+    for (let c = 0; c < 15; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.r = r; cell.dataset.c = c;
+
+      const prem = PREMIUM[r][c];
+      if (r === 7 && c === 7) cell.classList.add('center');
+      else if (prem) cell.classList.add('sq-' + prem);
+
+      if (prem) {
+        const lbl = document.createElement('div');
+        lbl.className = 'sq-label';
+        lbl.textContent = prem;
+        cell.appendChild(lbl);
+      }
+
+      const tileData = boardData[r][c];
+      if (tileData) {
+        cell.classList.add('has-tile');
+        const tile = document.createElement('div');
+
+        if (tileData.isGhost) {
+          tile.className = 'tile';
+          tile.style.cssText = 'background:linear-gradient(135deg,#1e293b,#0f172a);color:#475569;box-shadow:0 0 0 1px #334155;opacity:.5;';
+        } else if (tileData.player === 'p1') {
+          tile.className = 'tile p1' + (tileData.isPulse ? ' tile-pulse' : '') + (tileData.isNew ? ' tile-new' : '');
+        } else if (tileData.player === 'p2') {
+          tile.className = 'tile p2' + (tileData.isPulse ? ' tile-pulse' : '') + (tileData.isNew ? ' tile-new' : '');
+        } else {
+          tile.className = 'tile' + (tileData.isNew ? ' tile-new' : '');
+          tile.style.cssText = 'background:linear-gradient(135deg,#334155,#1e293b);color:#94a3b8;box-shadow:0 0 0 1px #475569;';
+        }
+
+        // Stagger animation delay for new tiles
+        if (tileData.isNew && tileData.isPulse) {
+          const cellIdx = r * 15 + c;
+          tile.style.animationDelay = (cellIdx % 15) * 40 + 'ms';
+        }
+
+        const face = document.createElement('span');
+        face.className = 'tile-face';
+        face.textContent = tileData.face;
+        tile.appendChild(face);
+
+        const pts = document.createElement('span');
+        pts.className = 'tile-pts';
+        pts.textContent = TILE_PTS[tileData.face] !== undefined ? TILE_PTS[tileData.face] : '';
+        tile.appendChild(pts);
+
+        cell.appendChild(tile);
+      }
+
+      grid.appendChild(cell);
+    }
+  }
+
+  // Highlight current turn row in sidebar
+  const items = document.querySelectorAll('.turn-item');
+  items.forEach((it, i) => {
+    it.classList.toggle('active', i === step - 1);
+  });
+  if (step > 0 && items[step - 1]) {
+    items[step - 1].scrollIntoView({block:'nearest', behavior:'smooth'});
+  }
+}
+
 // ===================== FULL GAME LOADER =====================
 function loadGameJSON(raw) {
   let data;
@@ -932,6 +1155,9 @@ function loadGameJSON(raw) {
     state.p1Name + ' (\uD83D\uDD34) vs ' + state.p2Name + ' (\uD83D\uDD35)';
   renderBoard();
   renderSidebar();
+  // Show replay button now that we have plays
+  const rb = document.getElementById('replay-btn');
+  if (rb && state.plays.length > 0) rb.style.display = 'block';
 }
 
 // ===================== BOOT =====================
