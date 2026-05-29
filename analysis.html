@@ -2091,35 +2091,42 @@ function copyExportCode(){
 }
 
 // The prompt a user pastes into their own AI along with a photo, to get a game code.
-const AI_PROMPT = `I'm analyzing an A-Math (Thai math Scrabble) game. I'll give you a PHOTO of the finished board and a photo of the RYUJI score sheet. Read them and output ONE JSON game code I can paste into a Game Analysis tool.
+const AI_PROMPT = `I'm analyzing an A-Math (Thai math Scrabble) game. I'll give you a PHOTO of the finished board and a photo of the RYUJI-style score sheet. Read them and output a JSON game code I can paste into a Game Analysis tool.
 
 A-MATH RULES YOU NEED:
-- 15x15 board, center is (row 7, col 7), 0-indexed. First play must cover center.
-- Tiles: numbers 0-20, operators + - x/÷ (×/÷ and +/- are two-choice tiles), =, and BLANK.
+- 15x15 board, center is (row 7, col 7), 0-indexed. The first play must cover center (7,7).
+- Tiles: numbers 0-20, operators + - and the two-choice tiles ×/÷ and +/-, plus = and BLANK.
 - A "bingo" places all 8 rack tiles in one turn (+40 bonus). Otherwise it's a "yoyo".
-- Max 8 NEW tiles placed per turn (a 9-tile line is fine if 1 tile was already there).
+- Max 8 NEW tiles placed per turn (a 9-tile line is fine if 1 tile was already on the board).
 
-HOW TO READ THE RYUJI SCORE SHEET:
-- The middle grid labelled 0..20, +/-, +, -, x/÷, =, ? is a TILE TRACKER, not scores. IGNORE it.
-- Each player has their own score column. Read it TOP TO BOTTOM: the numbers alternate
-  SCORE, RUNNING-SUM, SCORE, RUNNING-SUM... So: 1st = turn-1 score, 2nd = turn-2 score,
-  3rd = running sum, 4th = turn-3 score, 5th = running sum, etc.
-- Extract ONLY the per-turn scores; skip the running sums. VERIFY: each score + previous sum
-  should equal the next sum. If something doesn't add up, say so instead of guessing.
-- Two players are scored side by side. Players alternate turns (whoever the sheet shows first).
-- READ EACH PLAYER'S NAME from the header at the TOP of their score column (handwritten or printed,
-  e.g. "RYUJI", a person's name, or initials). Use those real names as "p1" and "p2". Only fall back
-  to "Player 1"/"Player 2" if a name is truly unreadable or blank.
+HOW TO READ THE SCORE SHEET (important — read carefully):
+- The middle grid labelled 0,1,2..20, +/-, +, -, ×/÷, =, ? is a TILE TRACKER (which tiles were used).
+  It is NOT scores. IGNORE that whole middle grid.
+- Each player has their OWN score column (one on each side). The numbers run TOP TO BOTTOM as a mix of
+  per-turn SCORES and RUNNING TOTALS, like a bank statement:
+    • The first TWO numbers are the turn-1 and turn-2 scores.
+    • The next number is their running total (turn1 + turn2).
+    • After that it alternates: each turn's SCORE, then the new RUNNING TOTAL, score, total, ...
+  Example column top-to-bottom: 100, 50, 150, 20, 170, 30, 200
+    → scores are 100, 50, 20, 30   (150, 170, 200 are running totals you SKIP)
+    → check: 100+50=150 ✓, 150+20=170 ✓, 170+30=200 ✓
+- Extract ONLY the per-turn scores. Use the running totals to CHECK yourself: a score plus the previous
+  total must equal the next total. If a number doesn't reconcile, note it rather than guess.
+- A swap or pass shows as a 0 (or a dash). Mark those turns "type":"swap".
+- Players alternate turns. Tell me who played first (the sheet's left/first column is usually turn 1).
+- READ EACH PLAYER'S NAME from the header at the TOP of their score column (e.g. "RYUJI" or a person's
+  name/initials) and use them as p1/p2. Fall back to "Player 1"/"Player 2" only if a name is unreadable.
 
-OUTPUT FORMAT — a single JSON object, nothing else:
-{"v":2,"p1":"<name from sheet>","p2":"<name from sheet>","grid":[[15 rows x 15 faces, "" for empty]],
- "plays":[{"player":"p1"|"p2","score":N,"type":"bingo"|"yoyo"|"swap","cells":[],"notes":""}, ...]}
-
-- "grid" = the final board faces you read from the board photo (use "" for blank cells,
-  "×/÷" and "+/-" for choice tiles, "BLANK" for a blank tile).
-- "plays" = one per turn in play order, with the player and score from the sheet.
-- Leave "cells":[] empty — the tool auto-places tiles from each score.
-- If you are unsure about any tile or score, list your uncertainties AFTER the JSON.`;
+OUTPUT — first a JSON code block, then (optional) your uncertainties as plain text below it:
+\`\`\`json
+{"v":2,"p1":"<name>","p2":"<name>","grid":[ 15 rows, each 15 faces, "" for empty cells ],
+ "plays":[ {"player":"p1","score":N,"type":"bingo"|"yoyo"|"swap","cells":[],"notes":""}, ... ]}
+\`\`\`
+- "grid" = the FINAL board faces from the board photo. Use "" for empty, "×/÷" / "+/-" for choice tiles,
+  "BLANK" for a blank tile. 15 rows × 15 columns exactly.
+- "plays" = one entry per turn in play order, alternating players, with the score you read.
+- Leave every "cells":[] EMPTY — the tool places the tiles automatically from each score.
+- After the JSON, list any tiles or scores you were unsure about so the human can double-check.`;
 
 function copyAIPrompt(){
   const msg=document.getElementById('ai-prompt-msg');
