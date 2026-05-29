@@ -461,7 +461,10 @@
   };
 
   // ---- wire UI --------------------------------------------------------------
+  var JS_VERSION = 'v139';
   function init() {
+    var stamp = document.getElementById('build-stamp');
+    if (stamp) stamp.textContent = JS_VERSION + ' js✓';   // proves the current scan-camera.js actually ran
     var keyInput = document.getElementById('gemini-key');
     var saveBtn = document.getElementById('btn-save-key');
     var photoBtn = document.getElementById('btn-photo');
