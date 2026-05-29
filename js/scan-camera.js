@@ -106,7 +106,32 @@
           }
         }
         ctx.putImageData(data, 0, 0);
-        done(cv.toDataURL('image/jpeg', 0.9).split(',')[1]);
+        // Mild sharpen (unsharp mask via a 3x3 convolution) to crispen tile
+        // digits/edges. Skipped on large images (already gated above by the 3.5MP
+        // cap) so the convolution can't stall the main thread.
+        try {
+          var src = ctx.getImageData(0, 0, w, h), s = src.data;
+          var out = ctx.createImageData(w, h), o = out.data;
+          var amt = 0.6;                         // strength; gentle on purpose
+          var c = 1 + 4 * amt, e = -amt;         // center / edge weights
+          for (var y = 0; y < h; y++) {
+            for (var x = 0; x < w; x++) {
+              var idx = (y * w + x) * 4;
+              if (x === 0 || y === 0 || x === w - 1 || y === h - 1) {
+                o[idx] = s[idx]; o[idx + 1] = s[idx + 1]; o[idx + 2] = s[idx + 2]; o[idx + 3] = s[idx + 3];
+                continue;
+              }
+              for (var ch = 0; ch < 3; ch++) {
+                var p = idx + ch;
+                var val = c * s[p] + e * s[p - 4] + e * s[p + 4] + e * s[p - w * 4] + e * s[p + w * 4];
+                o[p] = val < 0 ? 0 : val > 255 ? 255 : val;
+              }
+              o[idx + 3] = 255;
+            }
+          }
+          ctx.putImageData(out, 0, 0);
+        } catch (eSharp) { /* keep the contrast-stretched version if sharpen fails */ }
+        done(cv.toDataURL('image/jpeg', 0.92).split(',')[1]);
       } catch (e) { done(base64); }
     };
     img.src = 'data:image/jpeg;base64,' + base64;
@@ -464,7 +489,7 @@
   };
 
   // ---- wire UI --------------------------------------------------------------
-  var JS_VERSION = 'v141';
+  var JS_VERSION = 'v142';
   function init() {
     var stamp = document.getElementById('build-stamp');
     if (stamp) stamp.textContent = JS_VERSION + ' js✓';   // proves the current scan-camera.js actually ran
