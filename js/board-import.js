@@ -250,7 +250,10 @@
       }
     }
     if (obj === undefined) {
-      return { ok: false, errors: ['Could not read code — not valid JSON. Paste just the {…} code (you can include the ```json fences, that\'s fine).'], warnings: [] };
+      var hint = '';
+      try { JSON.parse(tidy(raw).replace(/```[a-zA-Z]*/g, '').replace(/```/g, '').trim()); }
+      catch (e2) { hint = ' (' + String(e2.message).replace(/in JSON /, '') + ')'; }
+      return { ok: false, errors: ['Could not read code — the JSON is malformed' + hint + '. Check for a stray quote/comma, or ask your AI to "output only valid JSON, no extra quotes".'], warnings: [] };
     }
     return normalizeImport(obj, inventory);
   }

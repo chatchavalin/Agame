@@ -1,5 +1,5 @@
 // Bump CACHE_NAME whenever ANY asset changes to force update.
-const CACHE_NAME = 'amath-v149-betterprompt';
+const CACHE_NAME = 'amath-v150-jsonerr';
 const ASSETS = [
   '/Agame/',
   '/Agame/lobby.html',
