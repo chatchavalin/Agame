@@ -343,6 +343,22 @@
     });
     dialog.appendChild(btn);
 
+    // Send to Analysis button — hands the finished game to Game Analysis mode
+    if (info.onSendToAnalysis) {
+      const analyzeBtn = document.createElement('button');
+      analyzeBtn.className = 'btn btn-secondary';
+      analyzeBtn.textContent = '🔍 Send to Analysis';
+      analyzeBtn.style.marginTop = '8px';
+      analyzeBtn.style.width = '100%';
+      analyzeBtn.style.background = 'linear-gradient(135deg,#7c3aed,#4f46e5)';
+      analyzeBtn.style.color = '#fff';
+      analyzeBtn.style.border = 'none';
+      analyzeBtn.addEventListener('click', function () {
+        info.onSendToAnalysis();
+      });
+      dialog.appendChild(analyzeBtn);
+    }
+
     // View Board button — hides popup so player can see the final board
     const viewBoardBtn = document.createElement('button');
     viewBoardBtn.className = 'btn btn-secondary';

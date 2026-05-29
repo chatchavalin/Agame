@@ -903,6 +903,19 @@ function bootMainView() {
 window.addEventListener('DOMContentLoaded',()=>{
   const p = new URLSearchParams(location.search);
   if (p.get('game')) { try { loadGameJSON(decodeURIComponent(p.get('game'))); } catch(e){} }
+  // Handoff from PvP/PvA "Send to Analysis": open the pending project automatically
+  try {
+    const pendingId = localStorage.getItem('amath_analysis_pending');
+    if (pendingId) {
+      localStorage.removeItem('amath_analysis_pending');
+      const lib = loadSavedLibrary();
+      if (lib[pendingId]) {
+        S._currentId = pendingId;
+        loadGameJSON(JSON.stringify(lib[pendingId].data));
+        setTimeout(()=>showToast('✅ Loaded from your finished game — tap 🪄 Auto-build or 📊 Report'),400);
+      }
+    }
+  } catch(e){}
   renderSavedList();
 });
 

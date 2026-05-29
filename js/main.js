@@ -3130,6 +3130,17 @@
         ? "Game ended: someone played their last tile and the bag is empty."
         : 'Game ended: 6 consecutive non-scoring turns.';
 
+    // Capture the recording for "Send to Analysis" (works for PvA and PvP).
+    // We finish the recorder here so the doc is available to the handoff button.
+    var analysisRec = null;
+    if (window.AMath.replayRecorder && window.AMath.replayRecorder.active()) {
+      analysisRec = window.AMath.replayRecorder.finish({
+        playerScore: session.playerScore, aiScore: session.aiScore,
+        won: session.playerScore > session.aiScore,
+      });
+    }
+    window._lastGameRecording = analysisRec;
+
     UI.showGameEndPopup({
       winnerLabel: winnerLabel,
       playerScore: session.playerScore,
@@ -3140,6 +3151,14 @@
       onNewGame: startGameSession,
       playerLabel: p1Label,
       aiLabel: p2Label,
+      // "Send to Analysis" handoff — converts the recording to a project
+      onSendToAnalysis: (analysisRec && window.AMath.analysisExport) ? function(){
+        var p1n = isPvP ? (session.p1Name || 'Player 1') : 'You';
+        var p2n = isPvP ? (session.p2Name || 'Player 2') : 'Computer';
+        var id = window.AMath.analysisExport.sendRecordingToAnalysis(analysisRec, {p1:p1n, p2:p2n});
+        if (id) { location.href = 'analysis.html'; }
+        else { alert('Could not send to Analysis.'); }
+      } : null,
     });
 
     // Save game result to Firebase (if logged in via lobby)
@@ -3164,15 +3183,12 @@
       };
       window.AMathBridge.saveGameResult(resultPayload);
 
-      // Save replay (separate Firestore doc in `games` collection)
-      if (window.AMath.replayRecorder && window.AMath.replayRecorder.active()) {
-        var replayDoc = window.AMath.replayRecorder.finish(resultPayload);
-        if (replayDoc && window.AMathBridge.saveReplay) {
-          window.AMathBridge.saveReplay(replayDoc);
-        }
+      // Save replay to Firestore (recording already finished above)
+      if (analysisRec && window.AMathBridge.saveReplay) {
+        window.AMathBridge.saveReplay(analysisRec);
       }
     } else if (window.AMath.replayRecorder) {
-      // Guest / PvP — discard the recording cleanly
+      // already finished above; nothing to cancel
       window.AMath.replayRecorder.cancel();
     }
 
