@@ -3198,9 +3198,11 @@
       };
       window.AMathBridge.saveGameResult(resultPayload);
 
-      // Save replay to Firestore (recording already finished above)
+      // Save replay to Firestore (recording already finished above).
+      // Merge the richer summary fields into the doc so nothing is lost vs. before.
       if (analysisRec && window.AMathBridge.saveReplay) {
-        window.AMathBridge.saveReplay(analysisRec);
+        var replayDoc = Object.assign({}, analysisRec, resultPayload);
+        window.AMathBridge.saveReplay(replayDoc);
       }
     } else if (window.AMath.replayRecorder) {
       // already finished above; nothing to cancel
