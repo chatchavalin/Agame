@@ -326,6 +326,57 @@ body {
 .an-picker-cancel { border:1px solid #334155; background:#0f172a; color:#94a3b8; }
 .an-picker-clear { border:none; background:#7f1d1d; color:#fecaca; }
 
+/* ── Analysis Report overlay ──────────────────────── */
+.an-report {
+  position:fixed; inset:0; background:rgba(0,0,0,.8);
+  display:none; align-items:flex-end; justify-content:center; z-index:210;
+}
+.an-report.visible { display:flex; }
+.an-report-panel {
+  background:#0d1520; border:1px solid #334155;
+  border-radius:16px 16px 0 0; padding:0;
+  width:100%; max-width:560px; max-height:88vh; display:flex; flex-direction:column;
+}
+@media(min-width:900px){ .an-report { align-items:center; } .an-report-panel { border-radius:16px; } }
+.an-report-head {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 16px; border-bottom:1px solid #1e2d3d; flex-shrink:0;
+}
+.an-report-title { font-size:15px; font-weight:900; color:#d8b4fe; }
+.an-report-close { background:none; border:1px solid #334155; color:#64748b; border-radius:8px; padding:5px 10px; cursor:pointer; font-size:14px; }
+#an-report-body { padding:14px 16px; overflow-y:auto; }
+.an-rep-cards { display:flex; gap:8px; margin-bottom:16px; }
+.an-rep-card { flex:1; border-radius:12px; padding:12px; border:2px solid; }
+.an-rep-card.p1 { border-color:#ef4444; background:#1a0606; }
+.an-rep-card.p2 { border-color:#3b82f6; background:#060a1a; }
+.an-rep-card-name { font-size:13px; font-weight:800; margin-bottom:6px; }
+.an-rep-card.p1 .an-rep-card-name { color:#fca5a5; }
+.an-rep-card.p2 .an-rep-card-name { color:#93c5fd; }
+.an-rep-mistakes { font-size:32px; font-weight:900; line-height:1; }
+.an-rep-mistakes.clean { color:#4ade80; }
+.an-rep-mistakes.bad { color:#f87171; }
+.an-rep-card-sub { font-size:10px; color:#64748b; margin-top:4px; }
+.an-rep-sev { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+.an-rep-sev span { font-size:9px; font-weight:700; padding:2px 6px; border-radius:5px; }
+.an-rep-sev .high { background:#450a0a; color:#fca5a5; }
+.an-rep-sev .med { background:#3d2a09; color:#fcd34d; }
+.an-rep-sev .low { background:#1e293b; color:#94a3b8; }
+.an-rep-section-title { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.6px; color:#475569; margin:14px 0 8px; }
+.an-rep-finding {
+  border-radius:10px; padding:9px 11px; margin-bottom:6px;
+  background:#0f172a; border-left:3px solid;
+}
+.an-rep-finding.p1 { border-color:#ef4444; }
+.an-rep-finding.p2 { border-color:#3b82f6; }
+.an-rep-finding-head { display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+.an-rep-finding-turn { font-size:11px; font-weight:800; }
+.an-rep-finding.p1 .an-rep-finding-turn { color:#fca5a5; }
+.an-rep-finding.p2 .an-rep-finding-turn { color:#93c5fd; }
+.an-rep-issue { font-size:12px; color:#cbd5e1; line-height:1.4; padding:3px 0; display:flex; gap:6px; }
+.an-rep-issue .ico { flex-shrink:0; }
+.an-rep-clean { text-align:center; padding:24px; color:#4ade80; font-size:14px; font-weight:700; }
+.an-rep-note { font-size:11px; color:#64748b; line-height:1.5; margin-top:12px; padding:10px; background:#0f172a; border-radius:8px; }
+
 /* ── Play editor overlay ──────────────────────────────── */
 .an-play-editor {
   position:fixed; inset:0; background:rgba(0,0,0,.75);
@@ -476,12 +527,24 @@ body {
 
       <!-- Control bar -->
       <div class="an-ctrlbar" id="an-ctrlbar">
-        <button class="an-btn active" id="btn-edit" onclick="toggleEditMode()">✏️ Edit: ON</button>
-        <button class="an-btn" id="btn-replay" onclick="startReplay()" style="display:none">▶ Replay</button>
+        <button class="an-btn active" id="btn-edit" onclick="toggleEditMode()">✏️ Edit</button>
         <button class="an-btn" onclick="openAddPlay()">+ Play</button>
         <button class="an-btn" onclick="undoLast()">↩ Undo</button>
+        <button class="an-btn" id="btn-replay" onclick="startReplay()" style="display:none">▶ Replay</button>
+        <button class="an-btn" id="btn-report" onclick="openReport()" style="display:none;background:#1a1430;border-color:#a855f7;color:#d8b4fe">📊 Report</button>
       </div>
 
+    </div>
+
+    <!-- ANALYSIS REPORT OVERLAY -->
+    <div class="an-report" id="an-report">
+      <div class="an-report-panel">
+        <div class="an-report-head">
+          <div class="an-report-title">📊 Game Analysis Report</div>
+          <button class="an-report-close" onclick="closeReport()">✕</button>
+        </div>
+        <div id="an-report-body"></div>
+      </div>
     </div>
 
     <!-- RIGHT: sidebar -->
@@ -562,6 +625,11 @@ body {
     </div>
   </div>
 </div>
+
+<!-- Reuse the real game's math engine for equation validation -->
+<script>window.AMath = window.AMath || {};</script>
+<script src="js/utils.js?v=analysis-v159"></script>
+<script src="js/evaluator.js?v=analysis-v159"></script>
 
 <script>
 // =====================================================================
@@ -797,7 +865,7 @@ function toggleTurnNums() {
 function toggleEditMode() {
   S.editMode=!S.editMode;
   const btn=document.getElementById('btn-edit');
-  btn.textContent='✏️ Edit: '+(S.editMode?'ON':'OFF');
+  btn.textContent=(S.editMode?'✏️ Edit':'✏️ Edit');
   btn.classList.toggle('active',S.editMode);
   renderBoard();
 }
@@ -855,7 +923,7 @@ function renderSidebar() {
     list.appendChild(it);
   });
   // Show replay button
-  if(S.plays.length>0) document.getElementById('btn-replay').style.display='';
+  if(S.plays.length>0){ document.getElementById('btn-replay').style.display=''; document.getElementById('btn-report').style.display=''; }
 }
 
 // =====================================================================
@@ -1123,6 +1191,239 @@ function renderReplayBoard() {
   }
   renderBoard({replayBoard:rb, newCells, pulseCells});
 }
+
+// =====================================================================
+// VALIDATION + MISTAKE ANALYSIS ENGINE
+// =====================================================================
+const PTS = TILE_PTS; // alias
+
+// Get the effective face for math evaluation (resolve choice tiles + blanks).
+// In our model the stored face is already the displayed face; for ×/÷ and +/-
+// we don't know which side was chosen, so we treat them as ambiguous and try both.
+function effectiveFacesForEval(faceList) {
+  // Returns array of candidate face-arrays (expanding ambiguous choice tiles).
+  let variants = [[]];
+  faceList.forEach(f=>{
+    let opts;
+    if(f==='×/÷') opts=['×','÷'];
+    else if(f==='+/-') opts=['+','-'];
+    else if(f==='BLANK') opts=['1']; // can't know; assume 1 (rarely on a scored line)
+    else opts=[f];
+    const next=[];
+    variants.forEach(v=>opts.forEach(o=>next.push(v.concat([o]))));
+    if(next.length>64){ /* cap explosion */ }
+    variants=next.slice(0,64);
+  });
+  return variants;
+}
+
+// Build the ordered face list for the tiles a play placed, read along the line
+// they form (row or column). We reconstruct the FULL equation line including
+// adjacent existing tiles, because A-Math equations include connecting tiles.
+function lineFacesForPlay(playIdx) {
+  // Gather this play's cells
+  const cells=[];
+  for(let r=0;r<15;r++) for(let c=0;c<15;c++)
+    if(S.board[r][c] && S.board[r][c].turnIdx===playIdx) cells.push([r,c]);
+  if(cells.length===0) return null;
+  // Determine orientation: all same row → horizontal; all same col → vertical
+  const rows=new Set(cells.map(x=>x[0])), cols=new Set(cells.map(x=>x[1]));
+  let line=null;
+  if(rows.size===1){
+    const r=[...rows][0];
+    // walk full contiguous run on this row covering the placed cols
+    let minC=Math.min(...cells.map(x=>x[1])), maxC=Math.max(...cells.map(x=>x[1]));
+    let lo=minC, hi=maxC;
+    while(lo>0 && S.board[r][lo-1]) lo--;
+    while(hi<14 && S.board[r][hi+1]) hi++;
+    line=[]; for(let c=lo;c<=hi;c++){ if(!S.board[r][c]) return null; line.push(S.board[r][c].face); }
+  } else if(cols.size===1){
+    const c=[...cols][0];
+    let minR=Math.min(...cells.map(x=>x[0])), maxR=Math.max(...cells.map(x=>x[0]));
+    let lo=minR, hi=maxR;
+    while(lo>0 && S.board[lo-1][c]) lo--;
+    while(hi<14 && S.board[hi+1][c]) hi++;
+    line=[]; for(let r=lo;r<=hi;r++){ if(!S.board[r][c]) return null; line.push(S.board[r][c].face); }
+  } else {
+    return null; // L-shaped / scattered — can't auto-read a single line
+  }
+  return line;
+}
+
+// Check whether a play's main equation line computes correctly.
+function checkPlayEquation(playIdx) {
+  const ev = window.AMath && window.AMath.evaluator;
+  if(!ev) return {status:'unknown', reason:'evaluator not loaded'};
+  const line = lineFacesForPlay(playIdx);
+  if(!line) return {status:'skip', reason:'tiles not in a single straight line on the board'};
+  if(!line.includes('=')) return {status:'skip', reason:'no = on this line yet'};
+  // Try all variants of ambiguous choice tiles; valid if ANY variant computes.
+  const variants = effectiveFacesForEval(line);
+  let lastReason='no valid interpretation';
+  for(const v of variants){
+    const res = ev.validateEquation(v);
+    if(res.valid) return {status:'ok', line:line.join(' ')};
+    lastReason=res.reason;
+  }
+  return {status:'bad', reason:lastReason, line:line.join(' ')};
+}
+
+// Compute expected score for a play from placed tiles + premiums on its line.
+// Simplified single-line model: tile multipliers on NEW tiles, one equation
+// multiplier if a new tile sits on 2E/3E, +40 if exactly 8 tiles placed.
+function expectedScoreForPlay(playIdx) {
+  // newly placed cells this turn
+  const newCells=[];
+  for(let r=0;r<15;r++) for(let c=0;c<15;c++)
+    if(S.board[r][c] && S.board[r][c].turnIdx===playIdx) newCells.push([r,c]);
+  if(newCells.length===0) return null;
+  const line = lineFacesForPlayCells(playIdx);
+  if(!line) return null;
+  // line is array of {r,c,face,isNew}
+  let base=0, eqMult=1;
+  line.forEach(cell=>{
+    let p = PTS[cell.face]||0;
+    if(cell.isNew){
+      const prem=PREMIUM[cell.r][cell.c];
+      if(prem==='3T') p*=3;
+      else if(prem==='2T') p*=2;
+      else if(prem==='3E') eqMult*=3;
+      else if(prem==='2E') eqMult*=2;
+    }
+    base+=p;
+  });
+  let total = base*eqMult;
+  if(newCells.length===8) total+=40;
+  return total;
+}
+// Like lineFacesForPlay but returns cell objects with isNew flag
+function lineFacesForPlayCells(playIdx) {
+  const cells=[];
+  for(let r=0;r<15;r++) for(let c=0;c<15;c++)
+    if(S.board[r][c] && S.board[r][c].turnIdx===playIdx) cells.push([r,c]);
+  if(!cells.length) return null;
+  const rows=new Set(cells.map(x=>x[0])), cols=new Set(cells.map(x=>x[1]));
+  const out=[];
+  if(rows.size===1){
+    const r=[...rows][0];
+    let lo=Math.min(...cells.map(x=>x[1])), hi=Math.max(...cells.map(x=>x[1]));
+    while(lo>0&&S.board[r][lo-1]) lo--; while(hi<14&&S.board[r][hi+1]) hi++;
+    for(let c=lo;c<=hi;c++){ if(!S.board[r][c]) return null; out.push({r,c,face:S.board[r][c].face,isNew:S.board[r][c].turnIdx===playIdx}); }
+  } else if(cols.size===1){
+    const c=[...cols][0];
+    let lo=Math.min(...cells.map(x=>x[0])), hi=Math.max(...cells.map(x=>x[0]));
+    while(lo>0&&S.board[lo-1][c]) lo--; while(hi<14&&S.board[hi+1][c]) hi++;
+    for(let r=lo;r<=hi;r++){ if(!S.board[r][c]) return null; out.push({r,c,face:S.board[r][c].face,isNew:S.board[r][c].turnIdx===playIdx}); }
+  } else return null;
+  return out;
+}
+
+// Full analysis: returns per-play findings + per-player mistake summary.
+function analyzeGame() {
+  const findings=[]; // {turn, player, issues:[{type,severity,msg}]}
+  S.plays.forEach((p,i)=>{
+    const issues=[];
+    // count placed tiles
+    let placed=0;
+    for(let r=0;r<15;r++) for(let c=0;c<15;c++)
+      if(S.board[r][c]&&S.board[r][c].turnIdx===i) placed++;
+
+    // 1. Too many tiles (impossible)
+    if(placed>8) issues.push({type:'illegal',sev:'high',msg:`${placed} tiles placed — max is 8`});
+
+    // 2. Equation validity
+    if(p.type!=='swap' && placed>0){
+      const eqCheck=checkPlayEquation(i);
+      if(eqCheck.status==='bad')
+        issues.push({type:'invalid-eq',sev:'high',msg:`Equation doesn't compute: ${eqCheck.line||p.equation}`});
+    }
+
+    // 3. Score check (expected vs recorded) — only if the whole line is player-assigned
+    if(p.type!=='swap' && placed>0){
+      const lineCells=lineFacesForPlayCells(i);
+      const hasUnknown = lineCells && lineCells.some(c=>{
+        const cell=S.board[c.r][c.c]; return cell && cell.player==='unknown';
+      });
+      if(!hasUnknown){
+        const exp=expectedScoreForPlay(i);
+        if(exp!==null && p.score!==undefined){
+          const diff=p.score-exp;
+          // Only flag meaningful mismatches (>3 pts) and ignore wild gaps (likely unmapped board)
+          if(Math.abs(diff)>3 && Math.abs(diff)<=200)
+            issues.push({type:'score',sev:Math.abs(diff)>10?'med':'low',
+              msg:`Recorded ${p.score}, board math gives ~${exp} (off by ${diff>0?'+':''}${diff})`});
+        }
+      }
+    }
+
+    // 4. Missed bingo (had a low-scoring play but not a bingo, early game)
+    if(p.type==='yoyo' && placed>=1 && placed<8 && i<8 && (p.score||0)<40)
+      issues.push({type:'maybe-missed-bingo',sev:'low',msg:`Low-scoring yoyo (${p.score}) early — possible missed bingo`});
+
+    if(issues.length) findings.push({turn:i+1, player:p.player, issues});
+  });
+
+  // Per-player summary
+  const summary={p1:{high:0,med:0,low:0,total:0}, p2:{high:0,med:0,low:0,total:0}};
+  findings.forEach(f=>{
+    f.issues.forEach(iss=>{ summary[f.player][iss.sev]++; summary[f.player].total++; });
+  });
+  return {findings, summary};
+}
+
+// ── Report UI ──
+function openReport() {
+  const {findings, summary} = analyzeGame();
+  const body=document.getElementById('an-report-body');
+  const icons={'illegal':'🚫','invalid-eq':'❌','score':'🔢','maybe-missed-bingo':'🎯'};
+  const sevLabel={high:'serious',med:'moderate',low:'minor'};
+
+  // Player summary cards
+  const card=(pl)=>{
+    const s=summary[pl];
+    const name=pl==='p1'?S.p1Name:S.p2Name;
+    const cls=s.total===0?'clean':'bad';
+    let sev='';
+    if(s.high) sev+=`<span class="high">${s.high} serious</span>`;
+    if(s.med) sev+=`<span class="med">${s.med} moderate</span>`;
+    if(s.low) sev+=`<span class="low">${s.low} minor</span>`;
+    return `<div class="an-rep-card ${pl}">
+      <div class="an-rep-card-name">${name}</div>
+      <div class="an-rep-mistakes ${cls}">${s.total}</div>
+      <div class="an-rep-card-sub">${s.total===1?'issue found':'issues found'}</div>
+      <div class="an-rep-sev">${sev||'<span class="low">clean</span>'}</div>
+    </div>`;
+  };
+
+  let html=`<div class="an-rep-cards">${card('p1')}${card('p2')}</div>`;
+
+  if(findings.length===0){
+    html+=`<div class="an-rep-clean">✅ No issues detected.<br><span style="font-size:11px;color:#64748b;font-weight:400">Both players' equations compute and scores look consistent with the board.</span></div>`;
+  } else {
+    html+=`<div class="an-rep-section-title">Detailed findings (${findings.length} turn${findings.length>1?'s':''})</div>`;
+    findings.forEach(f=>{
+      const name=f.player==='p1'?S.p1Name:S.p2Name;
+      const p=S.plays[f.turn-1];
+      let issuesHtml='';
+      f.issues.forEach(iss=>{
+        issuesHtml+=`<div class="an-rep-issue"><span class="ico">${icons[iss.type]||'⚠️'}</span><span>${iss.msg}</span></div>`;
+      });
+      html+=`<div class="an-rep-finding ${f.player}">
+        <div class="an-rep-finding-head">
+          <span class="an-rep-finding-turn">Turn ${f.turn} · ${name}</span>
+          <span style="font-size:10px;color:#64748b">${p&&p.equation?p.equation:''}</span>
+        </div>
+        ${issuesHtml}
+      </div>`;
+    });
+  }
+
+  html+=`<div class="an-rep-note">⚠️ This report is only as accurate as the board you built. Equation and score checks rely on tiles being correctly placed and assigned to the right turn. Tap ✏️ Edit and fix any tiles first, then re-run the report. "Possible missed bingo" is a heuristic, not a certainty.</div>`;
+
+  body.innerHTML=html;
+  document.getElementById('an-report').classList.add('visible');
+}
+function closeReport(){ document.getElementById('an-report').classList.remove('visible'); }
 </script>
 </body>
 </html>
