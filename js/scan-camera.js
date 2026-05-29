@@ -614,7 +614,7 @@
     });
   };
 
-  var JS_VERSION = 'v134';
+  var JS_VERSION = 'v135';
   // ---- wire UI --------------------------------------------------------------
   function init() {
     var stamp = document.getElementById('build-stamp');
@@ -630,10 +630,19 @@
       saveBtn.addEventListener('click', function () {
         var v = (keyInput.value || '').trim();
         if (!v) { status('Enter a key to save.', '#fbbf24'); return; }
+        // Validate: real Gemini keys look like "AIza" + ~35 chars. The owner
+        // unlock phrase is the one allowed exception. Reject anything else so a
+        // typo/random word can't be saved and fail confusingly at scan time.
+        var looksLikeKey = /^AIza[0-9A-Za-z_\-]{30,}$/.test(v);
+        var isOwnerPhrase = (v === OWNER_PHRASE);
+        if (!looksLikeKey && !isOwnerPhrase) {
+          status('❌ That doesn\'t look like a Gemini API key. A real key starts with "AIza" and is ~39 characters. Get one free at aistudio.google.com/apikey, then paste the whole thing.', '#f87171');
+          return;   // do NOT save invalid input
+        }
         saveKey(v);
         keyInput.value = '';
         keyInput.placeholder = 'Gemini key saved ✓ (tap to replace)';
-        status('✅ Key saved on this device.', '#34d399');
+        status(isOwnerPhrase ? '✅ Owner mode enabled on this device.' : '✅ Key saved on this device. Tap "Take / choose photo" to scan.', '#34d399');
       });
     }
     photoBtn.addEventListener('click', function () { photoInput.click(); });
