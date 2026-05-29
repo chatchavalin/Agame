@@ -1353,7 +1353,13 @@ function analyzeGame() {
         issues.push({type:'invalid-eq',sev:'high',msg:`Equation doesn't compute: ${eqCheck.line||p.equation}`});
     }
 
-    // 3. Score check (expected vs recorded) — only if the whole line is player-assigned
+    // 3. Score check (expected vs recorded) — only if the whole line is player-assigned.
+    // NOTE: expectedScoreForPlay scores only the MAIN line. A cross-play can form
+    // extra perpendicular equations that add more points (per official multi-equation
+    // rule). So the main-line score is a LOWER BOUND, not exact. We therefore only
+    // flag when the recorded score is clearly BELOW the minimum (a real miscount),
+    // or wildly above with no plausible cross-equations. This matches PvA scoring
+    // (tile mult first, then equation mult) and avoids false positives on cross-plays.
     if(p.type!=='swap' && placed>0){
       const lineCells=lineFacesForPlayCells(i);
       const hasUnknown = lineCells && lineCells.some(c=>{
@@ -1363,17 +1369,30 @@ function analyzeGame() {
         const exp=expectedScoreForPlay(i);
         if(exp!==null && p.score!==undefined){
           const diff=p.score-exp;
-          // Only flag meaningful mismatches (>3 pts) and ignore wild gaps (likely unmapped board)
-          if(Math.abs(diff)>3 && Math.abs(diff)<=200)
+          if(diff < -3 && Math.abs(diff)<=200){
+            // Recorded LESS than the minimum the main line alone is worth → likely miscount
             issues.push({type:'score',sev:Math.abs(diff)>10?'med':'low',
-              msg:`Recorded ${p.score}, board math gives ~${exp} (off by ${diff>0?'+':''}${diff})`});
+              msg:`Recorded ${p.score}, but the main equation alone scores ~${exp} (recorded is ${Math.abs(diff)} too low)`});
+          } else if(diff > 3 && Math.abs(diff)<=200){
+            // Recorded MORE than the main line — could be legit cross-equation points,
+            // so flag only as a low-severity note to double-check.
+            issues.push({type:'score',sev:'low',
+              msg:`Recorded ${p.score}, main equation scores ~${exp} (+${diff} extra — OK if a cross-equation also formed, otherwise check)`});
+          }
         }
       }
     }
 
-    // 4. Missed bingo (had a low-scoring play but not a bingo, early game)
+    // 4. Bingo/Yoyo rule consistency (official rule: bingo = all 8 rack tiles placed
+    //    → +40 bonus; yoyo = ≤7 placed → no bonus).
+    if(p.type==='bingo' && placed>0 && placed!==8)
+      issues.push({type:'illegal',sev:'med',msg:`Marked Bingo but ${placed} tiles placed — a Bingo must place exactly 8 tiles from the rack (the +40 bonus only applies then)`});
+    if(p.type==='yoyo' && placed===8)
+      issues.push({type:'maybe-missed-bingo',sev:'med',msg:`8 tiles placed but marked Yoyo — if all 8 came from the rack this should be a Bingo (+40 bonus). Check if it's mislabeled.`});
+
+    // 5. Possible missed bingo (low-scoring short play in the early fishing phase)
     if(p.type==='yoyo' && placed>=1 && placed<8 && i<8 && (p.score||0)<40)
-      issues.push({type:'maybe-missed-bingo',sev:'low',msg:`Low-scoring yoyo (${p.score}) early — possible missed bingo`});
+      issues.push({type:'maybe-missed-bingo',sev:'low',msg:`Low-scoring yoyo (${p.score}) early — possible missed bingo opportunity`});
 
     if(issues.length) findings.push({turn:i+1, player:p.player, issues});
   });
