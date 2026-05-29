@@ -82,8 +82,8 @@
       <div id="import-status"></div>
 
       <div style="border-top:1px solid #334155; margin-top:16px; padding-top:14px;">
-        <h2 style="margin-top:0;">Or scan a photo <span id="build-stamp" style="font-size:11px;color:#475569;font-weight:400;">v137</span></h2>
-        <p class="hint">Scanning reads your board with Google's free Gemini AI. Paste your own free API key below (one-time), then take a flat, well-lit, straight-on photo and tap below. A 1-pass read takes about 5–15 seconds.</p>
+        <h2 style="margin-top:0;">Or scan a photo</h2>
+        <p class="hint">Once Firebase AI Logic is set up on the project, you don't need a key — just take a flat, well-lit, straight-on photo and tap below. (The key field is only a fallback if Firebase isn't set up.)</p>
         <div class="btn-row">
           <button class="btn btn-amber" id="btn-photo">📷 Take / choose photo</button>
           <input id="photo-input" type="file" accept="image/*" style="display:none;">
@@ -106,15 +106,15 @@
         </label>
         <p class="hint" style="margin-top:6px;">More passes = better accuracy but more AI requests. If you hit "Free quota hit", choose Fast and wait a minute.</p>
         <div id="camera-status"></div>
-        <div style="margin-top:12px; padding:12px; background:#0b1220; border:1px solid #1e293b; border-radius:12px;">
-          <p style="margin:0 0 6px; font-size:13px; font-weight:700; color:#e2e8f0;">🔑 Your Gemini API key</p>
-          <p class="hint" style="margin:0 0 8px;">Scanning uses Google's free Gemini AI. Paste your own free key — it's saved only in this browser and sent straight to Google, never to us. Get one in ~1 min at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="color:#fbbf24;">aistudio.google.com/apikey</a>.</p>
+        <details style="margin-top:10px;">
+          <summary style="font-size:12px;color:#64748b;cursor:pointer;">Fallback: paste a Gemini API key</summary>
+          <p class="hint" style="margin-top:8px;">Only needed if you skip Firebase AI Logic (this direct path can be blocked by your browser).</p>
           <div class="btn-row">
-            <input id="gemini-key" type="password" autocomplete="off" placeholder="Paste Gemini API key here"
+            <input id="gemini-key" type="password" autocomplete="off" placeholder="Gemini API key"
               style="flex:1; min-width:150px; box-sizing:border-box; background:#0f172a; color:#e2e8f0; border:1px solid #334155; border-radius:10px; padding:9px; font-size:12px;">
-            <button class="btn btn-amber" id="btn-save-key">Save</button>
+            <button class="btn btn-ghost" id="btn-save-key">Save key</button>
           </div>
-        </div>
+        </details>
       </div>
     </div>
 
@@ -164,8 +164,8 @@
   <script src="js/settings.js?v=v90-en"></script>
   <script src="js/ui.js?v=v61-saveexit"></script>
   <script src="js/board-import.js?v=v85-assign"></script>
-  <script src="js/scan.js?v=v127-cancel"></script>
-  <script src="js/scan-camera.js?v=v137-nopreflight"></script>
+  <script src="js/scan.js?v=v117-quality"></script>
+  <script src="js/scan-camera.js?v=v138-revert"></script>
   <script type="module" src="js/scan-ai.js?v=v86-temp"></script>
 </body>
 </html>

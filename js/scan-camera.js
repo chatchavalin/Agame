@@ -21,7 +21,7 @@
   var KEY_LS = 'amath_gemini_key';
   var MODEL = 'gemini-3.5-flash';
   var ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODEL + ':generateContent';
-  var MAX_DIM = 1600;   // cap longest side; smaller = much faster upload on mobile data, still legible for tiles
+  var MAX_DIM = 2200;   // cap longest side; large enough to keep small tiles legible
 
   function getKey() { try { return localStorage.getItem(KEY_LS) || ''; } catch (e) { return ''; } }
   function saveKey(k) { try { localStorage.setItem(KEY_LS, k); } catch (e) {} }
@@ -33,56 +33,26 @@
 
   // ---- downscale a chosen image file to a base64 JPEG -----------------------
   function fileToBase64(file, cb) {
-    // Draw onto a canvas at MAX_DIM, returning base64 JPEG. Crucially, honor the
-    // photo's EXIF orientation flag — phones often store portrait shots as
-    // sideways pixels + a "rotate me" flag; <img>/drawImage ignore the flag, which
-    // fed Gemini sideways boards. createImageBitmap({imageOrientation:'from-image'})
-    // applies the flag so the pixels come out upright.
-    function fromBitmap() {
-      return createImageBitmap(file, { imageOrientation: 'from-image' }).then(function (bmp) {
-        var w = bmp.width, h = bmp.height;
+    var reader = new FileReader();
+    reader.onerror = function () { cb(null); };
+    reader.onload = function (e) {
+      var img = new Image();
+      img.onerror = function () { cb(null); };
+      img.onload = function () {
+        var w = img.naturalWidth, h = img.naturalHeight;
         var scale = Math.min(1, MAX_DIM / Math.max(w, h));
         var cw = Math.round(w * scale), ch = Math.round(h * scale);
         var canvas = document.createElement('canvas');
         canvas.width = cw; canvas.height = ch;
-        canvas.getContext('2d').drawImage(bmp, 0, 0, cw, ch);
-        if (bmp.close) bmp.close();
-        return canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
-      });
-    }
-    function legacy() {  // fallback for browsers without createImageBitmap options
-      return new Promise(function (resolve, reject) {
-        var reader = new FileReader();
-        reader.onerror = function () { reject(); };
-        reader.onload = function (e) {
-          var img = new Image();
-          img.onerror = function () { reject(); };
-          img.onload = function () {
-            var w = img.naturalWidth, h = img.naturalHeight;
-            var scale = Math.min(1, MAX_DIM / Math.max(w, h));
-            var cw = Math.round(w * scale), ch = Math.round(h * scale);
-            var canvas = document.createElement('canvas');
-            canvas.width = cw; canvas.height = ch;
-            canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
-            try { resolve(canvas.toDataURL('image/jpeg', 0.85).split(',')[1]); }
-            catch (err) { reject(); }
-          };
-          img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-      });
-    }
-    var p;
-    if (typeof createImageBitmap === 'function') {
-      p = fromBitmap().catch(function () { return legacy(); });
-    } else {
-      p = legacy();
-    }
-    // Hard guard: always call back within 8s, even if decode/load never settles.
-    var done = false;
-    function finish(out) { if (done) return; done = true; clearTimeout(timer); cb(out); }
-    var timer = setTimeout(function () { finish(null); }, 8000);
-    p.then(function (b64) { finish(b64 || null); }, function () { finish(null); });
+        canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
+        try {
+          var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          cb(dataUrl.split(',')[1]); // strip "data:image/jpeg;base64,"
+        } catch (err) { cb(null); }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
   }
 
   // ---- prompt: read the board into our exact board-code vocabulary ----------
@@ -141,27 +111,20 @@
   }
 
   // ---- call Gemini ----------------------------------------------------------
-  function callGemini(base64, key, temperature, prompt) {
+  function callGemini(base64, key, temperature) {
     var body = {
       contents: [{
         parts: [
           { inline_data: { mime_type: 'image/jpeg', data: base64 } },
-          { text: prompt || buildPrompt() }
+          { text: buildPrompt() }
         ]
       }],
       generationConfig: { responseMimeType: 'application/json', temperature: (typeof temperature === 'number' ? temperature : 0) }
     };
-    var ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
-    if (ctrl) { try { setTimeout(function () { ctrl.abort(); }, 30000); } catch (e) {} }
-    // Send the key as a query param and use only a "simple" Content-Type so the
-    // request does NOT trigger a CORS preflight (OPTIONS). A custom header like
-    // x-goog-api-key forces a preflight that this endpoint can leave hanging.
-    var url = ENDPOINT + '?key=' + encodeURIComponent(key);
-    return fetch(url, {
+    return fetch(ENDPOINT, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(body),
-      signal: ctrl ? ctrl.signal : undefined
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+      body: JSON.stringify(body)
     }).then(function (resp) {
       return resp.json().then(function (data) {
         if (!resp.ok) {
@@ -226,8 +189,7 @@
     var p = 'This is a photo of an A-Math / Scrabble-style board. Find the 15x15 grid of PLAYING SQUARES only. ' +
       'Exclude the outer plastic frame, the tile racks/trays, dice, and any paper or score sheets. ' +
       'Return ONLY JSON: {"x":<left>,"y":<top>,"w":<width>,"h":<height>} as fractions of the image size (0..1) for the tight bounding box of the grid. If unsure, return {"x":0,"y":0,"w":1,"h":1}.';
-    // Shorter cap than a full read: if detection stalls, just scan the whole image.
-    return withTimeout(analyze2Raw(base64, p, 0), 18000, 'Finding the board').then(function (text) {
+    return analyze2(base64, p).then(function (text) {
       try { var o = JSON.parse(extractJson(text) || 'null'); if (o && typeof o.x === 'number' && typeof o.w === 'number') return o; } catch (e) {}
       return null;
     }).catch(function () { return null; });
@@ -237,9 +199,6 @@
   // crop up so tiles are large. Falls back to the original on any problem.
   function cropToBox(base64, box, cb) {
     if (!box) return cb(base64);
-    var done = false;
-    function finish(out) { if (done) return; done = true; clearTimeout(timer); cb(out); }
-    var timer = setTimeout(function () { finish(base64); }, 5000); // never hang on a stalled image load
     var img = new Image();
     img.onload = function () {
       try {
@@ -248,68 +207,19 @@
         var x = Math.max(0, (box.x - pad)) * W, y = Math.max(0, (box.y - pad)) * H;
         var w = Math.min(1, (box.w + pad * 2)) * W, h = Math.min(1, (box.h + pad * 2)) * H;
         if (x + w > W) w = W - x; if (y + h > H) h = H - y;
-        if (w < W * 0.30 || h < H * 0.30) return finish(base64); // implausible box → skip crop
+        if (w < W * 0.30 || h < H * 0.30) return cb(base64); // implausible box → skip crop
         var scale = Math.min(2.0, 1800 / Math.max(w, h)); if (scale < 1) scale = 1;
         var cw = Math.round(w * scale), ch = Math.round(h * scale);
         var cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
         cv.getContext('2d').drawImage(img, x, y, w, h, 0, 0, cw, ch);
-        finish(cv.toDataURL('image/jpeg', 0.9).split(',')[1]);
-      } catch (e) { finish(base64); }
+        cb(cv.toDataURL('image/jpeg', 0.9).split(',')[1]);
+      } catch (e) { cb(base64); }
     };
-    img.onerror = function () { finish(base64); };
+    img.onerror = function () { cb(base64); };
     img.src = 'data:image/jpeg;base64,' + base64;
   }
 
-  // Normalize lighting before reading: stretch contrast per-channel (ignoring
-  // the extreme 1% tails) and gently roll off blown-out highlights. This makes
-  // the white tile glyphs stand out against the blue tiles under uneven light /
-  // mild glare. Conservative on purpose — strong filters make the model
-  // hallucinate. Falls back to the input on any problem.
-  function normalizeImage(base64, cb) {
-    // Hard guard: whatever happens, call back within 4s with at worst the
-    // original image, so the scan flow can never hang on this step.
-    var done = false;
-    function finish(out) { if (done) return; done = true; cb(out); }
-    var timer = setTimeout(function () { finish(base64); }, 4000);
-    function cbSafe(out) { clearTimeout(timer); finish(out); }
-
-    var img = new Image();
-    img.onerror = function () { cbSafe(base64); };
-    img.onload = function () {
-      try {
-        var w = img.width, h = img.height;
-        // Cap the work: processing many megapixels per-pixel on the main thread
-        // can stall a phone. If the crop is huge, skip normalization rather than freeze.
-        if (w * h > 3500000) { cbSafe(base64); return; }
-        var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-        var ctx = cv.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        var data = ctx.getImageData(0, 0, w, h), px = data.data, n = px.length;
-        var hist = new Array(256).fill(0), total = (n / 4) | 0;
-        for (var i = 0; i < n; i += 4) {
-          var l = (px[i] * 299 + px[i + 1] * 587 + px[i + 2] * 114) / 1000 | 0;
-          hist[l]++;
-        }
-        var lo = 0, hi = 255, cum = 0, loCut = total * 0.01, hiCut = total * 0.99;
-        for (var b = 0; b < 256; b++) { cum += hist[b]; if (cum >= loCut) { lo = b; break; } }
-        cum = 0;
-        for (var b2 = 0; b2 < 256; b2++) { cum += hist[b2]; if (cum >= hiCut) { hi = b2; break; } }
-        if (hi - lo < 32) { cbSafe(base64); return; }
-        var range = hi - lo;
-        for (var j = 0; j < n; j += 4) {
-          for (var k = 0; k < 3; k++) {
-            var v = (px[j + k] - lo) * 255 / range;
-            px[j + k] = v < 0 ? 0 : v > 255 ? 255 : v;
-          }
-        }
-        ctx.putImageData(data, 0, 0);
-        cbSafe(cv.toDataURL('image/jpeg', 0.9).split(',')[1]);
-      } catch (e) { cbSafe(base64); }
-    };
-    img.src = 'data:image/jpeg;base64,' + base64;
-  }
-
-
+  var PASS_TEMPS = [0.0, 0.2, 0.35, 0.5, 0.65];  // diverse reads → meaningful vote
   // Scan quality controls how many AI passes per scan (more passes = better
   // accuracy but more requests against the free quota). Default 'balanced'.
   // window.AMath.scanQuality can be set to 'fast' | 'balanced' | 'accurate'.
@@ -324,8 +234,7 @@
 
   function friendlyErr(err) {
     var m = String(err && err.message || err);
-    if (m === 'NO_KEY') return 'Paste your own free Gemini API key above to use scanning (get one at aistudio.google.com/apikey). Your key stays in your browser.';
-    if (m === 'NO_BACKEND') return 'Paste your own free Gemini API key above to use scanning.';
+    if (m === 'NO_BACKEND') return 'Set up Firebase AI Logic in the console (recommended) or paste a Gemini key above.';
     if (/api key|API_KEY|invalid|permission|PERMISSION/i.test(m)) return 'Access rejected — check your Firebase AI Logic setup (or key).';
     if (/quota|rate|RESOURCE_EXHAUSTED/i.test(m)) return 'Free quota hit — wait a bit and try again.';
     if (/failed to fetch|networkerror|CORS/i.test(m)) return 'Network error reaching the AI service.';
@@ -338,21 +247,20 @@
   function runScanPasses(image) {
     var prompt = buildPrompt();
     var P = boardPasses();
-    var done = 0, lastErr = null, sampleText = null, jobs = [];
+    var done = 0, lastErr = null, jobs = [];
     for (var i = 0; i < P; i++) {
       var temp = PASS_TEMPS[i % PASS_TEMPS.length];
       jobs.push(
         analyze2(image, prompt, temp).then(function (text) {
-          done++;
-          try { var o = JSON.parse(extractJson(text) || 'null'); if (o && Array.isArray(o.grid)) return o.grid; } catch (e) {}
-          if (!sampleText && text) sampleText = String(text).slice(0, 160);  // keep a sample for diagnostics
-          return null;
+          status('⏳ Reading board — pass ' + (++done) + '/' + P + '…');
+          try { var o = JSON.parse(extractJson(text) || 'null'); return (o && Array.isArray(o.grid)) ? o.grid : null; }
+          catch (e) { return null; }
         }).catch(function (e) { lastErr = e; return null; })
       );
     }
     return Promise.all(jobs).then(function (results) {
       var grids = results.filter(function (g) { return g; });
-      if (!grids.length) return { grid: null, err: lastErr, sample: sampleText };
+      if (!grids.length) return { grid: null, err: lastErr };
       return { grid: mergeGrids(grids), n: grids.length };
     });
   }
@@ -390,13 +298,6 @@
     return out;
   }
   function runRackPasses(image) {
-    return new Promise(function (resolveOuter, rejectOuter) {
-      normalizeImage(image, function (prepped) {
-        _runRackPasses(prepped).then(resolveOuter, rejectOuter);
-      });
-    });
-  }
-  function _runRackPasses(image) {
     var jobs = [];
     var RP = rackPassCount();
     for (var i = 0; i < RP; i++) {
@@ -431,155 +332,37 @@
     else status('⚠️ Scanned' + rackNote + ', but some cells need fixing — see the message below the grid.', '#fbbf24');
   }
 
-  // Live elapsed-time ticker so the user can see the scan is working (and tell
-  // "slow" from "stuck"). Call startTicker(prefix, onTimeout) and stopTicker().
-  var _ticker = null, _onTimeout = null, _abandoned = false, _tickNow = null;
-  var SCAN_DEADLINE = 35; // seconds of wall-clock before we abandon the read
-  function startTicker(prefix, onTimeout) {
-    stopTicker();
-    _onTimeout = onTimeout || null;
-    var t0 = Date.now();
-    function tick() {
-      var s = Math.round((Date.now() - t0) / 1000);
-      if (s >= SCAN_DEADLINE) {
-        stopTicker();
-        var cb = _onTimeout; _onTimeout = null;
-        if (cb) cb(s);
-        return;
-      }
-      var extra = '';
-      if (s >= 12) extra = ' &nbsp;<a href="#" onclick="window.AMath.cancelScan&&window.AMath.cancelScan();return false;" style="color:#fbbf24;">Taking too long? Tap to stop</a>';
-      status('⏳ ' + prefix + ' — ' + s + 's' + extra);
-    }
-    _tickNow = tick;
-    tick();
-    _ticker = setInterval(tick, 1000);
-  }
-  function stopTicker() { if (_ticker) { clearInterval(_ticker); _ticker = null; } _onTimeout = null; _tickNow = null; }
-  // When the tab is backgrounded (e.g. while the photo picker is open) the
-  // browser freezes our timers, so the ticker stops mid-count. The moment the
-  // tab becomes visible again, run a tick immediately so a past-deadline read aborts.
-  document.addEventListener('visibilitychange', function () {
-    if (!document.hidden && _tickNow) { try { _tickNow(); } catch (e) {} }
-  });
-  window.AMath = window.AMath || {};
-  window.AMath.cancelScan = function () {
-    _abandoned = true;
-    stopTicker();
-    status('⏹️ Stopped. Tap "Take / choose photo" to try again — try Fast quality and a flat, well-lit photo.', '#fbbf24');
-  };
-
-  var _dbg0 = 0;
-  function dbg(msg) {
-    if (!_dbg0) _dbg0 = Date.now();
-    var t = ((Date.now() - _dbg0) / 1000).toFixed(1);
-    try {
-      var el = document.getElementById('scan-debug');
-      if (!el) {
-        var host = document.getElementById('camera-status');
-        if (host && host.parentNode) {
-          el = document.createElement('div');
-          el.id = 'scan-debug';
-          el.style.cssText = 'margin-top:8px;font-size:11px;color:#94a3b8;font-family:monospace;white-space:pre-wrap;background:#0b1220;border:1px solid #1e293b;border-radius:8px;padding:8px;max-height:160px;overflow:auto;';
-          host.parentNode.insertBefore(el, host.nextSibling);
-        }
-      }
-      if (el) el.textContent += '[' + t + 's] ' + msg + '\n';
-    } catch (e) {}
-  }
   function onPhoto(file) {
     if (!file) return;
-    _dbg0 = 0; dbg('tapped scan; quality=' + ((window.AMath && window.AMath.scanQuality) || 'balanced') + '; backend=' + (isOwner() ? ('owner(module ' + (window.AMath && typeof window.AMath.geminiScan === 'function' ? 'loaded' : 'MISSING') + ')') : 'pastedKey'));
     status('⏳ Reading photo…');
-    dbg('decoding image…');
     fileToBase64(file, function (base64) {
-      if (!base64) { dbg('decode FAILED'); status('❌ Could not read that image.', '#f87171'); return; }
-      dbg('decoded ok, base64 len=' + base64.length);
+      if (!base64) { status('❌ Could not read that image.', '#f87171'); return; }
       var rackEl = document.getElementById('read-rack');
       var wantRack = !!(rackEl && rackEl.checked);
-      var quality = (window.AMath && window.AMath.scanQuality) || 'balanced';
-      var fast = (quality === 'fast');
-
-      function readBoard(imageForBoard) {
-        var settled = false;
-        dbg('calling AI (image len=' + imageForBoard.length + ')…');
-        startTicker('Reading board (' + boardPasses() + ' pass)', function (secs) {
-          if (settled) return; settled = true;
-          dbg('TICKER deadline hit at ' + secs + 's — aborting');
-          var path = isOwner() ? 'owner/Firebase backend' : 'your pasted key';
-          var via = (isOwner() && !(window.AMath && typeof window.AMath.geminiScan === 'function'))
-            ? ' (note: the owner AI module did NOT load, so your phrase was sent as a raw API key — that will fail)'
-            : '';
-          status('❌ Gave up after ' + secs + 's using ' + path + via + '. The AI request never returned — likely slow connection, CORS block on the direct-key path, or a key/quota issue. Try Wi-Fi, or tap tiles in manually.', '#f87171');
+      status('⏳ Finding the board edges…');
+      detectBoard(base64).then(function (box) {
+        cropToBox(base64, box, function (cropped) {
+          status('⏳ Reading board — ' + boardPasses() + ' pass(es)…');
+          runScanPasses(cropped).then(function (r) {
+            if (!r.grid) { status('❌ ' + (r.err ? friendlyErr(r.err) : 'The model did not return readable board data. Try a flatter, well-lit photo.'), '#f87171'); return; }
+            if (!wantRack) { applyScan(r.grid, null); return; }
+            status('⏳ Reading your rack…');
+            runRackPasses(base64).then(function (rack) { applyScan(r.grid, rack); })
+              .catch(function () { applyScan(r.grid, null); });
+          }).catch(function (err) { status('❌ ' + friendlyErr(err), '#f87171'); });
         });
-        runScanPasses(imageForBoard).then(function (r) {
-          if (settled) return; settled = true; stopTicker();
-          dbg('AI returned: ' + (r.grid ? 'grid ok' : ('no grid; err=' + (r.err && r.err.message) + '; sample=' + (r.sample || '∅'))));
-          if (!r.grid) { status('❌ ' + (r.err ? friendlyErr(r.err) : ('The model didn\'t return a board grid.' + (r.sample ? ' It said: "' + r.sample + '…"' : ' Try a flatter, well-lit photo.'))), '#f87171'); return; }
-          if (!wantRack) { applyScan(r.grid, null); return; }
-          startTicker('Reading your rack');
-          runRackPasses(base64).then(function (rack) { stopTicker(); applyScan(r.grid, rack); })
-            .catch(function () { stopTicker(); applyScan(r.grid, null); });
-        }).catch(function (err) { if (settled) return; settled = true; stopTicker(); dbg('AI threw: ' + (err && err.message)); status('❌ ' + friendlyErr(err), '#f87171'); });
-      }
-
-      if (fast) {
-        dbg('fast path: direct read, no detect/crop/normalize');
-        readBoard(base64);
-      } else {
-        dbg('full path: detectBoard…');
-        status('⏳ Finding the board edges…');
-        detectBoard(base64).then(function (box) {
-          dbg('detectBoard done (box=' + (box ? 'yes' : 'none') + '); cropping…');
-          cropToBox(base64, box, function (cropped) {
-            dbg('crop done; normalizing…');
-            normalizeImage(cropped, function (prepped) { dbg('normalize done'); readBoard(prepped); });
-          });
-        }).catch(function () { dbg('detectBoard failed; full-image read'); readBoard(base64); });
-      }
+      });
     });
   }
 
   // analyze() that takes an explicit prompt (so all passes share one prompt build)
-  function withTimeout(promise, ms, label) {
-    return new Promise(function (resolve, reject) {
-      var done = false;
-      var t0 = Date.now();
-      // Poll on an interval and compare wall-clock time. setTimeout alone can be
-      // paused/throttled when a mobile tab is backgrounded; a short polling
-      // interval that checks Date.now() recovers and fires as soon as the tab is
-      // active again, so a hung request can't sit forever.
-      var iv = setInterval(function () {
-        if (done) { clearInterval(iv); return; }
-        if (Date.now() - t0 >= ms) {
-          done = true; clearInterval(iv);
-          reject(new Error((label || 'Request') + ' timed out after ' + Math.round((Date.now() - t0) / 1000) + 's — check your connection / Gemini key and try again.'));
-        }
-      }, 1000);
-      promise.then(function (v) { if (done) return; done = true; clearInterval(iv); resolve(v); },
-                   function (e) { if (done) return; done = true; clearInterval(iv); reject(e); });
-    });
-  }
-  // Owner unlock: only the app owner may use the shared Firebase backend (which
-  // bills the owner's Gemini quota). Everyone else must paste their OWN Gemini
-  // key, which is sent straight to Google from their browser — never our backend.
-  // To use the owner backend, paste this exact phrase into the key box.
-  var OWNER_PHRASE = 'owner:amath2026';
-  function isOwner() { return getKey().trim() === OWNER_PHRASE; }
-
-  function analyze2Raw(base64, prompt, temperature) {
-    var stored = getKey().trim();
-    if (stored === OWNER_PHRASE && window.AMath && typeof window.AMath.geminiScan === 'function') {
-      dbg('-> dispatching to owner Firebase backend (geminiScan)');
-      return window.AMath.geminiScan(base64, prompt, temperature);   // owner: shared backend
-    } else if (stored) {
-      dbg('-> dispatching to direct Google fetch with key');
-      return callGemini(base64, stored, temperature, prompt);        // others: their own key
-    }
-    return Promise.reject(new Error('NO_KEY'));
-  }
   function analyze2(base64, prompt, temperature) {
-    return withTimeout(analyze2Raw(base64, prompt, temperature), 30000, 'Reading the photo'); // 30s/pass
+    if (window.AMath && typeof window.AMath.geminiScan === 'function') {
+      return window.AMath.geminiScan(base64, prompt, temperature);
+    }
+    var key = getKey();
+    if (!key) return Promise.reject(new Error('NO_BACKEND'));
+    return callGemini(base64, key, temperature);
   }
   function _onPhoto_OLD(file) {
     if (!file) return;
@@ -618,11 +401,8 @@
     });
   };
 
-  var JS_VERSION = 'v137';
   // ---- wire UI --------------------------------------------------------------
   function init() {
-    var stamp = document.getElementById('build-stamp');
-    if (stamp) stamp.textContent = JS_VERSION + ' js✓';   // proves which scan-camera.js actually ran
     var keyInput = document.getElementById('gemini-key');
     var saveBtn = document.getElementById('btn-save-key');
     var photoBtn = document.getElementById('btn-photo');
@@ -634,19 +414,10 @@
       saveBtn.addEventListener('click', function () {
         var v = (keyInput.value || '').trim();
         if (!v) { status('Enter a key to save.', '#fbbf24'); return; }
-        // Validate: real Gemini keys look like "AIza" + ~35 chars. The owner
-        // unlock phrase is the one allowed exception. Reject anything else so a
-        // typo/random word can't be saved and fail confusingly at scan time.
-        var looksLikeKey = /^AIza[0-9A-Za-z_\-]{30,}$/.test(v);
-        var isOwnerPhrase = (v === OWNER_PHRASE);
-        if (!looksLikeKey && !isOwnerPhrase) {
-          status('❌ That doesn\'t look like a Gemini API key. A real key starts with "AIza" and is ~39 characters. Get one free at aistudio.google.com/apikey, then paste the whole thing.', '#f87171');
-          return;   // do NOT save invalid input
-        }
         saveKey(v);
         keyInput.value = '';
         keyInput.placeholder = 'Gemini key saved ✓ (tap to replace)';
-        status(isOwnerPhrase ? '✅ Owner mode enabled on this device.' : '✅ Key saved on this device. Tap "Take / choose photo" to scan.', '#34d399');
+        status('✅ Key saved on this device.', '#34d399');
       });
     }
     photoBtn.addEventListener('click', function () { photoInput.click(); });
