@@ -331,20 +331,21 @@
   function runScanPasses(image) {
     var prompt = buildPrompt();
     var P = boardPasses();
-    var done = 0, lastErr = null, jobs = [];
+    var done = 0, lastErr = null, sampleText = null, jobs = [];
     for (var i = 0; i < P; i++) {
       var temp = PASS_TEMPS[i % PASS_TEMPS.length];
       jobs.push(
         analyze2(image, prompt, temp).then(function (text) {
           done++;
-          try { var o = JSON.parse(extractJson(text) || 'null'); return (o && Array.isArray(o.grid)) ? o.grid : null; }
-          catch (e) { return null; }
+          try { var o = JSON.parse(extractJson(text) || 'null'); if (o && Array.isArray(o.grid)) return o.grid; } catch (e) {}
+          if (!sampleText && text) sampleText = String(text).slice(0, 160);  // keep a sample for diagnostics
+          return null;
         }).catch(function (e) { lastErr = e; return null; })
       );
     }
     return Promise.all(jobs).then(function (results) {
       var grids = results.filter(function (g) { return g; });
-      if (!grids.length) return { grid: null, err: lastErr };
+      if (!grids.length) return { grid: null, err: lastErr, sample: sampleText };
       return { grid: mergeGrids(grids), n: grids.length };
     });
   }
@@ -453,21 +454,33 @@
       if (!base64) { status('❌ Could not read that image.', '#f87171'); return; }
       var rackEl = document.getElementById('read-rack');
       var wantRack = !!(rackEl && rackEl.checked);
-      status('⏳ Finding the board edges…');
-      detectBoard(base64).then(function (box) {
-        cropToBox(base64, box, function (cropped) {
-          normalizeImage(cropped, function (prepped) {
-            startTicker('Reading board (' + boardPasses() + ' pass)');
-            runScanPasses(prepped).then(function (r) {
-              if (!r.grid) { stopTicker(); status('❌ ' + (r.err ? friendlyErr(r.err) : 'The model did not return readable board data. Try a flatter, well-lit photo.'), '#f87171'); return; }
-              if (!wantRack) { stopTicker(); applyScan(r.grid, null); return; }
-              startTicker('Reading your rack');
-              runRackPasses(base64).then(function (rack) { stopTicker(); applyScan(r.grid, rack); })
-                .catch(function () { stopTicker(); applyScan(r.grid, null); });
-            }).catch(function (err) { stopTicker(); status('❌ ' + friendlyErr(err), '#f87171'); });
+      var quality = (window.AMath && window.AMath.scanQuality) || 'balanced';
+      var fast = (quality === 'fast');
+
+      function readBoard(imageForBoard) {
+        startTicker('Reading board (' + boardPasses() + ' pass)');
+        runScanPasses(imageForBoard).then(function (r) {
+          if (!r.grid) { stopTicker(); status('❌ ' + (r.err ? friendlyErr(r.err) : ('The model didn\'t return a board grid.' + (r.sample ? ' It said: "' + r.sample + '…"' : ' Try a flatter, well-lit photo.'))), '#f87171'); return; }
+          if (!wantRack) { stopTicker(); applyScan(r.grid, null); return; }
+          startTicker('Reading your rack');
+          runRackPasses(base64).then(function (rack) { stopTicker(); applyScan(r.grid, rack); })
+            .catch(function () { stopTicker(); applyScan(r.grid, null); });
+        }).catch(function (err) { stopTicker(); status('❌ ' + friendlyErr(err), '#f87171'); });
+      }
+
+      if (fast) {
+        // Minimal path: one read on the EXIF-corrected full image. No separate
+        // board-detect call, no normalization — fewer steps, fewer AI requests,
+        // fewer places to stall. Best first thing to try.
+        readBoard(base64);
+      } else {
+        status('⏳ Finding the board edges…');
+        detectBoard(base64).then(function (box) {
+          cropToBox(base64, box, function (cropped) {
+            normalizeImage(cropped, function (prepped) { readBoard(prepped); });
           });
-        });
-      }).catch(function (err) { stopTicker(); status('❌ ' + friendlyErr(err), '#f87171'); });
+        }).catch(function () { readBoard(base64); });   // detect failed → just read full image
+      }
     });
   }
 
