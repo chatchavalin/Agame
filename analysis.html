@@ -464,6 +464,24 @@ body {
   border-radius:9px; background:linear-gradient(135deg,#f59e0b,#ef4444);
   color:#fff; font-family:inherit; font-weight:900; font-size:14px; cursor:pointer;
 }
+.an-saved-section {
+  margin-top:12px; border-top:1px solid #1e2d3d; padding-top:12px;
+}
+.an-saved-section .hint { font-size:11px; color:#64748b; margin-bottom:8px; font-weight:700; }
+.an-saved-item {
+  display:flex; align-items:center; gap:6px; margin-bottom:6px;
+  background:#0f172a; border:1px solid #1e2d3d; border-radius:9px; padding:8px 10px;
+}
+.an-saved-info { flex:1; min-width:0; cursor:pointer; }
+.an-saved-name { font-size:13px; font-weight:700; color:#e2e8f0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.an-saved-meta { font-size:10px; color:#64748b; margin-top:2px; }
+.an-saved-btn {
+  flex-shrink:0; width:34px; height:34px; border-radius:8px;
+  background:#1e293b; border:1px solid #334155; color:#cbd5e1;
+  font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+}
+.an-saved-btn.del:hover { background:#450a0a; border-color:#ef4444; }
+.an-saved-info:hover .an-saved-name { color:#fbbf24; }
 </style>
 </head>
 <body>
@@ -483,6 +501,10 @@ body {
       <div class="hint">⚡ Or paste a full game code to load board + all plays instantly</div>
       <textarea id="full-game-input" placeholder='{"v":2,"p1":"...","p2":"...","grid":[...],"plays":[...]}'></textarea>
       <button class="an-load-btn" onclick="loadGameJSON(document.getElementById('full-game-input').value)">⚡ Load Full Game</button>
+    </div>
+    <div class="an-saved-section" id="an-saved-section">
+      <div class="hint">💾 Your saved games</div>
+      <div id="an-saved-list"></div>
     </div>
   </div>
 </div>
@@ -541,6 +563,7 @@ body {
       <!-- Control bar -->
       <div class="an-ctrlbar" id="an-ctrlbar">
         <button class="an-btn active" id="btn-edit" onclick="toggleEditMode()">✏️ Edit</button>
+        <button class="an-btn" id="btn-save" onclick="saveGamePrompt()" style="background:#0a2a18;border-color:#22c55e;color:#86efac">💾 Save</button>
         <button class="an-btn" id="btn-autobuild" onclick="runAutoBuild()" style="background:#0a2030;border-color:#22d3ee;color:#67e8f9">🪄 Auto-build</button>
         <button class="an-btn" onclick="openAddPlay()">+ Play</button>
         <button class="an-btn" onclick="undoLast()">↩ Undo</button>
@@ -699,6 +722,66 @@ const ALL_FACES = ['0','1','2','3','4','5','6','7','8','9','10','11','12','13','
 const PREM_LABEL = {'3E':'3E','2E':'2E','3T':'3T','2T':'2T'};
 
 // =====================================================================
+// SAVED GAMES LIBRARY  (localStorage, multiple renamable games)
+// =====================================================================
+const SAVE_KEY = 'amath_analysis_games';
+const CURRENT_KEY = 'amath_analysis_current';
+
+// Serialize current state → v2 game object
+function serializeGame() {
+  const grid = Array.from({length:15},()=>Array(15).fill(''));
+  for(let r=0;r<15;r++) for(let c=0;c<15;c++)
+    if(S.board[r][c]) grid[r][c]=S.board[r][c].face;
+  // capture per-cell player/turn assignment so reload is exact
+  const cellMeta = [];
+  for(let r=0;r<15;r++) for(let c=0;c<15;c++){
+    const cell=S.board[r][c];
+    if(cell) cellMeta.push([r,c,cell.player,cell.turnIdx]);
+  }
+  return {
+    v:2, p1:S.p1Name, p2:S.p2Name, grid,
+    plays:S.plays.map(p=>({player:p.player,equation:p.equation,score:p.score,
+      type:p.type,cells:p.cells,notes:p.notes})),
+    cellMeta
+  };
+}
+
+function loadSavedLibrary() {
+  try { return JSON.parse(localStorage.getItem(SAVE_KEY)||'{}'); }
+  catch(e){ return {}; }
+}
+function writeSavedLibrary(lib) {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(lib)); return true; }
+  catch(e){ alert('Could not save (storage full or blocked): '+e.message); return false; }
+}
+
+// Save current game under an id (creates or overwrites). Returns the id.
+function saveCurrentGame(name, id) {
+  const lib = loadSavedLibrary();
+  id = id || ('g'+Date.now());
+  lib[id] = {
+    id, name: name || ('Game '+new Date().toLocaleDateString()),
+    savedAt: Date.now(),
+    data: serializeGame()
+  };
+  if(writeSavedLibrary(lib)){
+    localStorage.setItem(CURRENT_KEY, id);
+    return id;
+  }
+  return null;
+}
+
+function deleteSavedGame(id) {
+  const lib = loadSavedLibrary();
+  delete lib[id];
+  writeSavedLibrary(lib);
+}
+function renameSavedGame(id, newName) {
+  const lib = loadSavedLibrary();
+  if(lib[id]){ lib[id].name=newName; writeSavedLibrary(lib); }
+}
+
+// =====================================================================
 // STATE
 // =====================================================================
 var S = window.S = {
@@ -741,7 +824,66 @@ function bootMainView() {
 window.addEventListener('DOMContentLoaded',()=>{
   const p = new URLSearchParams(location.search);
   if (p.get('game')) { try { loadGameJSON(decodeURIComponent(p.get('game'))); } catch(e){} }
+  renderSavedList();
 });
+
+// ── Saved games UI ──
+function renderSavedList() {
+  const lib = loadSavedLibrary();
+  const ids = Object.keys(lib).sort((a,b)=>(lib[b].savedAt||0)-(lib[a].savedAt||0));
+  const wrap = document.getElementById('an-saved-list');
+  const section = document.getElementById('an-saved-section');
+  if(!wrap) return;
+  if(ids.length===0){ section.style.display='none'; return; }
+  section.style.display='';
+  wrap.innerHTML = ids.map(id=>{
+    const g=lib[id];
+    const when=new Date(g.savedAt||0).toLocaleDateString();
+    const turns=(g.data&&g.data.plays)?g.data.plays.length:0;
+    return `<div class="an-saved-item">
+      <div class="an-saved-info" onclick="loadSavedGame('${id}')">
+        <div class="an-saved-name">${(g.name||'Untitled').replace(/</g,'&lt;')}</div>
+        <div class="an-saved-meta">${turns} turns · ${when}</div>
+      </div>
+      <button class="an-saved-btn" onclick="renameSavedPrompt('${id}')" title="Rename">✏️</button>
+      <button class="an-saved-btn del" onclick="deleteSavedPrompt('${id}')" title="Delete">🗑</button>
+    </div>`;
+  }).join('');
+}
+function loadSavedGame(id) {
+  const lib = loadSavedLibrary();
+  const g = lib[id];
+  if(!g){ alert('Game not found.'); return; }
+  localStorage.setItem(CURRENT_KEY, id);
+  S._currentId = id;
+  loadGameJSON(JSON.stringify(g.data));
+}
+function saveGamePrompt() {
+  const lib = loadSavedLibrary();
+  const existingId = S._currentId;
+  let defaultName = existingId && lib[existingId] ? lib[existingId].name
+                   : (S.p1Name+' vs '+S.p2Name);
+  const name = prompt('Save game as:', defaultName);
+  if(name===null) return; // cancelled
+  const id = saveCurrentGame(name.trim()||defaultName, existingId);
+  if(id){ S._currentId = id; showToast('💾 Saved "'+(name.trim()||defaultName)+'"'); renderSavedList(); }
+}
+function renameSavedPrompt(id) {
+  const lib = loadSavedLibrary();
+  if(!lib[id]) return;
+  const name = prompt('Rename game:', lib[id].name);
+  if(name===null || !name.trim()) return;
+  renameSavedGame(id, name.trim());
+  renderSavedList();
+}
+function deleteSavedPrompt(id) {
+  const lib = loadSavedLibrary();
+  if(!lib[id]) return;
+  if(!confirm('Delete "'+lib[id].name+'"? This cannot be undone.')) return;
+  deleteSavedGame(id);
+  if(S._currentId===id) S._currentId=null;
+  renderSavedList();
+}
 
 // =====================================================================
 // BOARD RENDER  (matches PvA style)
@@ -1144,6 +1286,13 @@ function loadGameJSON(raw) {
         Object.assign(S.board[r][c],{player:play.player,turnIdx:i});
     });
   });
+  // If a saved game included exact cell metadata, restore it (overrides the above)
+  if(Array.isArray(data.cellMeta)){
+    data.cellMeta.forEach(([r,c,player,turnIdx])=>{
+      if(r>=0&&r<15&&c>=0&&c<15&&S.board[r]&&S.board[r][c])
+        Object.assign(S.board[r][c],{player,turnIdx});
+    });
+  }
   bootMainView();
   if(overPlays.length) setTimeout(()=>alert('⚠️ Note: turn(s) '+overPlays.join(', ')+' have more than 8 tiles, which is impossible in A-Math (max 8 per turn). They are flagged ⚠️ in the play list — tap ✏️ on the board to fix.'),300);
   return;
