@@ -227,10 +227,30 @@
   /** Parse a pasted board-code string (JSON) into a normalized import. */
   function parseBoardCode(text, inventory) {
     var obj;
-    try {
-      obj = JSON.parse(text);
-    } catch (e) {
-      return { ok: false, errors: ['Could not read code — not valid JSON.'], warnings: [] };
+    var raw = String(text == null ? '' : text);
+    // Be tolerant of what AIs paste around the JSON: ```json fences, leading/
+    // trailing prose, and smart quotes. Extract the outermost {...} and
+    // normalize fancy quotes before parsing.
+    function tidy(s) {
+      return s
+        .replace(/[\u201C\u201D]/g, '"')   // smart double quotes → "
+        .replace(/[\u2018\u2019]/g, "'");  // smart single quotes → '
+    }
+    function attempt(s) {
+      try { return JSON.parse(s); } catch (e) { return undefined; }
+    }
+    obj = attempt(raw);
+    if (obj === undefined) {
+      var t = tidy(raw).replace(/```[a-zA-Z]*/g, '').replace(/```/g, '').trim();
+      obj = attempt(t);
+      if (obj === undefined) {
+        // grab the first {...} block (handles surrounding prose)
+        var i = t.indexOf('{'), j = t.lastIndexOf('}');
+        if (i !== -1 && j !== -1 && j > i) obj = attempt(t.slice(i, j + 1));
+      }
+    }
+    if (obj === undefined) {
+      return { ok: false, errors: ['Could not read code — not valid JSON. Paste just the {…} code (you can include the ```json fences, that\'s fine).'], warnings: [] };
     }
     return normalizeImport(obj, inventory);
   }
