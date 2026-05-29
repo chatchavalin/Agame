@@ -520,6 +520,12 @@ body {
       <textarea id="full-game-input" placeholder='{"v":2,"p1":"...","p2":"...","grid":[...],"plays":[...]}'></textarea>
       <button class="an-load-btn" onclick="loadGameJSON(document.getElementById('full-game-input').value)">⚡ Load Full Game</button>
     </div>
+    <div class="an-paste-section">
+      <div class="hint">🤖 No code yet? Get one from any AI</div>
+      <div style="font-size:10px;color:#475569;margin-bottom:6px;line-height:1.4;">Copy this prompt, paste it into Claude (or any AI) together with a photo of your board + score sheet. It returns a game code you paste above.</div>
+      <button class="an-load-btn" style="background:linear-gradient(135deg,#a855f7,#6366f1)" onclick="copyAIPrompt()">📋 Copy AI prompt</button>
+      <div id="ai-prompt-msg" style="font-size:11px;margin-top:5px;color:#94a3b8;"></div>
+    </div>
     <div class="an-saved-section" id="an-saved-section">
       <div class="hint">💾 Your saved games</div>
       <div id="an-saved-list"></div>
@@ -2082,6 +2088,49 @@ function copyExportCode(){
     else document.execCommand('copy');
     showToast('📋 Code copied');
   }catch(e){ showToast('Select the text and copy manually'); }
+}
+
+// The prompt a user pastes into their own AI along with a photo, to get a game code.
+const AI_PROMPT = `I'm analyzing an A-Math (Thai math Scrabble) game. I'll give you a PHOTO of the finished board and a photo of the RYUJI score sheet. Read them and output ONE JSON game code I can paste into a Game Analysis tool.
+
+A-MATH RULES YOU NEED:
+- 15x15 board, center is (row 7, col 7), 0-indexed. First play must cover center.
+- Tiles: numbers 0-20, operators + - x/÷ (×/÷ and +/- are two-choice tiles), =, and BLANK.
+- A "bingo" places all 8 rack tiles in one turn (+40 bonus). Otherwise it's a "yoyo".
+- Max 8 NEW tiles placed per turn (a 9-tile line is fine if 1 tile was already there).
+
+HOW TO READ THE RYUJI SCORE SHEET:
+- The middle grid labelled 0..20, +/-, +, -, x/÷, =, ? is a TILE TRACKER, not scores. IGNORE it.
+- Each player has their own score column. Read it TOP TO BOTTOM: the numbers alternate
+  SCORE, RUNNING-SUM, SCORE, RUNNING-SUM... So: 1st = turn-1 score, 2nd = turn-2 score,
+  3rd = running sum, 4th = turn-3 score, 5th = running sum, etc.
+- Extract ONLY the per-turn scores; skip the running sums. VERIFY: each score + previous sum
+  should equal the next sum. If something doesn't add up, say so instead of guessing.
+- Two players are scored side by side. Players alternate turns (whoever the sheet shows first).
+
+OUTPUT FORMAT — a single JSON object, nothing else:
+{"v":2,"p1":"Player 1","p2":"Player 2","grid":[[15 rows x 15 faces, "" for empty]],
+ "plays":[{"player":"p1"|"p2","score":N,"type":"bingo"|"yoyo"|"swap","cells":[],"notes":""}, ...]}
+
+- "grid" = the final board faces you read from the board photo (use "" for blank cells,
+  "×/÷" and "+/-" for choice tiles, "BLANK" for a blank tile).
+- "plays" = one per turn in play order, with the player and score from the sheet.
+- Leave "cells":[] empty — the tool auto-places tiles from each score.
+- If you are unsure about any tile or score, list your uncertainties AFTER the JSON.`;
+
+function copyAIPrompt(){
+  const msg=document.getElementById('ai-prompt-msg');
+  try{
+    if(navigator.clipboard) navigator.clipboard.writeText(AI_PROMPT);
+    else {
+      const t=document.createElement('textarea'); t.value=AI_PROMPT;
+      document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t);
+    }
+    if(msg){ msg.style.color='#86efac'; msg.textContent='✓ Prompt copied — paste it into Claude with your photo.'; }
+    showToast('📋 AI prompt copied');
+  }catch(e){
+    if(msg){ msg.style.color='#fca5a5'; msg.textContent='Could not copy automatically — long-press to select.'; }
+  }
 }
 function importProjectFile(ev){
   const file=ev.target.files && ev.target.files[0];
