@@ -515,9 +515,14 @@
     var copyBtn = byId('btn-copy-prompt');
     if (copyBtn) {
       copyBtn.addEventListener('click', function () {
-        var prompt = 'Read this A-Math (Thai math crossword) board photo into JSON. Output ONLY:\n' +
-          '{"v":2,"grid":[15 rows of 15 strings]}\n' +
-          'Each cell is "" if empty, else the tile face: "0"-"9", two-digit "10".."16","20", "+","-","=", "×/÷" for the multiply/divide tile, "+/-" for the plus/minus tile, "BLANK" for an empty-faced wildcard tile. Ignore the small corner point-number. Most cells are empty.';
+        var prompt = [
+          'You are reading a photo of an A-Math board (a 15x15 math-crossword grid; tiles are blue with a large symbol and a tiny corner point-number).',
+          'Return ONLY this JSON, nothing else: {"v":2,"grid":[ 15 rows of exactly 15 strings ]}.',
+          'Each cell: "" if there is NO tile, otherwise the tile face.',
+          'Faces: "0"-"9"; two-digit tiles "10","11","12","13","14","15","16","20" (one tile, never split into two cells); "+"; "-"; "="; "×/÷" for the multiply-divide tile; "+/-" for the plus-minus tile; "BLANK" for a tile with an empty centre.',
+          'IMPORTANT: read by grid position — line tiles up with the 15 columns and 15 rows; keep empty squares as "". Ignore the small corner point-number (e.g. a big 8 with a small 2 is "8"). Most squares are empty.',
+          'Before answering, check: every horizontal and vertical run of adjacent tiles should form a valid equation (it contains "=" and both sides are equal). If a run does not compute, re-examine those tiles — you probably misread a digit or split a two-digit tile.'
+        ].join('\n');
         var done = function (ok) {
           copyBtn.textContent = ok ? '✅ Copied — paste it into your AI with the photo' : '⚠️ Copy failed — long-press to select';
           setTimeout(function () { copyBtn.textContent = '📋 Copy prompt for AI'; }, 2500);
