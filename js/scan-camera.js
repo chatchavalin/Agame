@@ -251,16 +251,25 @@
   // mild glare. Conservative on purpose — strong filters make the model
   // hallucinate. Falls back to the input on any problem.
   function normalizeImage(base64, cb) {
+    // Hard guard: whatever happens, call back within 4s with at worst the
+    // original image, so the scan flow can never hang on this step.
+    var done = false;
+    function finish(out) { if (done) return; done = true; cb(out); }
+    var timer = setTimeout(function () { finish(base64); }, 4000);
+    function cbSafe(out) { clearTimeout(timer); finish(out); }
+
     var img = new Image();
-    img.onerror = function () { cb(base64); };
+    img.onerror = function () { cbSafe(base64); };
     img.onload = function () {
       try {
         var w = img.width, h = img.height;
+        // Cap the work: processing many megapixels per-pixel on the main thread
+        // can stall a phone. If the crop is huge, skip normalization rather than freeze.
+        if (w * h > 3500000) { cbSafe(base64); return; }
         var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
         var ctx = cv.getContext('2d');
         ctx.drawImage(img, 0, 0);
         var data = ctx.getImageData(0, 0, w, h), px = data.data, n = px.length;
-        // luminance histogram to find robust black/white points (1st/99th pct)
         var hist = new Array(256).fill(0), total = (n / 4) | 0;
         for (var i = 0; i < n; i += 4) {
           var l = (px[i] * 299 + px[i + 1] * 587 + px[i + 2] * 114) / 1000 | 0;
@@ -270,18 +279,17 @@
         for (var b = 0; b < 256; b++) { cum += hist[b]; if (cum >= loCut) { lo = b; break; } }
         cum = 0;
         for (var b2 = 0; b2 < 256; b2++) { cum += hist[b2]; if (cum >= hiCut) { hi = b2; break; } }
-        if (hi - lo < 32) { cb(base64); return; }   // already low-contrast/flat → leave alone
+        if (hi - lo < 32) { cbSafe(base64); return; }
         var range = hi - lo;
         for (var j = 0; j < n; j += 4) {
           for (var k = 0; k < 3; k++) {
             var v = (px[j + k] - lo) * 255 / range;
-            if (v < 0) v = 0; else if (v > 255) v = 255;
-            px[j + k] = v;
+            px[j + k] = v < 0 ? 0 : v > 255 ? 255 : v;
           }
         }
         ctx.putImageData(data, 0, 0);
-        cb(cv.toDataURL('image/jpeg', 0.9).split(',')[1]);
-      } catch (e) { cb(base64); }
+        cbSafe(cv.toDataURL('image/jpeg', 0.9).split(',')[1]);
+      } catch (e) { cbSafe(base64); }
     };
     img.src = 'data:image/jpeg;base64,' + base64;
   }
@@ -427,18 +435,32 @@
             }).catch(function (err) { status('❌ ' + friendlyErr(err), '#f87171'); });
           });
         });
-      });
+      }).catch(function (err) { status('❌ ' + friendlyErr(err), '#f87171'); });
     });
   }
 
   // analyze() that takes an explicit prompt (so all passes share one prompt build)
+  function withTimeout(promise, ms, label) {
+    return new Promise(function (resolve, reject) {
+      var done = false;
+      var t = setTimeout(function () {
+        if (done) return; done = true;
+        reject(new Error((label || 'Request') + ' timed out — check your connection and try again (or pick a lower Scan quality).'));
+      }, ms);
+      promise.then(function (v) { if (done) return; done = true; clearTimeout(t); resolve(v); },
+                   function (e) { if (done) return; done = true; clearTimeout(t); reject(e); });
+    });
+  }
   function analyze2(base64, prompt, temperature) {
+    var call;
     if (window.AMath && typeof window.AMath.geminiScan === 'function') {
-      return window.AMath.geminiScan(base64, prompt, temperature);
+      call = window.AMath.geminiScan(base64, prompt, temperature);
+    } else {
+      var key = getKey();
+      if (!key) return Promise.reject(new Error('NO_BACKEND'));
+      call = callGemini(base64, key, temperature);
     }
-    var key = getKey();
-    if (!key) return Promise.reject(new Error('NO_BACKEND'));
-    return callGemini(base64, key, temperature);
+    return withTimeout(call, 45000, 'Reading the photo');   // 45s hard cap per pass
   }
   function _onPhoto_OLD(file) {
     if (!file) return;
