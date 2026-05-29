@@ -33,26 +33,83 @@
 
   // ---- downscale a chosen image file to a base64 JPEG -----------------------
   function fileToBase64(file, cb) {
-    var reader = new FileReader();
-    reader.onerror = function () { cb(null); };
-    reader.onload = function (e) {
-      var img = new Image();
-      img.onerror = function () { cb(null); };
-      img.onload = function () {
-        var w = img.naturalWidth, h = img.naturalHeight;
+    // Preferred: createImageBitmap honors the EXIF orientation flag, so portrait
+    // photos that phones store as sideways-pixels-plus-a-flag come out upright.
+    // If anything goes wrong, fall back to the exact original <img> decode.
+    function legacyDecode() {
+      var reader = new FileReader();
+      reader.onerror = function () { cb(null); };
+      reader.onload = function (e) {
+        var img = new Image();
+        img.onerror = function () { cb(null); };
+        img.onload = function () {
+          var w = img.naturalWidth, h = img.naturalHeight;
+          var scale = Math.min(1, MAX_DIM / Math.max(w, h));
+          var cw = Math.round(w * scale), ch = Math.round(h * scale);
+          var canvas = document.createElement('canvas');
+          canvas.width = cw; canvas.height = ch;
+          canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
+          try {
+            var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            cb(dataUrl.split(',')[1]);
+          } catch (err) { cb(null); }
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+    if (typeof createImageBitmap === 'function') {
+      createImageBitmap(file, { imageOrientation: 'from-image' }).then(function (bmp) {
+        var w = bmp.width, h = bmp.height;
         var scale = Math.min(1, MAX_DIM / Math.max(w, h));
         var cw = Math.round(w * scale), ch = Math.round(h * scale);
         var canvas = document.createElement('canvas');
         canvas.width = cw; canvas.height = ch;
-        canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
-        try {
-          var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-          cb(dataUrl.split(',')[1]); // strip "data:image/jpeg;base64,"
-        } catch (err) { cb(null); }
-      };
-      img.src = e.target.result;
+        canvas.getContext('2d').drawImage(bmp, 0, 0, cw, ch);
+        if (bmp.close) bmp.close();
+        try { cb(canvas.toDataURL('image/jpeg', 0.85).split(',')[1]); }
+        catch (err) { legacyDecode(); }
+      }).catch(function () { legacyDecode(); });
+    } else {
+      legacyDecode();
+    }
+  }
+
+  // Gentle contrast/brightness normalization so white tile glyphs pop against
+  // blue tiles under uneven light. Conservative + guarded: skips flat or huge
+  // images, and always calls back (original image on any problem) within 4s.
+  function normalizeImage(base64, cb) {
+    var settled = false;
+    function done(out) { if (settled) return; settled = true; clearTimeout(timer); cb(out); }
+    var timer = setTimeout(function () { done(base64); }, 4000);
+    var img = new Image();
+    img.onerror = function () { done(base64); };
+    img.onload = function () {
+      try {
+        var w = img.width, h = img.height;
+        if (w * h > 3500000) { done(base64); return; }   // too big → skip (avoid main-thread stall)
+        var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        var ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0);
+        var data = ctx.getImageData(0, 0, w, h), px = data.data, n = px.length;
+        var hist = new Array(256).fill(0), total = (n / 4) | 0;
+        for (var i = 0; i < n; i += 4) { hist[(px[i] * 299 + px[i + 1] * 587 + px[i + 2] * 114) / 1000 | 0]++; }
+        var lo = 0, hi = 255, cum = 0, loCut = total * 0.01, hiCut = total * 0.99;
+        for (var b = 0; b < 256; b++) { cum += hist[b]; if (cum >= loCut) { lo = b; break; } }
+        cum = 0;
+        for (var b2 = 0; b2 < 256; b2++) { cum += hist[b2]; if (cum >= hiCut) { hi = b2; break; } }
+        if (hi - lo < 32) { done(base64); return; }      // already flat/low-contrast → leave alone
+        var range = hi - lo;
+        for (var j = 0; j < n; j += 4) {
+          for (var k = 0; k < 3; k++) {
+            var v = (px[j + k] - lo) * 255 / range;
+            px[j + k] = v < 0 ? 0 : v > 255 ? 255 : v;
+          }
+        }
+        ctx.putImageData(data, 0, 0);
+        done(cv.toDataURL('image/jpeg', 0.9).split(',')[1]);
+      } catch (e) { done(base64); }
     };
-    reader.readAsDataURL(file);
+    img.src = 'data:image/jpeg;base64,' + base64;
   }
 
   // ---- prompt: read the board into our exact board-code vocabulary ----------
@@ -342,14 +399,16 @@
       status('⏳ Finding the board edges…');
       detectBoard(base64).then(function (box) {
         cropToBox(base64, box, function (cropped) {
-          status('⏳ Reading board — ' + boardPasses() + ' pass(es)…');
-          runScanPasses(cropped).then(function (r) {
-            if (!r.grid) { status('❌ ' + (r.err ? friendlyErr(r.err) : 'The model did not return readable board data. Try a flatter, well-lit photo.'), '#f87171'); return; }
-            if (!wantRack) { applyScan(r.grid, null); return; }
-            status('⏳ Reading your rack…');
-            runRackPasses(base64).then(function (rack) { applyScan(r.grid, rack); })
-              .catch(function () { applyScan(r.grid, null); });
-          }).catch(function (err) { status('❌ ' + friendlyErr(err), '#f87171'); });
+          normalizeImage(cropped, function (prepped) {
+            status('⏳ Reading board — ' + boardPasses() + ' pass(es)…');
+            runScanPasses(prepped).then(function (r) {
+              if (!r.grid) { status('❌ ' + (r.err ? friendlyErr(r.err) : 'The model did not return readable board data. Try a flatter, well-lit photo.'), '#f87171'); return; }
+              if (!wantRack) { applyScan(r.grid, null); return; }
+              status('⏳ Reading your rack…');
+              runRackPasses(base64).then(function (rack) { applyScan(r.grid, rack); })
+                .catch(function () { applyScan(r.grid, null); });
+            }).catch(function (err) { status('❌ ' + friendlyErr(err), '#f87171'); });
+          });
         });
       });
     });
