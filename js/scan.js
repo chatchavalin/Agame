@@ -516,12 +516,13 @@
     if (copyBtn) {
       copyBtn.addEventListener('click', function () {
         var prompt = [
-          'You are reading a photo of an A-Math board (a 15x15 math-crossword grid; tiles are blue with a large symbol and a tiny corner point-number).',
-          'Return ONLY this JSON, nothing else: {"v":2,"grid":[ 15 rows of exactly 15 strings ]}.',
-          'Each cell: "" if there is NO tile, otherwise the tile face.',
-          'Faces: "0"-"9"; two-digit tiles "10","11","12","13","14","15","16","20" (one tile, never split into two cells); "+"; "-"; "="; "×/÷" for the multiply-divide tile; "+/-" for the plus-minus tile; "BLANK" for a tile with an empty centre.',
-          'IMPORTANT: read by grid position — line tiles up with the 15 columns and 15 rows; keep empty squares as "". Ignore the small corner point-number (e.g. a big 8 with a small 2 is "8"). Most squares are empty.',
-          'Before answering, check: every horizontal and vertical run of adjacent tiles should form a valid equation (it contains "=" and both sides are equal). If a run does not compute, re-examine those tiles — you probably misread a digit or split a two-digit tile.'
+          'Read this photo of an A-Math board: a 15x15 math-crossword grid of blue tiles, each with a large symbol and a tiny corner point-number.',
+          'Output the result as a single JSON object and NOTHING else — no explanation, no markdown, no code fences. Format exactly:',
+          '{"v":2,"grid":[ <15 rows>, each row an array of exactly 15 strings ]}',
+          'Each string is "" for an empty square, or the tile face. Faces: "0"-"9"; two-digit tiles "10","11","12","13","14","15","16","20" (each is ONE tile in ONE square — never split into two); "+"; "-"; "="; "×/÷" (the multiply-divide tile); "+/-" (the plus-minus tile); "BLANK" (a tile with an empty centre).',
+          'Read strictly by grid position: align every tile to its column (1-15) and row (1-15); leave empty squares as "". Ignore the tiny corner point-number (a big 8 with a small 2 is "8"). Most squares are empty.',
+          'Self-check before answering: every run of adjacent tiles (left-to-right and top-to-bottom) should be a valid equation — it contains "=" and both sides are equal. If a run does not compute, you misread a tile or split a two-digit tile; fix it.',
+          'Each of the 15 rows must have exactly 15 entries. Return only the JSON.'
         ].join('\n');
         var done = function (ok) {
           copyBtn.textContent = ok ? '✅ Copied — paste it into your AI with the photo' : '⚠️ Copy failed — long-press to select';
