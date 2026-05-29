@@ -2107,9 +2107,12 @@ HOW TO READ THE RYUJI SCORE SHEET:
 - Extract ONLY the per-turn scores; skip the running sums. VERIFY: each score + previous sum
   should equal the next sum. If something doesn't add up, say so instead of guessing.
 - Two players are scored side by side. Players alternate turns (whoever the sheet shows first).
+- READ EACH PLAYER'S NAME from the header at the TOP of their score column (handwritten or printed,
+  e.g. "RYUJI", a person's name, or initials). Use those real names as "p1" and "p2". Only fall back
+  to "Player 1"/"Player 2" if a name is truly unreadable or blank.
 
 OUTPUT FORMAT — a single JSON object, nothing else:
-{"v":2,"p1":"Player 1","p2":"Player 2","grid":[[15 rows x 15 faces, "" for empty]],
+{"v":2,"p1":"<name from sheet>","p2":"<name from sheet>","grid":[[15 rows x 15 faces, "" for empty]],
  "plays":[{"player":"p1"|"p2","score":N,"type":"bingo"|"yoyo"|"swap","cells":[],"notes":""}, ...]}
 
 - "grid" = the final board faces you read from the board photo (use "" for blank cells,
