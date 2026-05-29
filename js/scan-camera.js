@@ -21,7 +21,7 @@
   var KEY_LS = 'amath_gemini_key';
   var MODEL = 'gemini-3.5-flash';
   var ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODEL + ':generateContent';
-  var MAX_DIM = 2200;   // cap longest side; large enough to keep small tiles legible
+  var MAX_DIM = 1600;   // cap longest side; smaller = much faster upload on mobile data, still legible for tiles
 
   function getKey() { try { return localStorage.getItem(KEY_LS) || ''; } catch (e) { return ''; } }
   function saveKey(k) { try { localStorage.setItem(KEY_LS, k); } catch (e) {} }
@@ -488,12 +488,20 @@
   function withTimeout(promise, ms, label) {
     return new Promise(function (resolve, reject) {
       var done = false;
-      var t = setTimeout(function () {
-        if (done) return; done = true;
-        reject(new Error((label || 'Request') + ' timed out — check your connection and try again (or pick a lower Scan quality).'));
-      }, ms);
-      promise.then(function (v) { if (done) return; done = true; clearTimeout(t); resolve(v); },
-                   function (e) { if (done) return; done = true; clearTimeout(t); reject(e); });
+      var t0 = Date.now();
+      // Poll on an interval and compare wall-clock time. setTimeout alone can be
+      // paused/throttled when a mobile tab is backgrounded; a short polling
+      // interval that checks Date.now() recovers and fires as soon as the tab is
+      // active again, so a hung request can't sit forever.
+      var iv = setInterval(function () {
+        if (done) { clearInterval(iv); return; }
+        if (Date.now() - t0 >= ms) {
+          done = true; clearInterval(iv);
+          reject(new Error((label || 'Request') + ' timed out after ' + Math.round((Date.now() - t0) / 1000) + 's — check your connection / Gemini key and try again.'));
+        }
+      }, 1000);
+      promise.then(function (v) { if (done) return; done = true; clearInterval(iv); resolve(v); },
+                   function (e) { if (done) return; done = true; clearInterval(iv); reject(e); });
     });
   }
   // Owner unlock: only the app owner may use the shared Firebase backend (which
@@ -552,7 +560,7 @@
     });
   };
 
-  var JS_VERSION = 'v130';
+  var JS_VERSION = 'v131';
   // ---- wire UI --------------------------------------------------------------
   function init() {
     var stamp = document.getElementById('build-stamp');
