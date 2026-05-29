@@ -568,8 +568,10 @@
   function analyze2Raw(base64, prompt, temperature) {
     var stored = getKey().trim();
     if (stored === OWNER_PHRASE && window.AMath && typeof window.AMath.geminiScan === 'function') {
+      dbg('-> dispatching to owner Firebase backend (geminiScan)');
       return window.AMath.geminiScan(base64, prompt, temperature);   // owner: shared backend
     } else if (stored) {
+      dbg('-> dispatching to direct Google fetch with key');
       return callGemini(base64, stored, temperature, prompt);        // others: their own key
     }
     return Promise.reject(new Error('NO_KEY'));
@@ -614,7 +616,7 @@
     });
   };
 
-  var JS_VERSION = 'v135';
+  var JS_VERSION = 'v136';
   // ---- wire UI --------------------------------------------------------------
   function init() {
     var stamp = document.getElementById('build-stamp');
