@@ -33,26 +33,52 @@
 
   // ---- downscale a chosen image file to a base64 JPEG -----------------------
   function fileToBase64(file, cb) {
-    var reader = new FileReader();
-    reader.onerror = function () { cb(null); };
-    reader.onload = function (e) {
-      var img = new Image();
-      img.onerror = function () { cb(null); };
-      img.onload = function () {
-        var w = img.naturalWidth, h = img.naturalHeight;
+    // Draw onto a canvas at MAX_DIM, returning base64 JPEG. Crucially, honor the
+    // photo's EXIF orientation flag — phones often store portrait shots as
+    // sideways pixels + a "rotate me" flag; <img>/drawImage ignore the flag, which
+    // fed Gemini sideways boards. createImageBitmap({imageOrientation:'from-image'})
+    // applies the flag so the pixels come out upright.
+    function fromBitmap() {
+      return createImageBitmap(file, { imageOrientation: 'from-image' }).then(function (bmp) {
+        var w = bmp.width, h = bmp.height;
         var scale = Math.min(1, MAX_DIM / Math.max(w, h));
         var cw = Math.round(w * scale), ch = Math.round(h * scale);
         var canvas = document.createElement('canvas');
         canvas.width = cw; canvas.height = ch;
-        canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
-        try {
-          var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-          cb(dataUrl.split(',')[1]); // strip "data:image/jpeg;base64,"
-        } catch (err) { cb(null); }
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
+        canvas.getContext('2d').drawImage(bmp, 0, 0, cw, ch);
+        if (bmp.close) bmp.close();
+        return canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+      });
+    }
+    function legacy() {  // fallback for browsers without createImageBitmap options
+      return new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onerror = function () { reject(); };
+        reader.onload = function (e) {
+          var img = new Image();
+          img.onerror = function () { reject(); };
+          img.onload = function () {
+            var w = img.naturalWidth, h = img.naturalHeight;
+            var scale = Math.min(1, MAX_DIM / Math.max(w, h));
+            var cw = Math.round(w * scale), ch = Math.round(h * scale);
+            var canvas = document.createElement('canvas');
+            canvas.width = cw; canvas.height = ch;
+            canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
+            try { resolve(canvas.toDataURL('image/jpeg', 0.85).split(',')[1]); }
+            catch (err) { reject(); }
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+    var p;
+    if (typeof createImageBitmap === 'function') {
+      p = fromBitmap().catch(function () { return legacy(); });
+    } else {
+      p = legacy();
+    }
+    p.then(function (b64) { cb(b64 || null); }).catch(function () { cb(null); });
   }
 
   // ---- prompt: read the board into our exact board-code vocabulary ----------
