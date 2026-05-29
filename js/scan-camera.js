@@ -423,12 +423,20 @@
     var t0 = Date.now();
     function tick() {
       var s = Math.round((Date.now() - t0) / 1000);
-      status('⏳ ' + prefix + ' — ' + s + 's' + (s >= 45 ? ' (giving up soon…)' : ''));
+      var extra = '';
+      if (s >= 15) extra = ' &nbsp;<a href="#" onclick="window.AMath.cancelScan&&window.AMath.cancelScan();return false;" style="color:#fbbf24;">Taking too long? Tap to stop</a>';
+      if (s >= 45) extra = ' (giving up…)' + extra;
+      status('⏳ ' + prefix + ' — ' + s + 's' + extra);
     }
     tick();
     _ticker = setInterval(tick, 1000);
   }
   function stopTicker() { if (_ticker) { clearInterval(_ticker); _ticker = null; } }
+  window.AMath = window.AMath || {};
+  window.AMath.cancelScan = function () {
+    stopTicker();
+    status('⏹️ Stopped. Tap "Take / choose photo" to try again — try Fast quality and a flat, well-lit photo.', '#fbbf24');
+  };
 
   function onPhoto(file) {
     if (!file) return;
@@ -486,7 +494,7 @@
     } else {
       return Promise.reject(new Error('NO_KEY'));
     }
-    return withTimeout(call, 45000, 'Reading the photo');   // 45s hard cap per pass
+    return withTimeout(call, 30000, 'Reading the photo');   // 30s hard cap per pass
   }
   function _onPhoto_OLD(file) {
     if (!file) return;
