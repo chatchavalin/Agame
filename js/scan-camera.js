@@ -151,10 +151,15 @@
       }],
       generationConfig: { responseMimeType: 'application/json', temperature: (typeof temperature === 'number' ? temperature : 0) }
     };
+    var ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
+    // AbortController is honored by the browser's network layer even when JS
+    // timers are throttled in a backgrounded tab — the only reliable hard stop.
+    if (ctrl) { try { setTimeout(function () { ctrl.abort(); }, 30000); } catch (e) {} }
     return fetch(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal: ctrl ? ctrl.signal : undefined
     }).then(function (resp) {
       return resp.json().then(function (data) {
         if (!resp.ok) {
@@ -426,7 +431,7 @@
 
   // Live elapsed-time ticker so the user can see the scan is working (and tell
   // "slow" from "stuck"). Call startTicker(prefix, onTimeout) and stopTicker().
-  var _ticker = null, _onTimeout = null, _abandoned = false;
+  var _ticker = null, _onTimeout = null, _abandoned = false, _tickNow = null;
   var SCAN_DEADLINE = 35; // seconds of wall-clock before we abandon the read
   function startTicker(prefix, onTimeout) {
     stopTicker();
@@ -434,9 +439,6 @@
     var t0 = Date.now();
     function tick() {
       var s = Math.round((Date.now() - t0) / 1000);
-      // The ticker demonstrably keeps firing (the number climbs), so use IT as
-      // the source of truth for abandoning a stuck read — independent of any
-      // setTimeout, which mobile browsers throttle/pause in backgrounded tabs.
       if (s >= SCAN_DEADLINE) {
         stopTicker();
         var cb = _onTimeout; _onTimeout = null;
@@ -447,10 +449,17 @@
       if (s >= 12) extra = ' &nbsp;<a href="#" onclick="window.AMath.cancelScan&&window.AMath.cancelScan();return false;" style="color:#fbbf24;">Taking too long? Tap to stop</a>';
       status('⏳ ' + prefix + ' — ' + s + 's' + extra);
     }
+    _tickNow = tick;
     tick();
     _ticker = setInterval(tick, 1000);
   }
-  function stopTicker() { if (_ticker) { clearInterval(_ticker); _ticker = null; } _onTimeout = null; }
+  function stopTicker() { if (_ticker) { clearInterval(_ticker); _ticker = null; } _onTimeout = null; _tickNow = null; }
+  // When the tab is backgrounded (e.g. while the photo picker is open) the
+  // browser freezes our timers, so the ticker stops mid-count. The moment the
+  // tab becomes visible again, run a tick immediately so a past-deadline read aborts.
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && _tickNow) { try { _tickNow(); } catch (e) {} }
+  });
   window.AMath = window.AMath || {};
   window.AMath.cancelScan = function () {
     _abandoned = true;
@@ -580,7 +589,7 @@
     });
   };
 
-  var JS_VERSION = 'v132';
+  var JS_VERSION = 'v133';
   // ---- wire UI --------------------------------------------------------------
   function init() {
     var stamp = document.getElementById('build-stamp');
