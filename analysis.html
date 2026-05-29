@@ -631,6 +631,19 @@ body {
       <label>Notes</label>
       <input type="text" id="pe-notes" placeholder="e.g. missed bingo opportunity">
     </div>
+    <div class="an-pe-row" style="border-top:1px solid #1e2d3d;padding-top:10px;">
+      <label>🔍 Solve placement from score</label>
+      <div style="font-size:10px;color:#64748b;margin-bottom:6px;">Find which tiles match this score on a line.</div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <select id="pe-solve-dir" style="flex:1;padding:7px;border-radius:7px;background:#080d14;border:1px solid #334155;color:#e2e8f0;font-family:inherit;font-size:12px;">
+          <option value="row">Row →</option>
+          <option value="col">Col ↓</option>
+        </select>
+        <input type="number" id="pe-solve-idx" min="0" max="14" placeholder="0-14" style="width:64px;padding:7px;border-radius:7px;background:#080d14;border:1px solid #334155;color:#e2e8f0;font-family:inherit;font-size:12px;">
+        <button onclick="solveFromScore()" style="flex:1;padding:8px;border-radius:7px;border:none;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;">Solve</button>
+      </div>
+      <div id="pe-solve-result" style="font-size:11px;margin-top:6px;color:#94a3b8;line-height:1.5;"></div>
+    </div>
     <div class="an-pe-btns">
       <button class="an-pe-save" onclick="savePlayEdit()">Save</button>
       <button class="an-pe-delete" id="pe-delete-btn" onclick="deletePlay()">Delete</button>
@@ -1205,6 +1218,89 @@ function renderReplayBoard() {
     }
   }
   renderBoard({replayBoard:rb, newCells, pulseCells});
+}
+
+// =====================================================================
+// SCORE-BASED PLACEMENT SOLVER
+// Given a target score and a line (row/col) of faces, find which contiguous
+// window scores exactly the target. Reverse-engineers what was played.
+// =====================================================================
+function scoreWindow(faces, startCol, len, lineIndex, isRow) {
+  let base=0, eqMult=1;
+  for(let k=0;k<len;k++){
+    const idx=startCol+k;
+    const f=faces[idx];
+    if(!f) return null;
+    let p=PTS[f]||0;
+    const prem = isRow ? PREMIUM[lineIndex][idx] : PREMIUM[idx][lineIndex];
+    if(prem==='3T') p*=3;
+    else if(prem==='2T') p*=2;
+    else if(prem==='3E') eqMult*=3;
+    else if(prem==='2E') eqMult*=2;
+    base+=p;
+  }
+  return base*eqMult;
+}
+function solvePlacements(faces, target, opts) {
+  opts=opts||{};
+  const results=[];
+  for(let len=1;len<=8;len++){
+    for(let start=0;start+len<=15;start++){
+      if(opts.mustInclude!==undefined && (opts.mustInclude<start || opts.mustInclude>=start+len)) continue;
+      let ok=true;
+      for(let k=0;k<len;k++) if(!faces[start+k]){ ok=false; break; }
+      if(!ok) continue;
+      const base=scoreWindow(faces,start,len,opts.lineIndex,opts.isRow);
+      if(base===null) continue;
+      const withBingo = base + (len===8?40:0);
+      if(withBingo===target) results.push({start,len,total:withBingo,bingo:len===8});
+      else if(base===target && len!==8) results.push({start,len,total:base,bingo:false});
+    }
+  }
+  return results;
+}
+
+// UI: solve from the score field on the chosen row/col.
+function solveFromScore() {
+  const dir=document.getElementById('pe-solve-dir').value;
+  const idx=parseInt(document.getElementById('pe-solve-idx').value);
+  const target=parseInt(document.getElementById('pe-score').value)||0;
+  const out=document.getElementById('pe-solve-result');
+  if(isNaN(idx)||idx<0||idx>14){ out.innerHTML='<span style="color:#fca5a5">Enter a row/col 0-14.</span>'; return; }
+  if(!target){ out.innerHTML='<span style="color:#fca5a5">Enter the score first.</span>'; return; }
+  const isRow = dir==='row';
+  const faces=[];
+  for(let i=0;i<15;i++){
+    const cell = isRow ? S.board[idx][i] : S.board[i][idx];
+    faces.push(cell?cell.face:null);
+  }
+  const opts={isRow, lineIndex:idx};
+  if(S.pe.idx===0) opts.mustInclude=7; // first play must cover center (7,7)
+  const res=solvePlacements(faces, target, opts);
+  if(!res.length){
+    out.innerHTML=`<span style="color:#fcd34d">No window on ${dir} ${idx} scores exactly ${target}. Tile faces may be misread, or extra cross-equation points apply.</span>`;
+    return;
+  }
+  let html=`<span style="color:#86efac">Found ${res.length} match${res.length>1?'es':''}:</span>`;
+  res.slice(0,5).forEach(r=>{
+    const cols=[]; for(let k=0;k<r.len;k++) cols.push(r.start+k);
+    const facesStr=cols.map(c=>faces[c]).join(' ');
+    const cellList=cols.map(c=> isRow ? [idx,c] : [c,idx]);
+    html+=`<div style="margin-top:4px;padding:6px;background:#0f172a;border-radius:6px;">
+      <b>cols ${r.start}–${r.start+r.len-1}</b>: ${facesStr} ${r.bingo?'🎯':''}<br>
+      <button onclick='applySolved(${JSON.stringify(cellList)})' style="margin-top:3px;padding:4px 10px;border-radius:6px;border:none;background:#7c3aed;color:#fff;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">Assign to this turn →</button>
+    </div>`;
+  });
+  out.innerHTML=html;
+}
+function applySolved(cellList){
+  const idx=S.pe.idx>=0?S.pe.idx:S.plays.length;
+  const player=S.pe.player||'p1';
+  cellList.forEach(([r,c])=>{
+    if(S.board[r]&&S.board[r][c]) Object.assign(S.board[r][c],{player, turnIdx:idx});
+  });
+  document.getElementById('pe-solve-result').innerHTML='<span style="color:#86efac">✓ Assigned. Tap Save to confirm.</span>';
+  renderBoard();
 }
 
 // =====================================================================
