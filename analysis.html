@@ -524,6 +524,11 @@ body {
       <div class="hint">💾 Your saved games</div>
       <div id="an-saved-list"></div>
     </div>
+    <div class="an-paste-section">
+      <div class="hint">📂 Import a shared project file (.json)</div>
+      <div style="font-size:10px;color:#475569;margin-bottom:6px;line-height:1.4;">Someone sent you a game? Open their <code style="color:#64748b">.amath.json</code> file here.</div>
+      <input type="file" id="project-file-input" accept=".json,application/json" onchange="importProjectFile(event)" style="width:100%;font-size:12px;color:#94a3b8;">
+    </div>
   </div>
 </div>
 
@@ -582,6 +587,7 @@ body {
       <div class="an-ctrlbar" id="an-ctrlbar">
         <button class="an-btn active" id="btn-edit" onclick="toggleEditMode()">✏️ Edit</button>
         <button class="an-btn" id="btn-save" onclick="saveGamePrompt()" style="background:#0a2a18;border-color:#22c55e;color:#86efac">💾 Save</button>
+        <button class="an-btn" id="btn-export" onclick="openExport()" style="background:#1a1a2e;border-color:#818cf8;color:#c7d2fe">📤 Share</button>
         <button class="an-btn" id="btn-autobuild" onclick="runAutoBuild()" style="background:#0a2030;border-color:#22d3ee;color:#67e8f9">🪄 Auto-build</button>
         <button class="an-btn" onclick="openAddPlay()">+ Play</button>
         <button class="an-btn" onclick="undoLast()">↩ Undo</button>
@@ -602,8 +608,24 @@ body {
       </div>
     </div>
 
-    <!-- ANALYSIS REPORT OVERLAY -->
-    <div class="an-report" id="an-report">
+    <!-- EXPORT / SHARE OVERLAY -->
+    <div class="an-report" id="an-export">
+      <div class="an-report-panel">
+        <div class="an-report-head">
+          <div class="an-report-title" style="color:#c7d2fe">📤 Share this project</div>
+          <button class="an-report-close" onclick="closeExport()">✕</button>
+        </div>
+        <div id="an-export-body" style="padding:14px 16px;">
+          <button onclick="downloadProject()" style="width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;font-family:inherit;font-weight:800;font-size:14px;cursor:pointer;margin-bottom:10px;">⬇ Download .json file</button>
+          <div style="font-size:11px;color:#64748b;margin-bottom:8px;text-align:center">Send the file to someone — they open it on the start screen.</div>
+          <div style="border-top:1px solid #1e2d3d;padding-top:12px;">
+            <div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:6px;">Or copy the game code as text:</div>
+            <textarea id="export-code" readonly rows="4" style="width:100%;padding:8px;border-radius:8px;background:#080d14;border:1px solid #334155;color:#cbd5e1;font-family:Courier New,monospace;font-size:10px;resize:vertical;"></textarea>
+            <button onclick="copyExportCode()" style="margin-top:6px;width:100%;padding:9px;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#cbd5e1;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;">📋 Copy code</button>
+          </div>
+        </div>
+      </div>
+    </div>
       <div class="an-report-panel">
         <div class="an-report-head">
           <div class="an-report-title">📊 Game Analysis Report</div>
@@ -760,7 +782,7 @@ function serializeGame() {
   return {
     v:2, p1:S.p1Name, p2:S.p2Name, grid,
     plays:S.plays.map(p=>({player:p.player,equation:p.equation,score:p.score,
-      type:p.type,cells:p.cells,notes:p.notes})),
+      type:p.type,cells:p.cells,notes:p.notes,timeMs:p.timeMs||0})),
     cellMeta
   };
 }
@@ -1152,7 +1174,7 @@ function renderSidebar() {
       <div class="an-turn-nbadge">${i+1}</div>
       <div class="an-turn-info">
         <div class="an-turn-eq">${icons[p.type]||'📝'} ${p.equation||p.type||'—'}</div>
-        <div class="an-turn-meta">${pName} ${tileTag}${p.notes?' · '+p.notes:''}</div>
+        <div class="an-turn-meta">${pName} ${tileTag}${p.timeMs>0?' · ⏱'+fmtTime(p.timeMs):''}${p.notes?' · '+p.notes:''}</div>
       </div>
       <div class="an-turn-sc">${p.score||0}</div>
       <div class="an-turn-edit" onclick="event.stopPropagation();openPlayEditor(${i})">✏️</div>
@@ -1335,7 +1357,7 @@ function loadGameJSON(raw) {
   if(data.plays) data.plays.forEach((p,i)=>{
     const play={player:p.player||'p1',equation:p.equation||'',
       score:p.score||0,type:p.type||'yoyo',cells:p.cells||[],
-      notes:p.notes||'',turnIdx:i};
+      notes:p.notes||'',turnIdx:i,timeMs:p.timeMs||0};
     S.plays.push(play);
     if((p.cells||[]).length>8) overPlays.push(i+1);
     (p.cells||[]).forEach(([r,c])=>{
@@ -2006,6 +2028,61 @@ function fixFromReport(turnIdx, mode) {
 }
 
 // Lightweight toast
+function fmtTime(ms){
+  if(!ms||ms<0) return '0s';
+  const s=Math.round(ms/1000);
+  if(s<60) return s+'s';
+  const m=Math.floor(s/60), r=s%60;
+  return m+'m'+(r?r+'s':'');
+}
+
+// ── Export / Import project (file + text code) ──
+function openExport(){
+  if(!S.plays.length && S.board.flat().every(c=>!c)){ alert('Nothing to share yet — load or build a game first.'); return; }
+  const data=serializeGame();
+  document.getElementById('export-code').value=JSON.stringify(data);
+  document.getElementById('an-export').classList.add('visible');
+}
+function closeExport(){ document.getElementById('an-export').classList.remove('visible'); }
+function projectFileName(){
+  const lib=loadSavedLibrary();
+  let base = (S._currentId && lib[S._currentId]) ? lib[S._currentId].name
+            : (S.p1Name+' vs '+S.p2Name);
+  base = base.replace(/[^\w\-]+/g,'_').slice(0,40);
+  return base+'.amath.json';
+}
+function downloadProject(){
+  const data=serializeGame();
+  const blob=new Blob([JSON.stringify(data,null,0)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=projectFileName();
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); },100);
+  showToast('⬇ Downloaded '+projectFileName());
+}
+function copyExportCode(){
+  const ta=document.getElementById('export-code');
+  ta.select();
+  try{
+    if(navigator.clipboard) navigator.clipboard.writeText(ta.value);
+    else document.execCommand('copy');
+    showToast('📋 Code copied');
+  }catch(e){ showToast('Select the text and copy manually'); }
+}
+function importProjectFile(ev){
+  const file=ev.target.files && ev.target.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{ loadGameJSON(reader.result); }
+    catch(e){ alert('Could not read that file: '+e.message); }
+  };
+  reader.onerror=()=>alert('Failed to read the file.');
+  reader.readAsText(file);
+  ev.target.value=''; // allow re-importing same file
+}
+
 function showToast(msg){
   let t=document.getElementById('an-toast');
   if(!t){
