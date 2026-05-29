@@ -1001,7 +1001,9 @@ function openAddPlay() {
   document.getElementById('an-play-editor').classList.add('visible');
 }
 function openPlayEditor(idx) {
-  const p=S.plays[idx]; S.pe.idx=idx;
+  const p=S.plays[idx];
+  if(!p) return;  // guard against invalid index
+  S.pe.idx=idx;
   document.getElementById('pe-title').textContent=`Edit Play #${idx+1}`;
   document.getElementById('pe-eq').value=p.equation||'';
   document.getElementById('pe-score').value=p.score||'';
@@ -1452,6 +1454,7 @@ function closeReport(){ document.getElementById('an-report').classList.remove('v
 // mode 'play'  → open the play editor for that turn (fix score/equation/type)
 // mode 'tiles' → close report, highlight that turn's tiles on the board, scroll to board
 function fixFromReport(turnIdx, mode) {
+  if(turnIdx<0 || turnIdx>=S.plays.length) return;
   closeReport();
   if(mode==='play'){
     openPlayEditor(turnIdx);
