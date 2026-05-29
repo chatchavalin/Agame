@@ -1964,6 +1964,8 @@ function showToast(msg){
 // ── Auto-build UI (Steps 2 & 3) ──
 function runAutoBuild() {
   if(!S.plays.length){ alert('Load a game first.'); return; }
+  // Snapshot current cell assignments so the user can undo if they dislike the rebuild.
+  S._preAutoBuild = S.board.map(row=>row.map(cell=>cell?{...cell}:null));
   const {results, applied} = autoReconstruct();
   const body=document.getElementById('an-autobuild-body');
   const auto=results.filter(r=>r.status==='auto').length;
@@ -2019,11 +2021,26 @@ function runAutoBuild() {
     });
   }
 
+  html+=`<div style="margin-top:12px"><button onclick="undoAutoBuild()" style="width:100%;padding:10px;border-radius:9px;border:1px solid #475569;background:#1e293b;color:#cbd5e1;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer">↩ Undo Auto-build (restore previous placement)</button></div>`;
   html+=`<div class="an-rep-note">🪄 Auto-build cleared all turn assignments and rebuilt from scores. ${auto} placed automatically, ${skip} skipped (swaps / 0-pts). Resolve flagged turns above, then ✕ and run 📊 Report.</div>`;
   body.innerHTML=html;
   document.getElementById('an-autobuild').classList.add('visible');
 }
 function closeAutoBuild(){ document.getElementById('an-autobuild').classList.remove('visible'); }
+function undoAutoBuild(){
+  if(!S._preAutoBuild){ showToast('Nothing to undo'); return; }
+  S.board = S._preAutoBuild.map(row=>row.map(cell=>cell?{...cell}:null));
+  // also restore each play's cells from the snapshot
+  S.plays.forEach((p,t)=>{
+    const cells=[];
+    for(let r=0;r<15;r++) for(let c=0;c<15;c++)
+      if(S.board[r][c] && S.board[r][c].turnIdx===t) cells.push([r,c]);
+    p.cells=cells;
+  });
+  renderBoard(); renderSidebar();
+  closeAutoBuild();
+  showToast('↩ Restored previous placement');
+}
 function pickAmbiguous(turnIdx, cells){
   for(let r=0;r<15;r++) for(let c=0;c<15;c++)
     if(S.board[r][c] && S.board[r][c].turnIdx===turnIdx){ S.board[r][c].turnIdx=-1; S.board[r][c].player='unknown'; }
