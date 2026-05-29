@@ -1273,6 +1273,133 @@ function solvePlacements(faces, target, opts) {
 }
 
 // =====================================================================
+// CROSS-EQUATION FULL-PLAY SCORER (official multi-equation rule)
+// Given the board and a set of NEWLY-placed cells (this turn), find every
+// equation formed: the main line through them + each perpendicular line
+// passing through any newly-placed tile that has length ≥2. Score each
+// equation (tile mult on new tiles → equation mult), sum, + 40 if 8 new.
+// A premium square only multiplies for the equation(s) using a NEW tile on it;
+// to avoid double-counting an equation multiplier when a single new tile sits
+// on a 2E/3E and is shared by two equations, the rule counts it once per
+// equation it belongs to (standard A-Math: each equation scores independently).
+// =====================================================================
+function contiguousRun(board, r, c, isRow, exists) {
+  // exists(r,c) → is this cell considered present on the board right now?
+  let lo, hi;
+  if(isRow){
+    lo=c; hi=c;
+    while(lo>0 && exists(r,lo-1)) lo--;
+    while(hi<14 && exists(r,hi+1)) hi++;
+    const cells=[]; for(let cc=lo;cc<=hi;cc++) cells.push({r,c:cc});
+    return {cells};
+  } else {
+    lo=r; hi=r;
+    while(lo>0 && exists(lo-1,c)) lo--;
+    while(hi<14 && exists(hi+1,c)) hi++;
+    const cells=[]; for(let rr=lo;rr<=hi;rr++) cells.push({r:rr,c});
+    return {cells};
+  }
+}
+
+function scoreOneEquation(board, cells, newSet) {
+  let base=0, eqMult=1;
+  for(const {r,c} of cells){
+    const cell=board[r][c]; if(!cell) return null;
+    let p=PTS[cell.face]||0;
+    const isNew=newSet.has(r+','+c);
+    if(isNew){
+      const prem=PREMIUM[r][c];
+      if(prem==='3T') p*=3;
+      else if(prem==='2T') p*=2;
+      else if(prem==='3E') eqMult*=3;
+      else if(prem==='2E') eqMult*=2;
+    }
+    base+=p;
+  }
+  return base*eqMult;
+}
+
+// Score a full play. newCells = cells placed THIS turn. currentTurn lets us
+// treat only tiles placed in earlier turns (turnIdx 0..currentTurn-1) plus the
+// new cells as "present" — so contiguous runs don't bleed into not-yet-played tiles.
+function scoreFullPlay(board, newCells, currentTurn) {
+  const newSet=new Set(newCells.map(([r,c])=>r+','+c));
+  const exists=(r,c)=>{
+    const cell=board[r][c];
+    if(!cell) return false;
+    if(newSet.has(r+','+c)) return true;
+    return cell.turnIdx>=0 && cell.turnIdx<currentTurn; // earlier-placed hook
+  };
+  const rows=new Set(newCells.map(x=>x[0]));
+  const mainIsRow = rows.size===1;
+  let total=0;
+  const counted=new Set();
+
+  const first=newCells[0];
+  const mainRun=contiguousRun(board, first[0], first[1], mainIsRow, exists);
+  if(mainRun.cells.length>=2){
+    const sig='|'+mainRun.cells.map(x=>x.r+','+x.c).join('|');
+    if(!counted.has(sig)){ counted.add(sig);
+      const s=scoreOneEquation(board, mainRun.cells, newSet); if(s===null) return null; total+=s; }
+  }
+  for(const [r,c] of newCells){
+    const crossRun=contiguousRun(board, r, c, !mainIsRow, exists);
+    if(crossRun.cells.length>=2){
+      const sig='|'+crossRun.cells.map(x=>x.r+','+x.c).join('|');
+      if(!counted.has(sig)){ counted.add(sig);
+        const s=scoreOneEquation(board, crossRun.cells, newSet); if(s===null) return null; total+=s; }
+    }
+  }
+  if(newCells.length===8) total+=40;
+  return total;
+}
+
+// Cross-equation aware solver: tries every window on every line, places it
+// temporarily on a copy of the board, scores the FULL play (incl perpendiculars),
+// and keeps windows matching the target that also connect (or cover center on T1).
+function solvePlacementsFull(target, currentTurn, boardState, opts) {
+  opts=opts||{};
+  const results=[];
+  for(let li=0;li<15;li++){
+    for(const isRow of [true,false]){
+      for(let len=1;len<=8;len++){
+        for(let start=0;start+len<=15;start++){
+          // window cells that have a face AND are not already placed in an earlier turn
+          const cells=[];
+          let ok=true, touchesEarlier=false, coversCenter=false;
+          for(let k=0;k<len;k++){
+            const r=isRow?li:start+k, c=isRow?start+k:li;
+            const cell=boardState[r][c];
+            if(!cell){ ok=false; break; }
+            // a window cell already belonging to an earlier turn = overlap, illegal
+            if(cell.turnIdx>=0 && cell.turnIdx<currentTurn){ ok=false; break; }
+            cells.push([r,c]);
+            if(r===7&&c===7) coversCenter=true;
+          }
+          if(!ok || cells.length===0) continue;
+          // connection / center rule
+          if(currentTurn===0){
+            if(!coversCenter) continue;
+          } else {
+            if(!windowConnects(start,len,li,isRow,currentTurn,boardState)) continue;
+          }
+          const total=scoreFullPlay(boardState, cells, currentTurn);
+          if(total===target){
+            const sig=cells.map(x=>x.join(',')).sort().join('|');
+            results.push({isRow,lineIndex:li,start,len:cells.length,cells,
+              bingo:cells.length===8, sig,
+              label:(isRow?'Row ':'Col ')+li+' c'+start+'–'+(start+len-1)});
+          }
+        }
+      }
+    }
+  }
+  const seen=new Set(); const uniq=[];
+  results.forEach(r=>{ if(!seen.has(r.sig)){ seen.add(r.sig); uniq.push(r); }});
+  return uniq;
+}
+
+// =====================================================================
 // AUTO-RECONSTRUCT ENGINE  (Step 2 of the pipeline)
 // Walks turns in order. For each turn, scans every row & column for windows
 // that (a) score exactly the recorded score, and (b) connect to the board
@@ -1315,54 +1442,17 @@ function windowConnects(start, len, lineIndex, isRow, currentTurn, boardState) {
 function autoReconstruct() {
   const results=[];
   let applied=0;
-  // Work on a fresh assignment: keep faces, clear all turn/player assignment first,
-  // so we rebuild from scratch deterministically.
+  // Fresh rebuild: clear all turn/player assignment, keep faces.
   for(let r=0;r<15;r++) for(let c=0;c<15;c++)
     if(S.board[r][c]){ S.board[r][c].turnIdx=-1; S.board[r][c].player='unknown'; }
 
   S.plays.forEach((p,t)=>{
-    // skip non-placing turns
     if(p.type==='swap' || !p.score){ results.push({turn:t+1,status:'skip',options:[]}); return; }
 
-    const cand=[];
-    // scan all rows and cols
-    for(let li=0; li<15; li++){
-      for(const isRow of [true,false]){
-        const faces=lineFaces(li,isRow,S.board);
-        const opts={isRow, lineIndex:li};
-        if(t===0) opts.mustInclude=7; // turn 1 must cover center along the line
-        const wins=solvePlacements(faces, p.score, opts);
-        wins.forEach(w=>{
-          // connection rule
-          const connects = (t===0)
-            ? (isRow ? li===7 && w.start<=7 && 7<w.start+w.len   // covers (7,7)
-                     : li===7 && w.start<=7 && 7<w.start+w.len)
-            : windowConnects(w.start,w.len,li,isRow,t,S.board);
-          // turn 1: also require it literally covers center cell (7,7)
-          let coversCenter=true;
-          if(t===0){
-            coversCenter = isRow ? (li===7 && w.start<=7 && 7<w.start+w.len)
-                                 : (li===7 && w.start<=7 && 7<w.start+w.len);
-          }
-          if((t===0 && coversCenter) || (t>0 && connects)){
-            const cells=[];
-            for(let k=0;k<w.len;k++) cells.push(isRow?[li,w.start+k]:[w.start+k,li]);
-            cand.push({isRow,lineIndex:li,start:w.start,len:w.len,bingo:w.bingo,cells,
-              label:(isRow?'Row ':'Col ')+li+' c'+w.start+'–'+(w.start+w.len-1)});
-          }
-        });
-      }
-    }
-
-    // Deduplicate candidates by their cell-set signature
-    const seen=new Set(); const uniq=[];
-    cand.forEach(c=>{
-      const sig=c.cells.map(x=>x.join(',')).sort().join('|');
-      if(!seen.has(sig)){ seen.add(sig); uniq.push(c); }
-    });
+    // Cross-equation aware solver: scores main + perpendicular equations + bingo.
+    const uniq = solvePlacementsFull(p.score, t, S.board, {});
 
     if(uniq.length===1){
-      // auto-assign
       uniq[0].cells.forEach(([r,c])=>{ if(S.board[r][c]){ S.board[r][c].turnIdx=t; S.board[r][c].player=p.player; }});
       p.cells=uniq[0].cells;
       applied++;
