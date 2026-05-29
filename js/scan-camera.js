@@ -328,7 +328,7 @@
       var temp = PASS_TEMPS[i % PASS_TEMPS.length];
       jobs.push(
         analyze2(image, prompt, temp).then(function (text) {
-          status('⏳ Reading board — pass ' + (++done) + '/' + P + '…');
+          done++;
           try { var o = JSON.parse(extractJson(text) || 'null'); return (o && Array.isArray(o.grid)) ? o.grid : null; }
           catch (e) { return null; }
         }).catch(function (e) { lastErr = e; return null; })
@@ -415,6 +415,21 @@
     else status('⚠️ Scanned' + rackNote + ', but some cells need fixing — see the message below the grid.', '#fbbf24');
   }
 
+  // Live elapsed-time ticker so the user can see the scan is working (and tell
+  // "slow" from "stuck"). Call startTicker(prefix) and stopTicker().
+  var _ticker = null;
+  function startTicker(prefix) {
+    stopTicker();
+    var t0 = Date.now();
+    function tick() {
+      var s = Math.round((Date.now() - t0) / 1000);
+      status('⏳ ' + prefix + ' — ' + s + 's' + (s >= 45 ? ' (giving up soon…)' : ''));
+    }
+    tick();
+    _ticker = setInterval(tick, 1000);
+  }
+  function stopTicker() { if (_ticker) { clearInterval(_ticker); _ticker = null; } }
+
   function onPhoto(file) {
     if (!file) return;
     status('⏳ Reading photo…');
@@ -426,17 +441,17 @@
       detectBoard(base64).then(function (box) {
         cropToBox(base64, box, function (cropped) {
           normalizeImage(cropped, function (prepped) {
-            status('⏳ Reading board — ' + boardPasses() + ' pass(es)…');
+            startTicker('Reading board (' + boardPasses() + ' pass)');
             runScanPasses(prepped).then(function (r) {
-              if (!r.grid) { status('❌ ' + (r.err ? friendlyErr(r.err) : 'The model did not return readable board data. Try a flatter, well-lit photo.'), '#f87171'); return; }
-              if (!wantRack) { applyScan(r.grid, null); return; }
-              status('⏳ Reading your rack…');
-              runRackPasses(base64).then(function (rack) { applyScan(r.grid, rack); })
-                .catch(function () { applyScan(r.grid, null); });
-            }).catch(function (err) { status('❌ ' + friendlyErr(err), '#f87171'); });
+              if (!r.grid) { stopTicker(); status('❌ ' + (r.err ? friendlyErr(r.err) : 'The model did not return readable board data. Try a flatter, well-lit photo.'), '#f87171'); return; }
+              if (!wantRack) { stopTicker(); applyScan(r.grid, null); return; }
+              startTicker('Reading your rack');
+              runRackPasses(base64).then(function (rack) { stopTicker(); applyScan(r.grid, rack); })
+                .catch(function () { stopTicker(); applyScan(r.grid, null); });
+            }).catch(function (err) { stopTicker(); status('❌ ' + friendlyErr(err), '#f87171'); });
           });
         });
-      }).catch(function (err) { status('❌ ' + friendlyErr(err), '#f87171'); });
+      }).catch(function (err) { stopTicker(); status('❌ ' + friendlyErr(err), '#f87171'); });
     });
   }
 
