@@ -406,7 +406,7 @@
       window.AMath.replayRecorder.start({
         tileSet: tileSetForReplay,
         botLevel: botLevelForReplay,
-        isPvP: false,
+        isPvP: !!session.isPvP,
       });
     }
 
@@ -600,6 +600,15 @@
 
     Interactions.init(session);
     Interactions.setPlayerTurn(true);
+
+    // Start replay recording for PvP (enables "Send to Analysis")
+    if (window.AMath.replayRecorder) {
+      window.AMath.replayRecorder.start({
+        tileSet: (Settings && Settings.get('tileSet')) || 'prathom',
+        botLevel: 'pvp',
+        isPvP: true,
+      });
+    }
 
     // Timer display
     if (chessClockEnabled) {
@@ -1877,10 +1886,11 @@
     };
     session.opponentSwapHistory.push({ type: 'play' });
 
-    // Replay recorder — record before tentative placements are cleared
-    if (window.AMath.replayRecorder && !isPvP) {
+    // Replay recorder — record before tentative placements are cleared.
+    // PvA: always 'player'. PvP: both sides play through here, so tag by currentPlayer.
+    if (window.AMath.replayRecorder) {
       window.AMath.replayRecorder.recordPlay({
-        who: 'player',
+        who: (isPvP && session.currentPlayer === 2) ? 'opponent' : 'player',
         score: scoreResult.total,
         bingo: wasBingo,
         placements: session.tentativePlacements,
@@ -2296,9 +2306,11 @@
 
     session.consecutiveNonScoringTurns++;
 
-    // Replay recorder — player pass
-    if (window.AMath.replayRecorder && !session.isPvP) {
-      window.AMath.replayRecorder.recordPass({ who: 'player' });
+    // Replay recorder — pass (PvA + PvP)
+    if (window.AMath.replayRecorder) {
+      window.AMath.replayRecorder.recordPass({
+        who: (session.isPvP && session.currentPlayer === 2) ? 'opponent' : 'player'
+      });
     }
 
     // Warn player when close to 6-pass game end
@@ -2394,9 +2406,12 @@
       session.playerSwapCount = (session.playerSwapCount || 0) + 1;
     }
 
-    // Replay recorder — player swap
-    if (window.AMath.replayRecorder && !session.isPvP) {
-      window.AMath.replayRecorder.recordSwap({ who: 'player', count: tilesToReturn.length });
+    // Replay recorder — swap (PvA + PvP)
+    if (window.AMath.replayRecorder) {
+      window.AMath.replayRecorder.recordSwap({
+        who: (session.isPvP && session.currentPlayer === 2) ? 'opponent' : 'player',
+        count: tilesToReturn.length
+      });
     }
 
     // Track opponent's last action for late-game AI strategy
