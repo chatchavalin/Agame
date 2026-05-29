@@ -183,7 +183,7 @@ body {
 /* ── Control bar ──────────────────────────────────────── */
 .an-ctrlbar {
   display:flex; gap:6px; width:100%; max-width:560px;
-  position:sticky; bottom:0; padding-bottom:4px;
+  padding-bottom:4px;
 }
 .an-btn {
   flex:1; min-width:0; padding:11px 6px; border-radius:10px;
@@ -466,7 +466,7 @@ body {
       </div>
 
       <!-- Control bar -->
-      <div class="an-ctrlbar">
+      <div class="an-ctrlbar" id="an-ctrlbar">
         <button class="an-btn active" id="btn-edit" onclick="toggleEditMode()">✏️ Edit: ON</button>
         <button class="an-btn" id="btn-replay" onclick="startReplay()" style="display:none">▶ Replay</button>
         <button class="an-btn" onclick="openAddPlay()">+ Play</button>
@@ -800,13 +800,19 @@ function highlightTurn(idx) {
 // =====================================================================
 // SIDEBAR
 // =====================================================================
-function renderSidebar() {
-  const p1tot=S.plays.filter(p=>p.player==='p1').reduce((s,p)=>s+(p.score||0),0);
-  const p2tot=S.plays.filter(p=>p.player==='p2').reduce((s,p)=>s+(p.score||0),0);
+function updateScoreCards(uptoStep) {
+  // uptoStep: if given, only count plays[0..uptoStep-1]. Otherwise count all.
+  const plays = (uptoStep===undefined) ? S.plays : S.plays.slice(0, uptoStep);
+  const p1tot=plays.filter(p=>p.player==='p1').reduce((s,p)=>s+(p.score||0),0);
+  const p2tot=plays.filter(p=>p.player==='p2').reduce((s,p)=>s+(p.score||0),0);
   document.getElementById('sc-p1').textContent=p1tot;
   document.getElementById('sc-p2').textContent=p2tot;
   const d=p1tot-p2tot;
   document.getElementById('sc-diff').textContent=d===0?'—':(d>0?'+'+d:d);
+}
+
+function renderSidebar() {
+  updateScoreCards();
 
   const list=document.getElementById('an-turn-list');
   if(!S.plays.length){ list.innerHTML='<div style="color:#475569;font-size:12px;padding:6px 2px">No plays yet — tap + Play or load a game.</div>'; return; }
@@ -1019,6 +1025,9 @@ function startReplay() {
   if(!S.plays.length){ alert('No plays loaded.'); return; }
   S.replay.active=true; S.replay.step=0; S.replay.playing=false;
   document.getElementById('an-replaybar').classList.add('visible');
+  // Dim the editing controls while replaying so the board state isn't corrupted
+  document.getElementById('an-ctrlbar').style.opacity='.4';
+  document.getElementById('an-ctrlbar').style.pointerEvents='none';
   renderReplayBoard(); updateReplayUI();
 }
 function exitReplay() {
@@ -1026,6 +1035,8 @@ function exitReplay() {
   S.replay.active=false; S.replay.playing=false;
   document.getElementById('an-replaybar').classList.remove('visible');
   document.getElementById('rp-play-btn').textContent='▶ Play';
+  document.getElementById('an-ctrlbar').style.opacity='';
+  document.getElementById('an-ctrlbar').style.pointerEvents='';
   renderBoard(); renderSidebar();
 }
 function replayStep(dir) {
@@ -1057,6 +1068,8 @@ function updateReplayUI() {
   document.getElementById('rp-lbl').innerHTML=
     s===0?'Start — empty board':`Turn <b>${s}</b> / ${max}`;
   document.getElementById('rp-progress').style.width=(max?s/max*100:0)+'%';
+  // Score cards reflect the running totals at this step
+  updateScoreCards(s);
   const det=document.getElementById('rp-detail');
   if(s===0){ det.textContent=''; return; }
   const p=S.plays[s-1];
