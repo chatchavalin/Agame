@@ -78,7 +78,11 @@
     } else {
       p = legacy();
     }
-    p.then(function (b64) { cb(b64 || null); }).catch(function () { cb(null); });
+    // Hard guard: always call back within 8s, even if decode/load never settles.
+    var done = false;
+    function finish(out) { if (done) return; done = true; clearTimeout(timer); cb(out); }
+    var timer = setTimeout(function () { finish(null); }, 8000);
+    p.then(function (b64) { finish(b64 || null); }, function () { finish(null); });
   }
 
   // ---- prompt: read the board into our exact board-code vocabulary ----------
@@ -215,7 +219,8 @@
     var p = 'This is a photo of an A-Math / Scrabble-style board. Find the 15x15 grid of PLAYING SQUARES only. ' +
       'Exclude the outer plastic frame, the tile racks/trays, dice, and any paper or score sheets. ' +
       'Return ONLY JSON: {"x":<left>,"y":<top>,"w":<width>,"h":<height>} as fractions of the image size (0..1) for the tight bounding box of the grid. If unsure, return {"x":0,"y":0,"w":1,"h":1}.';
-    return analyze2(base64, p).then(function (text) {
+    // Shorter cap than a full read: if detection stalls, just scan the whole image.
+    return withTimeout(analyze2Raw(base64, p, 0), 18000, 'Finding the board').then(function (text) {
       try { var o = JSON.parse(extractJson(text) || 'null'); if (o && typeof o.x === 'number' && typeof o.w === 'number') return o; } catch (e) {}
       return null;
     }).catch(function () { return null; });
@@ -225,6 +230,9 @@
   // crop up so tiles are large. Falls back to the original on any problem.
   function cropToBox(base64, box, cb) {
     if (!box) return cb(base64);
+    var done = false;
+    function finish(out) { if (done) return; done = true; clearTimeout(timer); cb(out); }
+    var timer = setTimeout(function () { finish(base64); }, 5000); // never hang on a stalled image load
     var img = new Image();
     img.onload = function () {
       try {
@@ -233,15 +241,15 @@
         var x = Math.max(0, (box.x - pad)) * W, y = Math.max(0, (box.y - pad)) * H;
         var w = Math.min(1, (box.w + pad * 2)) * W, h = Math.min(1, (box.h + pad * 2)) * H;
         if (x + w > W) w = W - x; if (y + h > H) h = H - y;
-        if (w < W * 0.30 || h < H * 0.30) return cb(base64); // implausible box → skip crop
+        if (w < W * 0.30 || h < H * 0.30) return finish(base64); // implausible box → skip crop
         var scale = Math.min(2.0, 1800 / Math.max(w, h)); if (scale < 1) scale = 1;
         var cw = Math.round(w * scale), ch = Math.round(h * scale);
         var cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
         cv.getContext('2d').drawImage(img, x, y, w, h, 0, 0, cw, ch);
-        cb(cv.toDataURL('image/jpeg', 0.9).split(',')[1]);
-      } catch (e) { cb(base64); }
+        finish(cv.toDataURL('image/jpeg', 0.9).split(',')[1]);
+      } catch (e) { finish(base64); }
     };
-    img.onerror = function () { cb(base64); };
+    img.onerror = function () { finish(base64); };
     img.src = 'data:image/jpeg;base64,' + base64;
   }
 
@@ -482,19 +490,17 @@
   var OWNER_PHRASE = 'owner:amath2026';
   function isOwner() { return getKey().trim() === OWNER_PHRASE; }
 
-  function analyze2(base64, prompt, temperature) {
-    var call;
+  function analyze2Raw(base64, prompt, temperature) {
     var stored = getKey().trim();
     if (stored === OWNER_PHRASE && window.AMath && typeof window.AMath.geminiScan === 'function') {
-      // Owner only: use the shared Firebase AI Logic backend.
-      call = window.AMath.geminiScan(base64, prompt, temperature);
+      return window.AMath.geminiScan(base64, prompt, temperature);   // owner: shared backend
     } else if (stored) {
-      // Everyone else: use THEIR pasted key, sent directly to Google.
-      call = callGemini(base64, stored, temperature, prompt);
-    } else {
-      return Promise.reject(new Error('NO_KEY'));
+      return callGemini(base64, stored, temperature, prompt);        // others: their own key
     }
-    return withTimeout(call, 30000, 'Reading the photo');   // 30s hard cap per pass
+    return Promise.reject(new Error('NO_KEY'));
+  }
+  function analyze2(base64, prompt, temperature) {
+    return withTimeout(analyze2Raw(base64, prompt, temperature), 30000, 'Reading the photo'); // 30s/pass
   }
   function _onPhoto_OLD(file) {
     if (!file) return;
