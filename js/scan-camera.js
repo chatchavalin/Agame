@@ -467,11 +467,32 @@
     status('⏹️ Stopped. Tap "Take / choose photo" to try again — try Fast quality and a flat, well-lit photo.', '#fbbf24');
   };
 
+  var _dbg0 = 0;
+  function dbg(msg) {
+    if (!_dbg0) _dbg0 = Date.now();
+    var t = ((Date.now() - _dbg0) / 1000).toFixed(1);
+    try {
+      var el = document.getElementById('scan-debug');
+      if (!el) {
+        var host = document.getElementById('camera-status');
+        if (host && host.parentNode) {
+          el = document.createElement('div');
+          el.id = 'scan-debug';
+          el.style.cssText = 'margin-top:8px;font-size:11px;color:#94a3b8;font-family:monospace;white-space:pre-wrap;background:#0b1220;border:1px solid #1e293b;border-radius:8px;padding:8px;max-height:160px;overflow:auto;';
+          host.parentNode.insertBefore(el, host.nextSibling);
+        }
+      }
+      if (el) el.textContent += '[' + t + 's] ' + msg + '\n';
+    } catch (e) {}
+  }
   function onPhoto(file) {
     if (!file) return;
+    _dbg0 = 0; dbg('tapped scan; quality=' + ((window.AMath && window.AMath.scanQuality) || 'balanced') + '; backend=' + (isOwner() ? ('owner(module ' + (window.AMath && typeof window.AMath.geminiScan === 'function' ? 'loaded' : 'MISSING') + ')') : 'pastedKey'));
     status('⏳ Reading photo…');
+    dbg('decoding image…');
     fileToBase64(file, function (base64) {
-      if (!base64) { status('❌ Could not read that image.', '#f87171'); return; }
+      if (!base64) { dbg('decode FAILED'); status('❌ Could not read that image.', '#f87171'); return; }
+      dbg('decoded ok, base64 len=' + base64.length);
       var rackEl = document.getElementById('read-rack');
       var wantRack = !!(rackEl && rackEl.checked);
       var quality = (window.AMath && window.AMath.scanQuality) || 'balanced';
@@ -479,8 +500,10 @@
 
       function readBoard(imageForBoard) {
         var settled = false;
+        dbg('calling AI (image len=' + imageForBoard.length + ')…');
         startTicker('Reading board (' + boardPasses() + ' pass)', function (secs) {
           if (settled) return; settled = true;
+          dbg('TICKER deadline hit at ' + secs + 's — aborting');
           var path = isOwner() ? 'owner/Firebase backend' : 'your pasted key';
           var via = (isOwner() && !(window.AMath && typeof window.AMath.geminiScan === 'function'))
             ? ' (note: the owner AI module did NOT load, so your phrase was sent as a raw API key — that will fail)'
@@ -489,26 +512,28 @@
         });
         runScanPasses(imageForBoard).then(function (r) {
           if (settled) return; settled = true; stopTicker();
+          dbg('AI returned: ' + (r.grid ? 'grid ok' : ('no grid; err=' + (r.err && r.err.message) + '; sample=' + (r.sample || '∅'))));
           if (!r.grid) { status('❌ ' + (r.err ? friendlyErr(r.err) : ('The model didn\'t return a board grid.' + (r.sample ? ' It said: "' + r.sample + '…"' : ' Try a flatter, well-lit photo.'))), '#f87171'); return; }
           if (!wantRack) { applyScan(r.grid, null); return; }
           startTicker('Reading your rack');
           runRackPasses(base64).then(function (rack) { stopTicker(); applyScan(r.grid, rack); })
             .catch(function () { stopTicker(); applyScan(r.grid, null); });
-        }).catch(function (err) { if (settled) return; settled = true; stopTicker(); status('❌ ' + friendlyErr(err), '#f87171'); });
+        }).catch(function (err) { if (settled) return; settled = true; stopTicker(); dbg('AI threw: ' + (err && err.message)); status('❌ ' + friendlyErr(err), '#f87171'); });
       }
 
       if (fast) {
-        // Minimal path: one read on the EXIF-corrected full image. No separate
-        // board-detect call, no normalization — fewer steps, fewer AI requests,
-        // fewer places to stall. Best first thing to try.
+        dbg('fast path: direct read, no detect/crop/normalize');
         readBoard(base64);
       } else {
+        dbg('full path: detectBoard…');
         status('⏳ Finding the board edges…');
         detectBoard(base64).then(function (box) {
+          dbg('detectBoard done (box=' + (box ? 'yes' : 'none') + '); cropping…');
           cropToBox(base64, box, function (cropped) {
-            normalizeImage(cropped, function (prepped) { readBoard(prepped); });
+            dbg('crop done; normalizing…');
+            normalizeImage(cropped, function (prepped) { dbg('normalize done'); readBoard(prepped); });
           });
-        }).catch(function () { readBoard(base64); });   // detect failed → just read full image
+        }).catch(function () { dbg('detectBoard failed; full-image read'); readBoard(base64); });
       }
     });
   }
@@ -589,7 +614,7 @@
     });
   };
 
-  var JS_VERSION = 'v133';
+  var JS_VERSION = 'v134';
   // ---- wire UI --------------------------------------------------------------
   function init() {
     var stamp = document.getElementById('build-stamp');
