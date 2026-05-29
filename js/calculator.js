@@ -374,7 +374,13 @@
       renderRack();
       st.textContent = '✅ Read ' + rack.length + ' tile(s)' +
         (unresolved ? ' — ' + unresolved + ' slot(s) unclear (shown as ?). Tap to fix.' : '. Check them, then Find.');
-    }).catch(function (e) { st.textContent = '❌ ' + (e && e.message || 'Could not read the photo.'); });
+    }).catch(function (e) {
+      var msg = (e && e.message) || 'Could not read the photo.';
+      if (/Gemini API key|paste your own/i.test(msg)) {
+        msg = 'Scanning needs your own free Gemini API key. Open the Scan page (📷 from the lobby) to paste it once — it then works here too. Or just tap tiles in.';
+      }
+      st.textContent = '❌ ' + msg;
+    });
   }
 
   // ----- init -----

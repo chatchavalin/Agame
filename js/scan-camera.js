@@ -137,12 +137,12 @@
   }
 
   // ---- call Gemini ----------------------------------------------------------
-  function callGemini(base64, key, temperature) {
+  function callGemini(base64, key, temperature, prompt) {
     var body = {
       contents: [{
         parts: [
           { inline_data: { mime_type: 'image/jpeg', data: base64 } },
-          { text: buildPrompt() }
+          { text: prompt || buildPrompt() }
         ]
       }],
       generationConfig: { responseMimeType: 'application/json', temperature: (typeof temperature === 'number' ? temperature : 0) }
@@ -309,7 +309,8 @@
 
   function friendlyErr(err) {
     var m = String(err && err.message || err);
-    if (m === 'NO_BACKEND') return 'Set up Firebase AI Logic in the console (recommended) or paste a Gemini key above.';
+    if (m === 'NO_KEY') return 'Paste your own free Gemini API key above to use scanning (get one at aistudio.google.com/apikey). Your key stays in your browser.';
+    if (m === 'NO_BACKEND') return 'Paste your own free Gemini API key above to use scanning.';
     if (/api key|API_KEY|invalid|permission|PERMISSION/i.test(m)) return 'Access rejected — check your Firebase AI Logic setup (or key).';
     if (/quota|rate|RESOURCE_EXHAUSTED/i.test(m)) return 'Free quota hit — wait a bit and try again.';
     if (/failed to fetch|networkerror|CORS/i.test(m)) return 'Network error reaching the AI service.';
@@ -451,14 +452,24 @@
                    function (e) { if (done) return; done = true; clearTimeout(t); reject(e); });
     });
   }
+  // Owner unlock: only the app owner may use the shared Firebase backend (which
+  // bills the owner's Gemini quota). Everyone else must paste their OWN Gemini
+  // key, which is sent straight to Google from their browser — never our backend.
+  // To use the owner backend, paste this exact phrase into the key box.
+  var OWNER_PHRASE = 'owner:amath2026';
+  function isOwner() { return getKey().trim() === OWNER_PHRASE; }
+
   function analyze2(base64, prompt, temperature) {
     var call;
-    if (window.AMath && typeof window.AMath.geminiScan === 'function') {
+    var stored = getKey().trim();
+    if (stored === OWNER_PHRASE && window.AMath && typeof window.AMath.geminiScan === 'function') {
+      // Owner only: use the shared Firebase AI Logic backend.
       call = window.AMath.geminiScan(base64, prompt, temperature);
+    } else if (stored) {
+      // Everyone else: use THEIR pasted key, sent directly to Google.
+      call = callGemini(base64, stored, temperature, prompt);
     } else {
-      var key = getKey();
-      if (!key) return Promise.reject(new Error('NO_BACKEND'));
-      call = callGemini(base64, key, temperature);
+      return Promise.reject(new Error('NO_KEY'));
     }
     return withTimeout(call, 45000, 'Reading the photo');   // 45s hard cap per pass
   }
