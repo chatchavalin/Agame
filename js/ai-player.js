@@ -3818,8 +3818,16 @@
       const scoreResult = Scoring.scorePlay(validate.equations, board, placements.length);
 
       return {
+        // CLONE each tile and BAKE its current `assigned` face into the clone.
+        // permuteAndTry reuses the same rack tile objects across iterations,
+        // mutating tile.assigned each time. If we returned the live reference, a
+        // later permutation would overwrite the assigned face of an already-
+        // stored best play — e.g. a valid 56+10=15+51 bingo (blank=10) silently
+        // becoming an invalid 56-5=15+51 (blank=-). Cloning freezes the play.
         placements: placements.map((p) => ({
-          row: p.row, col: p.col, tile: p.tile, assigned: p.tile.assigned,
+          row: p.row, col: p.col,
+          tile: Object.assign({}, p.tile, { assigned: p.tile.assigned }),
+          assigned: p.tile.assigned,
         })),
         equations: validate.equations,
         score: scoreResult.total,
