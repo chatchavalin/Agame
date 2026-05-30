@@ -3331,12 +3331,17 @@
     // Add ×0 chain plays — these dump tiles fast even if they score low
     const zeroChainPlays = findZeroChainPlays(state.board, aiTiles, state.isFirstMove);
     for (const zp of zeroChainPlays) {
-      // Avoid duplicates
-      const dominated = allPlays.some(p =>
-        p.placements.length >= zp.placements.length &&
-        p.score >= zp.score &&
-        p.placements.every((pp, i) => pp.row === zp.placements[i].row && pp.col === zp.placements[i].col)
-      );
+      // Avoid duplicates: zp is dominated if some existing play p is at least as
+      // long and high-scoring AND covers every one of zp's placements. Iterate
+      // zp.placements (the subset we're testing) and look each up in p — never
+      // index p.placements by zp's length (that caused an out-of-range crash).
+      const dominated = allPlays.some(p => {
+        if (p.placements.length < zp.placements.length) return false;
+        if (p.score < zp.score) return false;
+        return zp.placements.every(zpp =>
+          p.placements.some(pp => pp.row === zpp.row && pp.col === zpp.col)
+        );
+      });
       if (!dominated) allPlays.push(zp);
     }
 
