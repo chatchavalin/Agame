@@ -1854,6 +1854,21 @@
           }
         }
       }
+
+      // ── HARD ×9 EARLY-EXIT ──────────────────────────────────────────────
+      // A play that lands new tiles on BOTH 3E squares of a line gets a ×9
+      // (3×3) equation multiplier — the maximum premium possible. It is the
+      // top-scoring option AND occupies the most dangerous squares (so it also
+      // blocks the opponent from using them). There is nothing better to find,
+      // so stop the brute-force search immediately. This never skips a needed
+      // block, because taking both 3E IS the strongest block of that line.
+      if (playHitsBoth3E(play.placements)) {
+        if (!bestPlay || play.score >= bestPlay.score) bestPlay = play;
+        counter.abort = true;
+        counter.stopAll = true;   // global: halt every stage/anchor, not just this loop
+        play._x9EarlyExit = true;
+        console.log('[AI] ×9 play found (both 3E, ' + play.score + 'pts) — early exit');
+      }
     };
 
     // Search plan: each stage gets an ABSOLUTE time budget in ms (not fractions),
@@ -1901,6 +1916,7 @@
     const YIELD_INTERVAL_MS = 30;  // yield to browser every ~30ms for responsive UI
 
     for (const stage of searchPlan) {
+      if (counter.stopAll) break;   // ×9 already found — stop all remaining stages
       const stageStart = Date.now();
       const stageDeadline = stageStart + stage.budgetMs;
       const startBest = bestPlay ? bestPlay.score : -1;
@@ -1916,7 +1932,7 @@
       }
 
       for (const anchor of anchors) {
-        if (counter.abort) break;
+        if (counter.abort || counter.stopAll) break;
         if (Date.now() > stageDeadline) {
           counter.abort = true;
           break;
@@ -1935,13 +1951,13 @@
         var perAnchorMs = (stage.size >= 7) ? Math.max(500, Math.floor(stage.budgetMs / anchors.length * 3)) : Infinity;
 
         // For bingo stages, reset abort flag per anchor so one expensive
-        // anchor doesn't kill all subsequent ones
-        if (stage.size >= 7) {
+        // anchor doesn't kill all subsequent ones (unless ×9 found globally)
+        if (stage.size >= 7 && !counter.stopAll) {
           counter.abort = false;
         }
 
         for (const direction of ['horizontal', 'vertical']) {
-          if (counter.abort) break;
+          if (counter.abort || counter.stopAll) break;
           if (Date.now() > stageDeadline) {
             counter.abort = true;
             break;
@@ -2028,6 +2044,21 @@
       for (const sq of C.THREE_E_SQUARES) {
         if (sq[0] === p.row && sq[1] === p.col) return true;
       }
+    }
+    return false;
+  }
+
+  // True if this play lands NEW tiles on 2+ distinct 3E squares — a ×9 (3×3)
+  // equation multiplier. Such a play is both the top-scoring option AND occupies
+  // the most valuable/ dangerous squares (so it inherently blocks the opponent
+  // from using them). Finding one lets the search stop early with no downside.
+  function playHitsBoth3E(placements) {
+    let hits = 0;
+    for (const sq of C.THREE_E_SQUARES) {
+      for (const p of placements) {
+        if (sq[0] === p.row && sq[1] === p.col) { hits++; break; }
+      }
+      if (hits >= 2) return true;
     }
     return false;
   }
