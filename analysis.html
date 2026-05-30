@@ -1678,15 +1678,17 @@ function solvePlacementsFull(target, currentTurn, boardState, opts) {
     for(const isRow of [true,false]){
       for(let len=1;len<=8;len++){
         for(let start=0;start+len<=15;start++){
-          // window cells that have a face AND are not already placed in an earlier turn
+          // Candidate window: cells that have a face. The window represents the
+          // tiles THIS turn placed, so each cell must currently be UNASSIGNED
+          // (turnIdx<0). A cell already belonging to an earlier turn = overlap
+          // (illegal); a cell with no face = gap (illegal).
           const cells=[];
-          let ok=true, touchesEarlier=false, coversCenter=false;
+          let ok=true, coversCenter=false;
           for(let k=0;k<len;k++){
             const r=isRow?li:start+k, c=isRow?start+k:li;
             const cell=boardState[r][c];
-            if(!cell){ ok=false; break; }
-            // a window cell already belonging to an earlier turn = overlap, illegal
-            if(cell.turnIdx>=0 && cell.turnIdx<currentTurn){ ok=false; break; }
+            if(!cell){ ok=false; break; }                 // empty gap
+            if(cell.turnIdx>=0 && cell.turnIdx!==currentTurn){ ok=false; break; } // belongs to another turn
             cells.push([r,c]);
             if(r===7&&c===7) coversCenter=true;
           }
