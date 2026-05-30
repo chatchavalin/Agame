@@ -175,17 +175,33 @@
     args = args || {};
     var rec = args.rec;
     var sheet = args.scoreSheet || [];
-    var recTurns = (rec && rec.moves) ? rec.moves.length : 0;
     var opts = { p1: args.p1, p2: args.p2 };
 
+    // Count how many recorded moves carry actual tile placements.
+    var recMoves = (rec && rec.moves) ? rec.moves : [];
+    var recPlacementCount = 0;
+    for (var i = 0; i < recMoves.length; i++) {
+      var pls = recMoves[i] && recMoves[i].placements;
+      if (pls && pls.length) recPlacementCount += pls.length;
+    }
+    // Count how many scoring turns the scoreSheet has (turns that NEED placement).
+    var sheetPlayTurns = 0;
+    for (var j = 0; j < sheet.length; j++) {
+      if (sheet[j] && sheet[j].action === 'play') sheetPlayTurns++;
+    }
+
     var project, name;
-    if (recTurns > 0 && recTurns >= sheet.length) {
-      // recording is complete — use it (has placements)
+    // Prefer the recording whenever it actually captured tile placements — it is
+    // the authoritative per-turn source. We do NOT require recMoves >= sheet.length
+    // anymore: a recording can legitimately have fewer entries (e.g. a turn the
+    // recorder didn't log) yet still hold every play's placements. Falling back to
+    // the scoreSheet would throw those placements away and force blank-guessing.
+    if (recPlacementCount > 0) {
       project = recordingToProject(rec, opts);
     } else if (sheet.length > 0) {
-      // scoreSheet is the fuller history (e.g. loaded from a saved game)
+      // No placements anywhere in the recording — scoreSheet is the only history.
       project = scoreSheetToProject(sheet, args.board, opts);
-    } else if (recTurns > 0) {
+    } else if (recMoves.length > 0) {
       project = recordingToProject(rec, opts);
     } else {
       return null;

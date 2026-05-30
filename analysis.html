@@ -1750,8 +1750,63 @@ function solvePlacementsFull(target, currentTurn, boardState, opts) {
   return uniq;
 }
 
-// Blank-aware solver: when the exact-face solver finds nothing, a tile may have
-// been a BLANK (0 points) when this turn played it. Try every candidate window
+// Validate that a play (with some cells treated as blanks) forms LEGAL equations.
+// Blanks are wildcards: we try a small set of candidate faces for each blank and
+// accept the run if ANY assignment validates. Runs without '=' (a partial cross
+// that's just digits) are allowed; runs with '=' must validate as a real equation.
+function blankPlayValidates(board, newCells, currentTurn, blankSet) {
+  const ev = window.AMath && window.AMath.evaluator;
+  if(!ev) return true; // can't validate → don't block
+  const newSet=new Set(newCells.map(([r,c])=>r+','+c));
+  const exists=(r,c)=>{
+    const cell=board[r][c]; if(!cell) return false;
+    if(newSet.has(r+','+c)) return true;
+    return cell.turnIdx>=0 && cell.turnIdx<currentTurn;
+  };
+  // candidate faces a blank could take (cover digits 0-20 + operators + =)
+  const CAND=['0','1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','+','-','×','÷','='];
+  const rows=new Set(newCells.map(x=>x[0]));
+  const mainIsRow=rows.size===1;
+  const runsToCheck=[];
+  const seen=new Set();
+  const first=newCells[0];
+  const mainRun=contiguousRun(board, first[0], first[1], mainIsRow, exists);
+  if(mainRun.cells.length>=2){ const sig=mainRun.cells.map(x=>x.r+','+x.c).join('|'); if(!seen.has(sig)){seen.add(sig); runsToCheck.push(mainRun.cells);} }
+  for(const [r,c] of newCells){
+    const cr=contiguousRun(board, r, c, !mainIsRow, exists);
+    if(cr.cells.length>=2){ const sig=cr.cells.map(x=>x.r+','+x.c).join('|'); if(!seen.has(sig)){seen.add(sig); runsToCheck.push(cr.cells);} }
+  }
+  for(const run of runsToCheck){
+    const faces=run.map(({r,c})=> board[r][c]?board[r][c].face:null);
+    const blanksIdx=run.map(({r,c},i)=> blankSet.has(r+','+c)?i:-1).filter(i=>i>=0);
+    // run with no '=' and no blanks that could introduce one: only validate runs that contain '='
+    const hasEq = faces.includes('=');
+    if(blanksIdx.length===0){
+      if(hasEq){ const res=ev.validateEquation(faces); if(!res.valid) return false; }
+      continue;
+    }
+    // wildcard search: try candidate faces for each blank (cap combinations)
+    let validFound=false;
+    const tryAssign=(k)=>{
+      if(validFound) return;
+      if(k===blanksIdx.length){
+        const res=ev.validateEquation(faces);
+        if(res.valid) validFound=true;
+        return;
+      }
+      for(const cand of CAND){
+        faces[blanksIdx[k]]=cand;
+        tryAssign(k+1);
+        if(validFound) return;
+      }
+    };
+    // only bother if the run has (or could have) an '='; otherwise a bare digit run is fine
+    if(hasEq || blanksIdx.length>0){ tryAssign(0); if(!validFound) return false; }
+  }
+  return true;
+}
+
+
 // and, within it, every choice of 1 or 2 cells being blank; keep windows that
 // then score the target. Returns candidates tagged with which cells are blanks.
 // These are GUESSES (a blank could be any face), so they're surfaced as "pick".
@@ -1780,7 +1835,7 @@ function solvePlacementsWithBlanks(target, currentTurn, boardState, maxBlanks) {
           const tryBlanks=(idxs)=>{
             const blankSet=new Set(idxs.map(i=>cells[i][0]+','+cells[i][1]));
             const total=scoreFullPlay(boardState, cells, currentTurn, blankSet);
-            if(total===target){
+            if(total===target && blankPlayValidates(boardState, cells, currentTurn, blankSet)){
               const blanks=idxs.map(i=>cells[i]);
               const sig=cells.map(x=>x.join(',')).sort().join('|')+'#'+
                         blanks.map(x=>x.join(',')).sort().join('|');
