@@ -35,3 +35,23 @@ Diagnosis confirmed + reproduced. Next: complete a SAFE solve-for-blank integrat
 that actually reduces the per-window blank explosion (not just the last cell), so
 cap-bound 2-blank windows like this are solved fast. Must verify same-or-more-plays
 before shipping.
+
+## UPDATE — user correction + refined finding
+- CORRECTION (user was right): 15=-5+15+5 IS playable — the '=' is the BOARD HOOK at
+  (11,2), not a rack tile. Verified ok:true via real validatePlay, score 26, with
+  blanks = {15, +} (one 15 MUST be a blank since the rack has only one 15 tile; so it
+  can't be blanks {5,+} as first guessed, but it IS a legal play). It places 7 NEW
+  tiles → a strong PLAY, not a bingo. My earlier "not playable" was WRONG (I forgot
+  the free '=' hook). The separate 8-tile bingo 1=6+5-15+5 (76) also exists.
+- So on this hook the AI had at least a 26-pt play AND a 76-pt bingo available, and
+  it SWAPPED (best=none) → missed both.
+- Variance note: a 300s isolated repro found a 74 bingo, but the real game (worker)
+  and a 90s repro both SWAP (best=none). So the miss is real and reproducible at
+  shorter/realistic budgets; it's CAP/TIME-bound on the 2-blank window.
+- The ×4-avoidance swap rule (score<40 + ×4 threat → swap) is NOT the cause here
+  (log shows best=none, i.e. nothing found), but it's worth remembering it can also
+  turn a found sub-40 play into a swap.
+- FIX DIRECTION CONFIRMED: make the 2-blank window search efficient (solve numeric
+  blanks like 15/6 instead of enumerating) so these plays are found within budget.
+  Reproducible target: this position must yield the 76 bingo (or at least the 26 play
+  rather than a swap).
