@@ -1092,6 +1092,7 @@ function renderBoard(opts) {
   const boardData = opts.replayBoard || S.board;
   const newCells  = opts.newCells  || new Set();
   const pulseCells= opts.pulseCells|| new Set();
+  const dimCells  = opts.dimCells  || new Set();
 
   const wrap = document.getElementById('an-board-wrap');
   wrap.innerHTML='';
@@ -1157,6 +1158,8 @@ function renderBoard(opts) {
         // Filter dim
         if(S.filter!=='all' && td.player!=='unknown' && td.player!==S.filter)
           tileEl.classList.add('an-dimmed');
+        // Replay dim: tiles not yet mapped to a turn show faint throughout
+        if(dimCells.has(key)) tileEl.classList.add('an-dimmed');
 
         // Highlight selected turn
         if(S.selectedTurn>=0 && td.turnIdx===S.selectedTurn)
@@ -1489,6 +1492,9 @@ function startReplay() {
   // Dim the editing controls while replaying so the board state isn't corrupted
   document.getElementById('an-ctrlbar').style.opacity='.4';
   document.getElementById('an-ctrlbar').style.pointerEvents='none';
+  // Bring the board into view so the user watches tiles appear, not the list.
+  var bd=document.getElementById('amath-board');
+  if(bd) bd.scrollIntoView({block:'start', behavior:'smooth'});
   renderReplayBoard(); updateReplayUI();
 }
 function exitReplay() {
@@ -1543,7 +1549,22 @@ function updateReplayUI() {
   document.querySelectorAll('.an-turn-item').forEach((el,i)=>{
     el.classList.toggle('active',i===s-1);
   });
-  if(s>0){const el=document.querySelectorAll('.an-turn-item')[s-1]; if(el) el.scrollIntoView({block:'nearest',behavior:'smooth'});}
+  // During replay, keep the BOARD in view — do NOT scroll the page down to the
+  // play-by-play list. Only scroll the sidebar item within its own scroll
+  // container (if that container itself scrolls), never the whole page.
+  if(s>0){
+    const el=document.querySelectorAll('.an-turn-item')[s-1];
+    if(el){
+      const container=document.getElementById('an-turn-list');
+      if(container && container.scrollHeight>container.clientHeight){
+        // scroll only inside the list container, not the page
+        const elTop=el.offsetTop, elBot=elTop+el.offsetHeight;
+        if(elTop<container.scrollTop) container.scrollTop=elTop;
+        else if(elBot>container.scrollTop+container.clientHeight)
+          container.scrollTop=elBot-container.clientHeight;
+      }
+    }
+  }
 }
 function renderReplayBoard() {
   const step=S.replay.step;
@@ -1566,17 +1587,28 @@ function renderReplayBoard() {
     return;
   }
 
-  // Build board state at this step (turn-by-turn)
+  // Build board state at this step (turn-by-turn for assigned tiles).
+  // Tiles with NO turn assignment (turnIdx=-1) are shown dimmed THROUGHOUT, so a
+  // partially-reconstructed game still shows its full position instead of a board
+  // that's mostly empty until the final step. Assigned tiles still animate in at
+  // their turn.
+  const dimCells=new Set();
   for(let r=0;r<15;r++) for(let c=0;c<15;c++){
     const td=S.board[r][c]; if(!td) continue;
-    if(td.turnIdx===-1){ if(step>=S.plays.length) rb[r][c]={...td,player:'unknown'}; continue; }
+    if(td.turnIdx===-1){
+      // unplaced-by-turn tile: show it dimmed the whole way through
+      rb[r][c]={...td,player:td.player||'unknown'};
+      dimCells.add(r+','+c);
+      continue;
+    }
     if(td.turnIdx<step) rb[r][c]={...td};
     else if(td.turnIdx===step-1){
       rb[r][c]={...td};
       newCells.add(r+','+c); pulseCells.add(r+','+c);
     }
+    // assigned tiles whose turn hasn't come yet: hidden (animate in later)
   }
-  renderBoard({replayBoard:rb, newCells, pulseCells});
+  renderBoard({replayBoard:rb, newCells, pulseCells, dimCells});
 }
 
 // =====================================================================
