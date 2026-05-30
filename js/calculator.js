@@ -169,7 +169,10 @@
       h.innerHTML = '<h2 style="font-size:15px;margin:0 0 6px;">9-tile bingo — your tiles + 1 hook</h2>';
       res.appendChild(h);
       if (!report.nine.length) {
-        var no = document.createElement('p'); no.className = 'muted'; no.textContent = '❌ No hook tile makes a bingo with these tiles.';
+        var no = document.createElement('p'); no.className = 'muted';
+        no.textContent = report.capped
+          ? '⏱️ Couldn’t finish searching every hook — these tiles (especially with two blanks) have a huge number of arrangements. No bingo found in the part searched; one may still exist. Try removing a blank or fixing a blank to a specific value.'
+          : '❌ No hook tile makes a bingo with these tiles.';
         res.appendChild(no); return;
       }
       report.nine.forEach(function (it) { it.total = base + tilePts(it.hook, m) + bonus; });
@@ -177,6 +180,11 @@
       var intro = document.createElement('p'); intro.className = 'muted';
       intro.textContent = report.nine.length + ' hook tile(s) make a bingo — ranked by total score. Your tiles = ' + base + ' pts, + the hook tile, + ' + bonus + ' bingo bonus (uses all 8):';
       res.appendChild(intro);
+      if (report.capped) {
+        var capNote = document.createElement('p'); capNote.className = 'muted';
+        capNote.textContent = '⏱️ Note: the search was very large and didn’t fully finish, so more hooks may also work — these are the ones found so far.';
+        res.appendChild(capNote);
+      }
       report.nine.forEach(function (item, idx) {
         var card = document.createElement('div'); card.className = 'hook-card';
         var rrow = document.createElement('div'); rrow.className = 'rank-row';

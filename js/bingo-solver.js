@@ -47,6 +47,15 @@
       return !(last === '+' || last === '×' || last === '÷' || last === '='); // '-' (unary) ok
     }
     if (last === '=' && isBinOp(prev)) return false;           // a segment can't end with an operator
+    // A valid A-Math equation has EXACTLY ONE '='. As soon as a partial places a
+    // second '=', the whole branch is dead — prune it. This is the single biggest
+    // win for heavy-BLANK racks, where blanks would otherwise explore '=' in many
+    // doomed positions (a blank can become '='). Only check when last is '=' so
+    // the scan cost is paid rarely.
+    if (last === '=') {
+      var eq = 0;
+      for (var k = 0; k < L; k++) { if (seq[k] === '=') { eq++; if (eq > 1) return false; } }
+    }
     return true;
   }
 
@@ -130,14 +139,24 @@
   function bingos(rack, validate, inventory, opts) {
     opts = opts || {};
     var ex = opts.examples || 3;
+    // Heavy-BLANK racks (each BLANK = 15 face choices) explode the search. A
+    // bigger cap does NOT fix the two-BLANK case: the DFS reaches some valid
+    // arrangements only ~30M+ nodes deep (its fixed face-order finds them late),
+    // and exhausting that for all 24 hooks takes ~100s — far too slow for an
+    // interactive tool, and you don't want a time cap. So we keep the cap modest
+    // (fast/responsive) and, when it's hit without finding a bingo, report
+    // "couldn't finish" HONESTLY instead of the old false "no bingo exists"
+    // (calculator.js). A proper fix needs a smarter blank-aware search order,
+    // not a larger cap. No time cap by design.
+    var nodeCap = opts.nodeCap || 2000000;
     var capped = false;
 
-    var eight = solve(rack, validate, { maxSolutions: ex });
+    var eight = solve(rack, validate, { maxSolutions: ex, nodeCap: nodeCap });
     if (eight.capped) capped = true;
 
     var nine = [];
     candidateHooks(inventory).forEach(function (hook) {
-      var sols = solve(rack.concat([hook]), validate, { maxSolutions: ex });
+      var sols = solve(rack.concat([hook]), validate, { maxSolutions: ex, nodeCap: nodeCap });
       if (sols.capped) capped = true;
       if (sols.length) nine.push({ hook: hook, examples: sols });
     });
