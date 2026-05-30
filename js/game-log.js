@@ -84,10 +84,15 @@
   function logState(label, session) {
     if (!session) return;
     var boardTiles = 0;
+    var boardRows = [];
     for (var r = 0; r < 15; r++) {
+      var rowStr = [];
       for (var c = 0; c < 15; c++) {
-        if (session.board.cells[r][c].tile) boardTiles++;
+        var t = session.board.cells[r][c].tile;
+        if (t) { boardTiles++; rowStr.push(t.assigned || t.face); }
+        else rowStr.push('.');
       }
+      boardRows.push(rowStr.join(' '));
     }
     var pRack = session.playerRack.tiles.map(function (t) { return t.assigned || t.face; }).join(',');
     var aRack = session.aiRack.tiles.map(function (t) { return t.assigned || t.face; }).join(',');
@@ -100,6 +105,7 @@
       aiRack: aRack,
       consecutivePasses: session.consecutiveNonScoringTurns,
       isFirstMove: session.isFirstMove,
+      board: boardRows,   // compact 15-row layout ('.'=empty) for diagnosing AI misses
     });
   }
 
