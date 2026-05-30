@@ -2625,6 +2625,10 @@
           (diag.bingoIsHard ? ' (hard)' : '') + ' budget=' + Math.round((diag.budgetMs||0)/1000) + 's level=' + (diag.level||'?') +
           ' | bingo=' + diag.bingo + ' yoyo=' + diag.yoyo +
           ' fast=' + diag.fast + ' grammar=' + diag.grammar + ' → best=' + diag.best);
+        if (diag.rackTypes) {
+          window.AMath.gameLog.log('AI rack types: ' + diag.rackTypes +
+            ' | engine=' + ((window.AMath.aiWorkerClient && window.AMath.aiWorkerClient.isAvailable()) ? 'worker' : 'main-thread'));
+        }
       } else {
         window.AMath.gameLog.log('AI search: (no diagnostics captured — decision returned before search, or stale code)');
       }
