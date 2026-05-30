@@ -1754,10 +1754,17 @@
       console.log('[AI] findBestPlay in DESPERATION mode — multiplier boosted 4×');
     }
 
-    const maxCandidatesThisRack = Math.floor(MAX_CANDIDATES_PER_STAGE * candidateMultiplier);
+    // Scale the candidate cap with the available TIME budget. The per-stage
+    // time check is the real safety net; a fixed candidate cap that's far below
+    // what the time allows makes the search stop early (observed: 2-blank bingo
+    // stage hit the 3.6M cap in 16s of a 180s budget and quit before finding a
+    // valid 8-tile bingo). Roughly allow ~1M candidates per 5s of total budget.
+    const timeBudgetForCap = getTimeBudgetMs();
+    const timeScale = Math.max(1, Math.floor(timeBudgetForCap / 30000)); // 180s → 6×
+    const maxCandidatesThisRack = Math.floor(MAX_CANDIDATES_PER_STAGE * candidateMultiplier * timeScale);
     if (candidateMultiplier > 1) {
       console.log('[AI] Rack: ' + blankCount + ' BLANKs, ' + choiceCount + ' choices, isFirstMove=' + isFirstMove +
-                  ' — budget multiplier ' + candidateMultiplier + ' → ' + maxCandidatesThisRack);
+                  ' — budget multiplier ' + candidateMultiplier + ' × timeScale ' + timeScale + ' → ' + maxCandidatesThisRack);
     }
 
     const onValidPlay = (play) => {
@@ -1906,7 +1913,14 @@
     // bounded. On 3-blank + 2-equals racks the bingo brute-force almost
     // never finds anything, AND the smaller-size stages also have huge
     // permutation spaces. Spending full budget here starves yoyo of time.
-    const bingoBudgetPct = (bingoIsHard && !_isEducationMode) ? 0.15 : 0.33;
+    let bingoBudgetPct = (bingoIsHard && !_isEducationMode) ? 0.15 : 0.33;
+    // 2-blank feasible (not "hard") racks: the 8-tile bingo is high-value but the
+    // blank explosion makes it slow to find — give the bingo stage a bigger share
+    // (it was timing out at 0.33 before reaching valid 2-blank bingos like
+    // 56+10=15+51). Yoyo still keeps its reserve from the caller's split.
+    if (!bingoIsHard && bingoFeasible !== false && blankCount === 2 && maxTiles === 8) {
+      bingoBudgetPct = 0.50;
+    }
     const otherBudgetPct = (bingoIsHard && !_isEducationMode) ? 0.04 : 0.08;
     const bingoStageMs = Math.floor(totalBudgetMs * bingoBudgetPct * Math.min(candidateMultiplier, 1.5));
     const otherStageMs = Math.floor(totalBudgetMs * otherBudgetPct * Math.min(candidateMultiplier, 1.5));
@@ -1940,6 +1954,7 @@
       // Reset abort flag AND counter at each stage (per-stage budget, not global)
       counter.abort = false;
       counter.count = 0;
+      counter._seenWindows = new Set();   // dedup windows within this stage
 
       // Yield at start of each stage so browser can repaint
       if (Date.now() - lastYieldTime > YIELD_INTERVAL_MS) {
@@ -2787,6 +2802,28 @@
       var adjTiles = Board.getAdjacentTiles(board, a.row, a.col);
       promise += adjTiles.length * 0.5;
 
+      // Bingo equations REQUIRE an '='. An anchor whose line already contains an
+      // existing '=' (within ~8 cells either way) can hook that '=' to complete a
+      // bingo without spending a rack '=' — these are prime bingo anchors and were
+      // previously under-ranked (only the generic +0.5/adjacent-tile bonus). Boost
+      // them so the capped 8-tile search reaches them before exhausting candidates.
+      for (var dd = 0; dd < 2; dd++) {
+        var ddr = dd === 0 ? 0 : 1, ddc = dd === 0 ? 1 : 0;
+        for (var sg = -1; sg <= 1; sg += 2) {
+          for (var dist = 1; dist <= 8; dist++) {
+            var er = a.row + ddr * dist * sg, ec = a.col + ddc * dist * sg;
+            if (!Board.inBounds(er, ec)) break;
+            var ecell = board.cells[er][ec];
+            if (!ecell) break;
+            if (ecell.tile) {
+              var ef = ecell.tile.assigned || ecell.tile.face;
+              if (ef === '=') promise += 12;   // reachable existing '=' hook
+              break;  // stop at first tile in this ray
+            }
+          }
+        }
+      }
+
       a._promise = promise;
     });
 
@@ -2800,6 +2837,16 @@
   ) {
     const cellPositions = collectPlacementCells(board, anchor, direction, numTiles);
     if (!cellPositions) return;
+
+    // Window dedup: 4-directional search makes many anchor+direction pairs
+    // produce the SAME set of cells (e.g. left-from-X == right-from-Y). Skip a
+    // window we already searched this stage so the freed time goes to genuinely
+    // new windows instead of re-permuting identical ones.
+    if (counter._seenWindows) {
+      const sig = cellPositions.map(function (p) { return p.row + ',' + p.col; }).sort().join('|');
+      if (counter._seenWindows.has(sig)) return;
+      counter._seenWindows.add(sig);
+    }
 
     const rack = aiRack.tiles;
     const used = new Array(rack.length).fill(false);
