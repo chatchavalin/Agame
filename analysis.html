@@ -588,6 +588,10 @@ body:has(.an-report.visible) { overflow:hidden; }
           <span class="an-replay-lbl" id="rp-lbl">Turn 0</span>
           <button onclick="exitReplay()" style="background:none;border:1px solid #334155;color:#64748b;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;font-family:inherit;">✕</button>
         </div>
+        <div id="rp-noassign" style="display:none;background:#2a2008;border:1px solid #b45309;border-radius:8px;padding:8px 10px;margin:4px 0;font-size:11px;color:#fcd34d;text-align:center;line-height:1.4">
+          Tiles aren't mapped to turns yet, so the board can't build turn-by-turn — it shows the full position.
+          <button onclick="exitReplay();runAutoBuild();" style="display:block;margin:6px auto 0;padding:6px 14px;border:none;border-radius:7px;background:#22d3ee;color:#072a33;font-family:inherit;font-weight:800;font-size:11px;cursor:pointer">🪄 Run Auto-build to map turns</button>
+        </div>
         <div class="an-replay-progress"><div class="an-replay-progress-fill" id="rp-progress" style="width:0%"></div></div>
         <div class="an-replay-btns">
           <button onclick="replayGoto(0)" title="Start">⏮</button>
@@ -1481,13 +1485,14 @@ function loadGameJSON(raw) {
 // =====================================================================
 function startReplay() {
   if(!S.plays.length){ alert('No plays loaded.'); return; }
-  // Warn if no per-turn tile data: replay can show scores but not tiles appearing.
+  // Detect whether tiles are mapped to turns. If not, replay can't build
+  // turn-by-turn — show a persistent notice in the bar (not a fleeting toast).
   let hasAssignment=false;
   for(let r=0;r<15&&!hasAssignment;r++) for(let c=0;c<15;c++)
     if(S.board[r][c] && S.board[r][c].turnIdx>=0){ hasAssignment=true; break; }
-  if(!hasAssignment && S.board.flat().some(c=>c)){
-    showToast('ℹ️ Tiles aren\'t mapped to turns — run 🪄 Auto-build first to see them appear turn by turn. Showing full board for now.');
-  }
+  const hasTiles = S.board.flat().some(c=>c);
+  const notice=document.getElementById('rp-noassign');
+  if(notice) notice.style.display = (!hasAssignment && hasTiles) ? 'block' : 'none';
   S.replay.active=true; S.replay.step=0; S.replay.playing=false;
   document.getElementById('an-replaybar').classList.add('visible');
   // Dim the editing controls while replaying so the board state isn't corrupted
