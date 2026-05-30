@@ -31,7 +31,7 @@ self.window = self;
 // Cache-bust version — bumped whenever any imported AI module changes.
 // Without this, the worker would serve cached old AI code even after a
 // hard refresh on the main page (worker has its own cache lifecycle).
-const CACHE_V = '?v=v203';
+const CACHE_V = '?v=v204';
 
 // Load all AI dependencies. Order matters — match what index.html loads.
 try {
@@ -73,6 +73,11 @@ self.onmessage = function (e) {
         // Attach top plays from the search for education mode
         if (self.AMath.aiPlayer.getLastTopPlays) {
           decision._topPlays = self.AMath.aiPlayer.getLastTopPlays();
+        }
+        // Attach the search diagnostics so the main thread can log them
+        // (the worker has its own isolated aiPlayer; main thread can't read it).
+        if (self.AMath.aiPlayer._lastDecisionDiag) {
+          decision._diag = self.AMath.aiPlayer._lastDecisionDiag;
         }
         self.postMessage({
           type: 'decided',

@@ -30,7 +30,7 @@
     if (worker) return worker;
 
     try {
-      worker = new Worker('js/ai-worker.js?v=v203');
+      worker = new Worker('js/ai-worker.js?v=v204');
       worker.onmessage = handleWorkerMessage;
       worker.onerror = function (err) {
         console.error('[AI Worker] error:', err.message, 'at', err.filename, ':', err.lineno);
@@ -65,6 +65,12 @@
       if (!pending) return;
       pendingRequests.delete(reqId);
       if (msg.type === 'decided') {
+        // Mirror the worker's search diagnostics onto the main-thread aiPlayer
+        // so the game log's 'AI search:' line can read them (the worker runs in
+        // an isolated scope the main thread otherwise can't see into).
+        if (msg.decision && msg.decision._diag && window.AMath.aiPlayer) {
+          window.AMath.aiPlayer._lastDecisionDiag = msg.decision._diag;
+        }
         pending.resolve(msg.decision);
       } else {
         const err = new Error(msg.error || 'Unknown worker error');
