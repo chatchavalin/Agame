@@ -2230,6 +2230,19 @@ body.theme-volcano .score-sheet-table th {
     display: flex;
   }
 }
+/* In PORTRAIT tablet the bottom timer-bar mirror is shown, so hide the inline
+   timers next to each rack — otherwise BOTH render and the timers look
+   duplicated (once in the rack rows, once in the bottom bar). Must be
+   portrait-only: the landscape tablet layout (further below) HIDES the bar and
+   relies on these inline timers riding inside each player's column, so hiding
+   them there would leave no timer at all. Previously inline timers were only
+   hidden ≤600px, so the whole 700–1299px portrait range showed duplicates. */
+@media (min-width: 700px) and (max-width: 1299px) and (orientation: portrait) {
+  .opponent-area .opponent-timer,
+  .player-area .player-timer {
+    display: none;
+  }
+}
 
 /* Inline tile tracker panel (visible on mobile under the action buttons).
    Hidden on desktop because the right side panel already shows the tracker
