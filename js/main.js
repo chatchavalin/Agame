@@ -2620,10 +2620,12 @@
       // Record exactly what the search found this turn (diagnoses 'missed bingo'
       // reports: shows the rack the AI computed on + each search stage's result).
       var diag = window.AMath.aiPlayer && window.AMath.aiPlayer._lastDecisionDiag;
-      if (diag && window.AMath.gameLog.log) {
+      if (diag) {
         window.AMath.gameLog.log('AI search: rack=[' + diag.rack + '] feasible=' + diag.bingoFeasible +
           (diag.bingoIsHard ? ' (hard)' : '') + ' | bingo=' + diag.bingo + ' yoyo=' + diag.yoyo +
           ' fast=' + diag.fast + ' grammar=' + diag.grammar + ' → best=' + diag.best);
+      } else {
+        window.AMath.gameLog.log('AI search: (no diagnostics captured — decision returned before search, or stale code)');
       }
       window.AMath.gameLog.logState('After AI decision', session);
     }

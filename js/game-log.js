@@ -34,6 +34,8 @@
   function startGame(info) {
     entries = [];
     gameStartTime = Date.now();
+    info = info || {};
+    info.codeVersion = 'v203';   // bump with each ship; confirms fresh code is loaded
     log('GAME', 'New game started', info);
   }
 
