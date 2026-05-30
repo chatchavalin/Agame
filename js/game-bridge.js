@@ -285,6 +285,64 @@
     }
   }
 
+  // ── Analysis projects (cloud) — stored under users/{uid}/analysisProjects ──
+  // Auto-pruned to the most recent 20.
+  async function saveAnalysisProject(name, projectData) {
+    if (!_userId || _userId === 'guest' || !_db || !projectData) return null;
+    try {
+      var col = _db.collection('users').doc(_userId).collection('analysisProjects');
+      var ref = await col.add({
+        name: name || ('Game ' + new Date().toISOString().slice(0, 16)),
+        data: projectData,
+        savedAt: Date.now(),
+      });
+      // Prune to last 20 (delete oldest beyond that)
+      try {
+        var snap = await col.orderBy('savedAt', 'desc').get();
+        if (snap.size > 20) {
+          var docs = snap.docs.slice(20);
+          for (var i = 0; i < docs.length; i++) { await docs[i].ref.delete(); }
+        }
+      } catch (e) { /* pruning is best-effort */ }
+      return ref.id;
+    } catch (err) {
+      console.warn('[Bridge] saveAnalysisProject failed:', err);
+      return null;
+    }
+  }
+
+  async function listAnalysisProjects(limit) {
+    if (!_userId || _userId === 'guest' || !_db) return [];
+    try {
+      var snap = await _db.collection('users').doc(_userId)
+        .collection('analysisProjects')
+        .orderBy('savedAt', 'desc')
+        .limit(limit || 20)
+        .get();
+      var out = [];
+      snap.forEach(function (d) {
+        var v = d.data();
+        out.push({ id: d.id, name: v.name, savedAt: v.savedAt, data: v.data });
+      });
+      return out;
+    } catch (err) {
+      console.warn('[Bridge] listAnalysisProjects failed:', err);
+      return [];
+    }
+  }
+
+  async function deleteAnalysisProject(id) {
+    if (!_userId || _userId === 'guest' || !_db || !id) return false;
+    try {
+      await _db.collection('users').doc(_userId)
+        .collection('analysisProjects').doc(id).delete();
+      return true;
+    } catch (err) {
+      console.warn('[Bridge] deleteAnalysisProject failed:', err);
+      return false;
+    }
+  }
+
   window.AMathBridge = {
     saveGameResult: saveGameResult,
     saveReplay: saveReplay,
@@ -293,6 +351,9 @@
     saveInProgressGame: saveInProgressGame,
     loadInProgressGame: loadInProgressGame,
     clearInProgressGame: clearInProgressGame,
+    saveAnalysisProject: saveAnalysisProject,
+    listAnalysisProjects: listAnalysisProjects,
+    deleteAnalysisProject: deleteAnalysisProject,
     getUserId: function () { return _userId; },
     getUserName: function () { return _userName; },
     getUserPhoto: function () { return _userPhoto; },

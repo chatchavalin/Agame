@@ -3171,7 +3171,20 @@
         var p1n = isPvP ? (session.p1Name || 'Player 1') : 'You';
         var p2n = isPvP ? (session.p2Name || 'Player 2') : 'Computer';
         var id = window.AMath.analysisExport.sendRecordingToAnalysis(analysisRec, {p1:p1n, p2:p2n});
-        if (id) { location.href = 'analysis.html'; }
+        if (id) {
+          // Carry the logged-in identity so analysis.html can auto-save to the cloud.
+          var url = 'analysis.html';
+          try {
+            if (window.AMathBridge && !window.AMathBridge.isGuest()) {
+              var qp = new URLSearchParams();
+              qp.set('userId', window.AMathBridge.getUserId());
+              if (window.AMathBridge.getUserName()) qp.set('userName', window.AMathBridge.getUserName());
+              if (window.AMathBridge.getUserPhoto()) qp.set('userPhoto', window.AMathBridge.getUserPhoto());
+              url += '?' + qp.toString();
+            }
+          } catch(e){}
+          location.href = url;
+        }
         else { alert('Could not send to Analysis.'); }
       } : null,
     });

@@ -530,6 +530,10 @@ body {
       <div class="hint">💾 Your saved games</div>
       <div id="an-saved-list"></div>
     </div>
+    <div class="an-saved-section" id="an-cloud-section" style="display:none">
+      <div class="hint">☁️ From your account (last 20, synced)</div>
+      <div id="an-cloud-list"></div>
+    </div>
     <div class="an-paste-section">
       <div class="hint">📂 Import a shared project file (.json)</div>
       <div style="font-size:10px;color:#475569;margin-bottom:6px;line-height:1.4;">Someone sent you a game? Open their <code style="color:#64748b">.amath.json</code> file here.</div>
@@ -918,12 +922,27 @@ window.addEventListener('DOMContentLoaded',()=>{
       if (lib[pendingId]) {
         S._currentId = pendingId;
         loadGameJSON(JSON.stringify(lib[pendingId].data));
+        // queue a cloud auto-save (runs once the bridge finishes loading, if logged in)
+        S._cloudSavePending = { name: lib[pendingId].name, data: lib[pendingId].data };
         setTimeout(()=>showToast('✅ Loaded from your finished game — tap 🪄 Auto-build or 📊 Report'),400);
       }
     }
   } catch(e){}
   renderSavedList();
 });
+
+// Called when the Firebase bridge finishes loading (logged-in users only).
+function onCloudReady() {
+  try {
+    // 1) push any queued auto-save from a "Send to Analysis" handoff
+    if (S._cloudSavePending && window.AMathBridge && !window.AMathBridge.isGuest()) {
+      window.AMathBridge.saveAnalysisProject(S._cloudSavePending.name, S._cloudSavePending.data)
+        .then(function(id){ if(id){ showToast('☁️ Auto-saved to your account'); S._cloudSavePending=null; renderCloudList(); }});
+    }
+    // 2) show the user's cloud projects
+    renderCloudList();
+  } catch(e){}
+}
 
 // ── Saved games UI ──
 function renderSavedList() {
@@ -948,6 +967,44 @@ function renderSavedList() {
     </div>`;
   }).join('');
 }
+
+// ── Cloud projects (logged-in users) ──
+let _cloudProjects = [];
+function renderCloudList() {
+  const section = document.getElementById('an-cloud-section');
+  const wrap = document.getElementById('an-cloud-list');
+  if(!wrap || !section) return;
+  if(!window.AMathBridge || window.AMathBridge.isGuest()){ section.style.display='none'; return; }
+  window.AMathBridge.listAnalysisProjects(20).then(function(list){
+    _cloudProjects = list || [];
+    if(!_cloudProjects.length){ section.style.display='none'; return; }
+    section.style.display='';
+    wrap.innerHTML = _cloudProjects.map((g,i)=>{
+      const when=new Date(g.savedAt||0).toLocaleDateString();
+      const turns=(g.data&&g.data.plays)?g.data.plays.length:0;
+      return `<div class="an-saved-item">
+        <div class="an-saved-info" onclick="loadCloudProject(${i})">
+          <div class="an-saved-name">☁️ ${(g.name||'Untitled').replace(/</g,'&lt;')}</div>
+          <div class="an-saved-meta">${turns} turns · ${when}</div>
+        </div>
+        <button class="an-saved-btn del" onclick="deleteCloudProject(${i})" title="Delete from account">🗑</button>
+      </div>`;
+    }).join('');
+  });
+}
+function loadCloudProject(i) {
+  const g = _cloudProjects[i];
+  if(!g){ return; }
+  S._currentId = null;
+  loadGameJSON(JSON.stringify(g.data));
+}
+function deleteCloudProject(i) {
+  const g = _cloudProjects[i];
+  if(!g || !window.AMathBridge) return;
+  if(!confirm('Delete "'+g.name+'" from your account?')) return;
+  window.AMathBridge.deleteAnalysisProject(g.id).then(function(){ renderCloudList(); });
+}
+
 function loadSavedGame(id) {
   const lib = loadSavedLibrary();
   const g = lib[id];
@@ -2258,6 +2315,36 @@ function pickAmbiguous(turnIdx, cells){
   runAutoBuild();
 }
 function fixFromAutoBuild(turnIdx){ closeAutoBuild(); openPlayEditor(turnIdx); }
+</script>
+
+<!-- Firebase (optional) — only for logged-in users, enables cloud auto-save of analysis projects -->
+<script>
+(function(){
+  var params = new URLSearchParams(window.location.search);
+  if (!params.get('userId') || params.get('userId') === 'guest') return; // guests: localStorage only
+  var scripts = [
+    'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js',
+    'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js',
+    'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js'
+  ];
+  var loaded = 0;
+  scripts.forEach(function(src){
+    var s = document.createElement('script');
+    s.src = src; s.async = false;
+    s.onload = function(){
+      loaded++;
+      if (loaded === scripts.length) {
+        var s1 = document.createElement('script'); s1.src = 'js/firebase-config.js'; document.body.appendChild(s1);
+        var s2 = document.createElement('script'); s2.src = 'js/game-bridge.js?v=analysis'; document.body.appendChild(s2);
+        s2.onload = function(){
+          // Bridge ready — push any pending cloud-save and refresh the cloud list
+          if (window.onCloudReady) window.onCloudReady();
+        };
+      }
+    };
+    document.body.appendChild(s);
+  });
+})();
 </script>
 </body>
 </html>
