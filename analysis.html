@@ -2393,16 +2393,28 @@ function runAutoBuild() {
   // Snapshot current cell assignments so the user can undo if they dislike the rebuild.
   S._preAutoBuild = S.board.map(row=>row.map(cell=>cell?{...cell}:null));
   const {results, applied} = autoReconstruct();
+  S._autoBuildResults = results;        // persist so picks can re-render without re-solving
+  S._autoBuildApplied = applied;
+  renderAutoBuildBody();
+  document.getElementById('an-autobuild').classList.add('visible');
+}
+
+// Render the auto-build overlay body from the stored results. A turn the user has
+// resolved (status 'resolved') is shown as placed ✓ rather than as a pick list.
+function renderAutoBuildBody(){
+  const results = S._autoBuildResults || [];
   const body=document.getElementById('an-autobuild-body');
   const auto=results.filter(r=>r.status==='auto').length;
+  const resolved=results.filter(r=>r.status==='resolved').length;
   const amb=results.filter(r=>r.status==='ambiguous');
   const none=results.filter(r=>r.status==='none');
   const skip=results.filter(r=>r.status==='skip').length;
+  const placedTotal = auto + resolved;
 
   let html=`<div style="display:flex;gap:8px;margin-bottom:14px;">
     <div style="flex:1;background:#0a2417;border:1px solid #22c55e;border-radius:10px;padding:10px;text-align:center">
-      <div style="font-size:26px;font-weight:900;color:#4ade80">${auto}</div>
-      <div style="font-size:10px;color:#86efac">auto-placed ✓</div>
+      <div style="font-size:26px;font-weight:900;color:#4ade80">${placedTotal}</div>
+      <div style="font-size:10px;color:#86efac">placed ✓</div>
     </div>
     <div style="flex:1;background:#2a2008;border:1px solid #f59e0b;border-radius:10px;padding:10px;text-align:center">
       <div style="font-size:26px;font-weight:900;color:#fbbf24">${amb.length}</div>
@@ -2415,7 +2427,22 @@ function runAutoBuild() {
   </div>`;
 
   if(amb.length===0 && none.length===0){
-    html+=`<div style="text-align:center;padding:20px;color:#4ade80;font-weight:700;font-size:14px">✅ Every scoring turn placed unambiguously!<br><span style="font-size:11px;color:#64748b;font-weight:400">Tap ✕ then ▶ Replay to watch it build, or 📊 Report to analyze.</span></div>`;
+    html+=`<div style="text-align:center;padding:20px;color:#4ade80;font-weight:700;font-size:14px">✅ Every scoring turn placed!<br><span style="font-size:11px;color:#64748b;font-weight:400">Tap ✕ then ▶ Replay to watch it build, or 📊 Report to analyze.</span></div>`;
+  }
+
+  // Show resolved-by-user turns as confirmed (so the pick clearly "took")
+  const justResolved=results.filter(r=>r.status==='resolved');
+  if(justResolved.length){
+    html+=`<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#4ade80;margin:6px 0 8px">✓ You placed these</div>`;
+    justResolved.forEach(r=>{
+      const p=S.plays[r.turn-1];
+      const name=p.player==='p1'?S.p1Name:S.p2Name;
+      const faces=(p.cells||[]).map(([rr,cc])=>S.board[rr][cc]?S.board[rr][cc].face:'?').join(' ');
+      html+=`<div style="background:#0a2417;border-left:3px solid #22c55e;border-radius:8px;padding:9px 11px;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:700;color:#bbf7d0">Turn ${r.turn} · ${name} · ${p.score}pts ✓ placed: ${faces}
+        <button onclick='undoPick(${r.turn-1})' style="float:right;padding:2px 8px;border-radius:6px;border:1px solid #334155;background:none;color:#94a3b8;font-family:inherit;font-size:10px;cursor:pointer">change</button></div>
+      </div>`;
+    });
   }
 
   if(amb.length){
@@ -2449,9 +2476,8 @@ function runAutoBuild() {
   }
 
   html+=`<div style="margin-top:12px"><button onclick="undoAutoBuild()" style="width:100%;padding:10px;border-radius:9px;border:1px solid #475569;background:#1e293b;color:#cbd5e1;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer">↩ Undo Auto-build (restore previous placement)</button></div>`;
-  html+=`<div class="an-rep-note">🪄 Auto-build cleared all turn assignments and rebuilt from scores. ${auto} placed automatically, ${skip} skipped (swaps / 0-pts). Resolve flagged turns above, then ✕ and run 📊 Report.</div>`;
+  html+=`<div class="an-rep-note">🪄 Auto-build rebuilt from scores. ${placedTotal} placed, ${skip} skipped (swaps / 0-pts). Resolve flagged turns above, then ✕ and run 📊 Report.</div>`;
   body.innerHTML=html;
-  document.getElementById('an-autobuild').classList.add('visible');
 }
 function closeAutoBuild(){ document.getElementById('an-autobuild').classList.remove('visible'); }
 function undoAutoBuild(){
@@ -2469,14 +2495,33 @@ function undoAutoBuild(){
   showToast('↩ Restored previous placement');
 }
 function pickAmbiguous(turnIdx, cells){
+  // Clear any cells currently assigned to this turn, then place the chosen ones.
   for(let r=0;r<15;r++) for(let c=0;c<15;c++)
     if(S.board[r][c] && S.board[r][c].turnIdx===turnIdx){ S.board[r][c].turnIdx=-1; S.board[r][c].player='unknown'; }
   const p=S.plays[turnIdx];
   cells.forEach(([r,c])=>{ if(S.board[r][c]){ S.board[r][c].turnIdx=turnIdx; S.board[r][c].player=p.player; }});
   p.cells=cells;
+  // Mark this turn resolved in the stored results so the overlay reflects the choice.
+  if(S._autoBuildResults){
+    const res=S._autoBuildResults.find(x=>x.turn===turnIdx+1);
+    if(res) res.status='resolved';
+  }
   renderBoard(); renderSidebar();
+  renderAutoBuildBody();           // re-render overlay from state (do NOT re-solve)
   showToast(`Turn ${turnIdx+1} placement chosen ✓`);
-  runAutoBuild();
+}
+
+// Revert a user pick back to an ambiguous choice (the "change" button).
+function undoPick(turnIdx){
+  for(let r=0;r<15;r++) for(let c=0;c<15;c++)
+    if(S.board[r][c] && S.board[r][c].turnIdx===turnIdx){ S.board[r][c].turnIdx=-1; S.board[r][c].player='unknown'; }
+  const p=S.plays[turnIdx]; if(p) p.cells=[];
+  if(S._autoBuildResults){
+    const res=S._autoBuildResults.find(x=>x.turn===turnIdx+1);
+    if(res) res.status='ambiguous';
+  }
+  renderBoard(); renderSidebar();
+  renderAutoBuildBody();
 }
 function fixFromAutoBuild(turnIdx){ closeAutoBuild(); openPlayEditor(turnIdx); }
 </script>
