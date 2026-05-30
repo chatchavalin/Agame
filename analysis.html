@@ -344,7 +344,13 @@ body {
 }
 .an-report-title { font-size:15px; font-weight:900; color:#d8b4fe; }
 .an-report-close { background:none; border:1px solid #334155; color:#64748b; border-radius:8px; padding:5px 10px; cursor:pointer; font-size:14px; }
-#an-report-body { padding:14px 16px; overflow-y:auto; }
+#an-report-body, #an-autobuild-body, #an-export-body {
+  padding:14px 16px; overflow-y:auto; flex:1 1 auto; min-height:0;
+  overscroll-behavior:contain;
+}
+/* When any modal overlay is open, prevent the page behind it from scrolling
+   so touch-scroll stays inside the overlay body. */
+body:has(.an-report.visible) { overflow:hidden; }
 .an-rep-cards { display:flex; gap:8px; margin-bottom:16px; }
 .an-rep-card { flex:1; border-radius:12px; padding:12px; border:2px solid; }
 .an-rep-card.p1 { border-color:#ef4444; background:#1a0606; }
