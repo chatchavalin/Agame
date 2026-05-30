@@ -185,11 +185,11 @@ body {
 
 /* ── Control bar ──────────────────────────────────────── */
 .an-ctrlbar {
-  display:flex; gap:6px; width:100%; max-width:560px;
+  display:flex; flex-wrap:wrap; gap:6px; width:100%; max-width:560px;
   padding-bottom:4px;
 }
 .an-btn {
-  flex:1; min-width:0; padding:11px 6px; border-radius:10px;
+  flex:1 1 auto; min-width:88px; padding:11px 10px; border-radius:10px;
   border:1px solid #334155; background:#0f172a; color:#cbd5e1;
   font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;
   text-align:center; transition:all .12s; white-space:nowrap;
