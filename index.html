@@ -65,6 +65,10 @@
   <script src="js/ui.js?v=v61-saveexit"></script>
   <script src="js/interactions.js?v=20260535"></script>
   <script src="js/main.js?v=v61-saveexit"></script>
+  <!-- Replay recorder + analysis export: load for ALL players (guests too) so
+       "Send to Analysis" works without login. These don't need Firebase. -->
+  <script src="js/replay-recorder.js?v=20260530"></script>
+  <script src="js/analysis-export.js?v=20260530"></script>
   <!-- Firebase (optional — loads async, won't slow down game) -->
   <script>
   (function(){
@@ -86,8 +90,6 @@
           // All Firebase scripts loaded — init
           var s1 = document.createElement('script'); s1.src = 'js/firebase-config.js'; document.body.appendChild(s1);
           var sA = document.createElement('script'); sA.src = 'js/achievements.js'; document.body.appendChild(sA);
-          var sR = document.createElement('script'); sR.src = 'js/replay-recorder.js'; document.body.appendChild(sR);
-          var sAE = document.createElement('script'); sAE.src = 'js/analysis-export.js'; document.body.appendChild(sAE);
           var s2 = document.createElement('script'); s2.src = 'js/game-bridge.js?v=v61-saveexit'; document.body.appendChild(s2);
         }
       };
