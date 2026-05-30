@@ -171,35 +171,70 @@
    * which always holds the full turn history (survives save/resume).
    * @param {object} args { rec, scoreSheet, board, p1, p2 }
    */
+  /**
+   * Merge: use the scoreSheet as the full turn skeleton (it survives save/resume
+   * and is the most complete turn list), then overlay the recording's per-turn
+   * tile placements onto the turns they correspond to. This keeps BOTH the full
+   * history (no lost turns) AND whatever placements the recording captured.
+   * Recording moves are matched to scoreSheet 'play' turns in order.
+   */
+  function mergeSheetAndRecording(scoreSheet, rec, board, opts) {
+    var base = scoreSheetToProject(scoreSheet, board, opts);
+    var moves = (rec && rec.moves) ? rec.moves : [];
+    // Build an ordered list of recording PLAY moves (those with placements).
+    var recPlays = moves.filter(function (m) {
+      return m && m.type === 'play' && m.placements && m.placements.length;
+    });
+    if (!recPlays.length) return base;
+
+    // Walk scoreSheet play-turns and recording play-moves together, in order.
+    var cellMeta = [];
+    var ri = 0;
+    for (var ti = 0; ti < base.plays.length && ri < recPlays.length; ti++) {
+      var pl = base.plays[ti];
+      if (pl.type === 'swap') continue;           // skip swaps/passes
+      var mv = recPlays[ri];
+      // Only overlay if the score matches (sanity guard against misalignment).
+      if (mv.score === pl.score) {
+        var cells = [];
+        mv.placements.forEach(function (p) {
+          if (p && p.r >= 0 && p.r < 15 && p.c >= 0 && p.c < 15) {
+            cells.push([p.r, p.c]);
+            cellMeta.push([p.r, p.c, pl.player, ti]);
+            if (!base.grid[p.r][p.c]) base.grid[p.r][p.c] = p.a || p.f || '';
+          }
+        });
+        pl.cells = cells;
+        ri++;
+      }
+    }
+    base.cellMeta = cellMeta;
+    return base;
+  }
+
   function sendBestToAnalysis(args) {
     args = args || {};
     var rec = args.rec;
     var sheet = args.scoreSheet || [];
     var opts = { p1: args.p1, p2: args.p2 };
 
-    // Count how many recorded moves carry actual tile placements.
     var recMoves = (rec && rec.moves) ? rec.moves : [];
     var recPlacementCount = 0;
     for (var i = 0; i < recMoves.length; i++) {
       var pls = recMoves[i] && recMoves[i].placements;
       if (pls && pls.length) recPlacementCount += pls.length;
     }
-    // Count how many scoring turns the scoreSheet has (turns that NEED placement).
-    var sheetPlayTurns = 0;
-    for (var j = 0; j < sheet.length; j++) {
-      if (sheet[j] && sheet[j].action === 'play') sheetPlayTurns++;
-    }
 
     var project, name;
-    // Prefer the recording whenever it actually captured tile placements — it is
-    // the authoritative per-turn source. We do NOT require recMoves >= sheet.length
-    // anymore: a recording can legitimately have fewer entries (e.g. a turn the
-    // recorder didn't log) yet still hold every play's placements. Falling back to
-    // the scoreSheet would throw those placements away and force blank-guessing.
-    if (recPlacementCount > 0) {
+    if (recPlacementCount > 0 && recMoves.length >= sheet.length) {
+      // Fresh game: recording is complete AND has placements — use it directly.
       project = recordingToProject(rec, opts);
+    } else if (recPlacementCount > 0 && sheet.length > recMoves.length) {
+      // Resumed/partial recording but scoreSheet is the fuller turn history:
+      // keep ALL turns from the sheet and overlay the recording's placements.
+      project = mergeSheetAndRecording(sheet, rec, args.board, opts);
     } else if (sheet.length > 0) {
-      // No placements anywhere in the recording — scoreSheet is the only history.
+      // No placements anywhere — scoreSheet is the only history (board grid only).
       project = scoreSheetToProject(sheet, args.board, opts);
     } else if (recMoves.length > 0) {
       project = recordingToProject(rec, opts);
