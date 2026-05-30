@@ -1471,6 +1471,13 @@ function loadGameJSON(raw) {
 // =====================================================================
 function startReplay() {
   if(!S.plays.length){ alert('No plays loaded.'); return; }
+  // Warn if no per-turn tile data: replay can show scores but not tiles appearing.
+  let hasAssignment=false;
+  for(let r=0;r<15&&!hasAssignment;r++) for(let c=0;c<15;c++)
+    if(S.board[r][c] && S.board[r][c].turnIdx>=0){ hasAssignment=true; break; }
+  if(!hasAssignment && S.board.flat().some(c=>c)){
+    showToast('ℹ️ Tiles aren\'t mapped to turns — run 🪄 Auto-build first to see them appear turn by turn. Showing full board for now.');
+  }
   S.replay.active=true; S.replay.step=0; S.replay.playing=false;
   document.getElementById('an-replaybar').classList.add('visible');
   // Dim the editing controls while replaying so the board state isn't corrupted
@@ -1534,9 +1541,26 @@ function updateReplayUI() {
 }
 function renderReplayBoard() {
   const step=S.replay.step;
-  // Build board state at this step
+  // Does this game have ANY per-turn tile assignment? (scoreSheet-imported games
+  // have all turnIdx=-1 — nothing to step through tile-by-tile.)
+  let hasAssignment=false;
+  for(let r=0;r<15&&!hasAssignment;r++) for(let c=0;c<15;c++)
+    if(S.board[r][c] && S.board[r][c].turnIdx>=0){ hasAssignment=true; break; }
+
   const rb=Array.from({length:15},()=>Array(15).fill(null));
   const newCells=new Set(), pulseCells=new Set();
+
+  if(!hasAssignment){
+    // No tile-to-turn data: show the full final board throughout the replay so
+    // the user still sees the position while scores step through.
+    for(let r=0;r<15;r++) for(let c=0;c<15;c++){
+      const td=S.board[r][c]; if(td) rb[r][c]={...td,player:td.player||'unknown'};
+    }
+    renderBoard({replayBoard:rb, newCells, pulseCells});
+    return;
+  }
+
+  // Build board state at this step (turn-by-turn)
   for(let r=0;r<15;r++) for(let c=0;c<15;c++){
     const td=S.board[r][c]; if(!td) continue;
     if(td.turnIdx===-1){ if(step>=S.plays.length) rb[r][c]={...td,player:'unknown'}; continue; }
