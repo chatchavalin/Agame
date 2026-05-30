@@ -1972,7 +1972,13 @@
           counter.abort = false;
         }
 
-        for (const direction of ['horizontal', 'vertical']) {
+        // Search all FOUR directions, not just right/down. An existing tile can
+        // sit to the LEFT/ABOVE the anchor, so the only window that fits the rack
+        // may extend leftward/upward over that hook. Restricting to right/down
+        // made the AI miss valid bingos like 5+16-15-5=1 that hook an interior
+        // '=' on the anchor's left. (collectPlacementCells already supports
+        // left/up; we just never asked for them.)
+        for (const direction of ['right', 'left', 'down', 'up']) {
           if (counter.abort || counter.stopAll) break;
           if (Date.now() > stageDeadline) {
             counter.abort = true;
