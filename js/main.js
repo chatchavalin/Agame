@@ -3167,10 +3167,14 @@
       playerLabel: p1Label,
       aiLabel: p2Label,
       // "Send to Analysis" handoff — converts the recording to a project
-      onSendToAnalysis: (analysisRec && window.AMath.analysisExport) ? function(){
+      onSendToAnalysis: (window.AMath.analysisExport) ? function(){
         var p1n = isPvP ? (session.p1Name || 'Player 1') : 'You';
         var p2n = isPvP ? (session.p2Name || 'Player 2') : 'Computer';
-        var id = window.AMath.analysisExport.sendRecordingToAnalysis(analysisRec, {p1:p1n, p2:p2n});
+        var sheet = (window.AMath.scoreSheet && window.AMath.scoreSheet.getAllEntries)
+                    ? window.AMath.scoreSheet.getAllEntries() : [];
+        var id = window.AMath.analysisExport.sendBestToAnalysis({
+          rec: analysisRec, scoreSheet: sheet, board: session.board, p1: p1n, p2: p2n
+        });
         if (id) {
           // Carry the logged-in identity so analysis.html can auto-save to the cloud.
           var url = 'analysis.html';

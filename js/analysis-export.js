@@ -108,6 +108,49 @@
   }
 
   /**
+   * Build a project from a scoreSheet (the full per-turn history that survives
+   * save/resume) plus the final board grid. The scoreSheet lacks per-tile
+   * placements, so cells are left empty for Auto-build, but every TURN is present.
+   * @param {Array} scoreSheet entries {turn,who,action,score,isBingo,total}
+   * @param {object} board the game board (cells[r][c].tile.face) — optional
+   * @param {object} opts { p1, p2 }
+   */
+  function scoreSheetToProject(scoreSheet, board, opts) {
+    opts = opts || {};
+    var p1 = opts.p1 || 'Player 1';
+    var p2 = opts.p2 || 'Computer';
+
+    var grid = [];
+    for (var r = 0; r < 15; r++) { grid[r] = []; for (var c = 0; c < 15; c++) grid[r][c] = ''; }
+    // Fill grid from the final board if provided
+    if (board && board.cells) {
+      for (var rr = 0; rr < 15; rr++) {
+        for (var cc = 0; cc < 15; cc++) {
+          var cell = board.cells[rr] && board.cells[rr][cc];
+          if (cell && cell.tile) grid[rr][cc] = cell.tile.assigned || cell.tile.face || '';
+        }
+      }
+    }
+
+    var plays = (scoreSheet || []).map(function (e) {
+      var who = e.who === 'player' ? 'p1' : 'p2';
+      var type = e.action === 'play' ? (e.isBingo ? 'bingo' : 'yoyo')
+               : (e.action === 'swap' ? 'swap' : 'swap'); // pass/swap both 'swap'
+      return {
+        player: who,
+        equation: '',
+        score: e.score || 0,
+        type: type,
+        cells: [],
+        notes: e.action === 'pass' ? 'pass' : (e.action === 'swap' ? 'swap' : ''),
+        timeMs: 0
+      };
+    });
+
+    return { v: 2, p1: p1, p2: p2, grid: grid, plays: plays, cellMeta: [] };
+  }
+
+  /**
    * One-call helper for game pages: convert the recording and send it.
    * @param {object} rec recording doc
    * @param {object} opts { p1, p2 }
@@ -121,12 +164,44 @@
     return sendProjectToAnalysis(project, name);
   }
 
+  /**
+   * Smart sender: picks the most COMPLETE source.
+   * Prefers the recording IF it has as many (or more) turns than the scoreSheet
+   * (recording has per-tile placements). Otherwise falls back to the scoreSheet,
+   * which always holds the full turn history (survives save/resume).
+   * @param {object} args { rec, scoreSheet, board, p1, p2 }
+   */
+  function sendBestToAnalysis(args) {
+    args = args || {};
+    var rec = args.rec;
+    var sheet = args.scoreSheet || [];
+    var recTurns = (rec && rec.moves) ? rec.moves.length : 0;
+    var opts = { p1: args.p1, p2: args.p2 };
+
+    var project, name;
+    if (recTurns > 0 && recTurns >= sheet.length) {
+      // recording is complete — use it (has placements)
+      project = recordingToProject(rec, opts);
+    } else if (sheet.length > 0) {
+      // scoreSheet is the fuller history (e.g. loaded from a saved game)
+      project = scoreSheetToProject(sheet, args.board, opts);
+    } else if (recTurns > 0) {
+      project = recordingToProject(rec, opts);
+    } else {
+      return null;
+    }
+    name = stamp(new Date()) + '  ' + project.p1 + ' vs ' + project.p2;
+    return sendProjectToAnalysis(project, name);
+  }
+
   window.AMath = window.AMath || {};
   window.AMath.analysisExport = {
     stamp: stamp,
     recordingToProject: recordingToProject,
+    scoreSheetToProject: scoreSheetToProject,
     sendProjectToAnalysis: sendProjectToAnalysis,
     sendRecordingToAnalysis: sendRecordingToAnalysis,
+    sendBestToAnalysis: sendBestToAnalysis,
     PENDING_KEY: PENDING_KEY,
     SAVE_KEY: SAVE_KEY
   };
