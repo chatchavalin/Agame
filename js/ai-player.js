@@ -814,6 +814,8 @@
       rack: state.aiRack.tiles.map(function(t){ return t.assigned || t.face; }).join(','),
       bingoFeasible: bingoFeasible,
       bingoIsHard: bingoIsHard,
+      budgetMs: timeBudget,
+      level: getBotLevel(),
       bingo: bingoPlay ? (bingoPlay.score + '/' + bingoPlay.placements.length + 't') : 'none',
       yoyo: yoyoPlay ? (yoyoPlay.score + '/' + yoyoPlay.placements.length + 't') : 'none',
       fast: fastBingoPlay ? String(fastBingoPlay.score) : 'none',

@@ -2622,7 +2622,8 @@
       var diag = window.AMath.aiPlayer && window.AMath.aiPlayer._lastDecisionDiag;
       if (diag) {
         window.AMath.gameLog.log('AI search: rack=[' + diag.rack + '] feasible=' + diag.bingoFeasible +
-          (diag.bingoIsHard ? ' (hard)' : '') + ' | bingo=' + diag.bingo + ' yoyo=' + diag.yoyo +
+          (diag.bingoIsHard ? ' (hard)' : '') + ' budget=' + Math.round((diag.budgetMs||0)/1000) + 's level=' + (diag.level||'?') +
+          ' | bingo=' + diag.bingo + ' yoyo=' + diag.yoyo +
           ' fast=' + diag.fast + ' grammar=' + diag.grammar + ' → best=' + diag.best);
       } else {
         window.AMath.gameLog.log('AI search: (no diagnostics captured — decision returned before search, or stale code)');
