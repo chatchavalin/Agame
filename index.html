@@ -3,6 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <!-- Prevent the browser from serving a stale cached index.html, which would
+       keep loading old ?v= script URLs even after we bump them. Forces a fresh
+       HTML fetch each visit so new code actually loads. -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>A-Math</title>
   <!-- Cache-busting: bump ?v= when you ship changes so browsers fetch the
        new files instead of serving stale cached versions. -->
