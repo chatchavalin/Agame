@@ -808,6 +808,19 @@
       '→ best=' + (bestPlay ? bestPlay.score + '/' + bestPlay.placements.length + 't' : 'none')
     );
 
+    // Snapshot the search outcome so the game log can record exactly what the AI
+    // saw and decided this turn (for diagnosing 'missed bingo' reports).
+    window.AMath.aiPlayer._lastDecisionDiag = {
+      rack: state.aiRack.tiles.map(function(t){ return t.assigned || t.face; }).join(','),
+      bingoFeasible: bingoFeasible,
+      bingoIsHard: bingoIsHard,
+      bingo: bingoPlay ? (bingoPlay.score + '/' + bingoPlay.placements.length + 't') : 'none',
+      yoyo: yoyoPlay ? (yoyoPlay.score + '/' + yoyoPlay.placements.length + 't') : 'none',
+      fast: fastBingoPlay ? String(fastBingoPlay.score) : 'none',
+      grammar: grammarBingoPlay ? String(grammarBingoPlay.score) : 'none',
+      best: bestPlay ? (bestPlay.score + '/' + bestPlay.placements.length + 't') : 'none'
+    };
+
     if (hasMultiBlanks && bestPlay) {
       console.log('[AI] Multi-blank rack (' + rackBlanks + ' blanks): best=' +
                   bestPlay.score + 'pts using ' + countBlanksInPlay(bestPlay) + ' blanks');
