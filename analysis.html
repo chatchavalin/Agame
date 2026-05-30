@@ -1239,6 +1239,11 @@ function renderSidebar() {
   const list=document.getElementById('an-turn-list');
   const cnt=document.getElementById('an-play-count');
   if(cnt) cnt.textContent = S.plays.length ? S.plays.length+' turns' : '';
+  // Show/hide replay + report based on whether there are any plays (do this
+  // BEFORE the early return so an empty game correctly hides them).
+  const hasPlays = S.plays.length>0;
+  document.getElementById('btn-replay').style.display = hasPlays ? '' : 'none';
+  document.getElementById('btn-report').style.display = hasPlays ? '' : 'none';
   if(!S.plays.length){ list.innerHTML='<div style="color:#475569;font-size:12px;padding:6px 2px">No plays yet — tap + Play or load a game.</div>'; return; }
   list.innerHTML='';
   const icons={bingo:'🎯',yoyo:'🪀',swap:'🔄',other:'📝'};
@@ -1267,8 +1272,6 @@ function renderSidebar() {
     `;
     list.appendChild(it);
   });
-  // Show replay button
-  if(S.plays.length>0){ document.getElementById('btn-replay').style.display=''; document.getElementById('btn-report').style.display=''; }
 }
 
 // =====================================================================
