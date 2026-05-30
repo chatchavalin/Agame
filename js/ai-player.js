@@ -28,6 +28,7 @@
   let _isEducationMode = false;
   let _desperationRetryActive = false;  // set by decideMove during fallback retry
   let _lastTopPlays = [];  // Top plays from last search — survives any return path
+  let _blankValueSet = null;  // cached set of inventory-valid numeric blank faces (for solve fast-path)
   function getTimeBudgetMs() {
     try {
       // Bot level overrides think time
@@ -2848,7 +2849,19 @@
       counter._seenWindows.add(sig);
     }
 
-    const rack = aiRack.tiles;
+    // Reorder so BLANK tiles come LAST. permuteAndTry fills cellPositions in order
+    // and prefers lower-index rack tiles for earlier cells, so putting blanks last
+    // makes them land in the final cells — at which point the rest of the equation
+    // is fully determined and the solve-for-blank fast path (solveLastCell) can
+    // deduce a standalone-number blank's value directly instead of trying ~23
+    // faces. This is a pure REORDERING of the same tile set, so the set of board
+    // outcomes explored is unchanged (a blank can take any face a reordered tile
+    // would have): completeness/accuracy is preserved. We copy the array so the
+    // real rack object is never mutated.
+    var rack = aiRack.tiles.slice().sort(function (a, b) {
+      var ab = a.type === 'blank' ? 1 : 0, bb = b.type === 'blank' ? 1 : 0;
+      return ab - bb;
+    });
     const used = new Array(rack.length).fill(false);
     const sequence = [];
 
@@ -3046,6 +3059,72 @@
     return { prev: faceOfSlot(pos - 1), next: faceOfSlot(pos + 1) };
   }
 
+  // SOLVE-FOR-BLANK fast path. When exactly ONE placement cell remains unfilled
+  // and that cell is a STANDALONE-NUMBER slot (its line-neighbors are operators/=,
+  // not digits — so it isn't a digit inside a multi-digit number), the whole
+  // equation is determined except for this one number, which is therefore the
+  // solution of a linear equation. Compute it directly (two-probe exact-fraction
+  // solve) instead of trying all ~23 faces. Returns the solved face string if it's
+  // a single valid value, or null to mean "can't solve cleanly — fall back to
+  // normal enumeration" (e.g. neighbor is a digit, or value isn't an integer in
+  // range). This NEVER causes a miss: a null falls back to the full search, and a
+  // non-null is the unique value that can work there (every other face fails the
+  // equation), so no valid play is skipped.
+  function solveLastCell(depth, sequence, rack, cellPositions, numTiles, lineTemplate, validValueSet) {
+    if (!lineTemplate || !lineTemplate.slots) return null;
+    if (depth !== numTiles - 1) return null;            // only when ONE cell remains
+    var slots = lineTemplate.slots;
+    var pos = -1;
+    for (var si = 0; si < slots.length; si++) if (slots[si].cellIdx === depth) { pos = si; break; }
+    if (pos < 0) return null;
+    var isDigitFace = function (f) { return f !== null && /^[0-9]$/.test(f); };
+    function faceOfSlot(k) {
+      if (k < 0 || k >= slots.length) return null;
+      var sl = slots[k];
+      if (sl.fixed !== undefined) return sl.fixed;
+      if (sl.cellIdx !== undefined && sl.cellIdx < sequence.length) {
+        var t = rack[sequence[sl.cellIdx]]; return t.assigned || t.face;
+      }
+      return null;
+    }
+    // If either immediate neighbor is a single digit, this hole may concatenate
+    // into a multi-digit number — solving as a standalone number is unsafe. Bail.
+    if (isDigitFace(faceOfSlot(pos - 1)) || isDigitFace(faceOfSlot(pos + 1))) return null;
+    var faces = [];
+    var holeIndex = -1;
+    for (var k2 = 0; k2 < slots.length; k2++) {
+      var slk = slots[k2];
+      if (slk.cellIdx === depth) { holeIndex = faces.length; faces.push('?'); continue; }
+      var fc = faceOfSlot(k2);
+      if (fc === null) return null;
+      faces.push(fc);
+    }
+    if (holeIndex < 0) return null;
+    var eqIdx = faces.indexOf('=');
+    if (eqIdx < 0) return null;
+    var ev = (typeof window !== 'undefined' && window.AMath && window.AMath.evaluator) || null;
+    if (!ev) return null;
+    function sideFrac(arr) {
+      var tr = ev.tokenize(arr); if (tr.error || !tr.tokens) return null;
+      var r = ev.evaluateSegment(tr.tokens); return r.ok ? r.value : null;
+    }
+    function gAt(x) {
+      var t = faces.slice(); t[holeIndex] = String(x);
+      var L = sideFrac(t.slice(0, eqIdx)), R = sideFrac(t.slice(eqIdx + 1));
+      if (L === null || R === null) return null;
+      return L.num * R.den - R.num * L.den;
+    }
+    var g0 = gAt(0), g1 = gAt(1);
+    if (g0 === null || g1 === null) return null;
+    var m = g1 - g0;
+    if (m === 0) return null;
+    if ((-g0) % m !== 0) return null;
+    var x = (-g0) / m;
+    var xs = String(x);
+    if (!validValueSet.has(xs)) return null;
+    return xs;
+  }
+
   function permuteAndTry(
     rack, used, sequence, cellPositions, numTiles, board,
     isFirstMove, onValidPlay, counter, stageStart, stageBudgetMs, maxCandidates,
@@ -3103,6 +3182,37 @@
       if (isDuplicate) continue;
       const cellPos = cellPositions[sequence.length]; // the cell this tile will go into
       let assignedValues = getCandidateAssignments(tile, rack, isFirstMove, board, cellPos);
+
+      // ── SOLVE-FOR-BLANK fast path ──
+      // If this is a BLANK filling the LAST remaining cell, the rest of the line
+      // is fully determined, so a standalone-number hole has exactly one possible
+      // value — compute it instead of trying ~23 faces. We INTERSECT the solved
+      // value with the normal candidate list (so any neighbor/grammar filtering
+      // still applies) and only substitute when the solve succeeds; otherwise we
+      // leave assignedValues untouched and fall back to full enumeration. This is
+      // accuracy-safe: the solved value is the unique number that can satisfy the
+      // equation there, so no valid play is lost.
+      if (tile.type === 'blank' && lineTemplate && sequence.length === numTiles - 1) {
+        if (!_blankValueSet) {
+          _blankValueSet = new Set();
+          var bvc = (C.getBlankChoices ? C.getBlankChoices() : C.BLANK_CHOICES);
+          for (var bvi = 0; bvi < bvc.length; bvi++) if (/^[0-9]+$/.test(bvc[bvi])) _blankValueSet.add(bvc[bvi]);
+        }
+        var solved = solveLastCell(sequence.length, sequence, rack, cellPositions, numTiles, lineTemplate, _blankValueSet);
+        if (solved !== null && assignedValues.indexOf(solved) >= 0) {
+          // Replace the ~23 numeric tries with just the solved value. We KEEP any
+          // non-number faces (operator/'=') from the original list, since the
+          // solve only covers the standalone-number interpretation — an operator
+          // here would form a different (also valid) equation shape and must still
+          // be tried. So: solved number + all non-number candidates.
+          var kept = [solved];
+          for (var ai = 0; ai < assignedValues.length; ai++) {
+            var av = assignedValues[ai];
+            if (!/^[0-9]+$/.test(av)) kept.push(av);   // keep ops and '='
+          }
+          assignedValues = kept;
+        }
+      }
 
       // Neighbor-aware face filter (accuracy-safe pruning of the blank/choice
       // explosion). Drop only faces that would create an IMMEDIATELY invalid
