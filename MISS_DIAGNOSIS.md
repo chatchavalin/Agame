@@ -72,3 +72,28 @@ So there are (at least) TWO missed playable bingos on this position:
 Both are cap/time-bound misses; both have a solvable standalone-number blank +
 an operator blank → solve-for-blank is the correct fix. These are now the concrete
 regression targets the fix must satisfy.
+
+## ROOT CAUSE FOUND (two distinct bugs)
+Window cells are collected by walking ONE direction from an anchor, skipping
+occupied cells (collectPlacementCells). Anchors = empty cells ADJACENT to a tile.
+
+BUG 1 — 76-bingo (1=6+5-15+5), cells [1,3,4,5,6,7,8,9]: REACHABLE from anchor
+(11,1) going right (col1, skip '='@col2, col3..col9). So it SHOULD be found. It is
+not found within budget → the cause for THIS one is in blank-face generation/time
+for that specific window (still to pin down), NOT geometry.
+
+BUG 2 — 70-bingo (15=-5+15+5), cells [0,1,3,4,5,6,7,8]: needs col0. col0 is only
+reachable by starting collection at col0 and going right, but (11,0) is NOT adjacent
+to any tile, so it is NOT generated as an anchor. From (11,1) going right you start
+at col1 and never include col0; from (11,1) going left you get only [1,0] then OOB.
+So this window is UNREACHABLE by the current anchor+single-direction collection.
+This is a genuine WINDOW-GENERATION GAP: a bingo whose far end lands on a board-edge
+empty cell separated from the hook can't be framed. Fix would require generating
+windows that extend PAST the anchor on the far side (or seeding anchors at empty
+cells that are reachable along a line from a tile within N steps, not just immediate
+neighbors).
+
+## Next
+Tackle BUG 2 (window generation) — it's a concrete, testable gap and likely the
+class behind several "obvious" misses. Then re-examine BUG 1. Keep both bingos as
+regression targets (70 and 76 on this position).
