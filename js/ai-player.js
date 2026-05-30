@@ -3016,6 +3016,36 @@
     return false;
   }
 
+  // For the cell about to be filled (cellPositions[depth]), find the faces of its
+  // IMMEDIATE line-neighbors that are already DETERMINED — either a fixed board
+  // tile or a rack tile already placed in this partial sequence. Returns
+  // { prev, next } face strings (or null). Used to drop blank/choice faces that
+  // would create an immediately-invalid adjacency (e.g. two binary operators),
+  // which is provably safe (validatePlay would reject them anyway) and avoids the
+  // assign+recurse overhead of trying them.
+  function determinedNeighbors(depth, sequence, rack, cellPositions, lineTemplate) {
+    var slots = lineTemplate && lineTemplate.slots;
+    if (!slots) return { prev: null, next: null };
+    var curCellIdx = depth; // cells fill in cellPositions order → cellIdx === depth
+    function placedFace(cellIdx) {
+      if (cellIdx < sequence.length) { var t = rack[sequence[cellIdx]]; return t.assigned || t.face; }
+      return null;
+    }
+    var pos = -1;
+    for (var s = 0; s < slots.length; s++) {
+      if (slots[s].cellIdx === curCellIdx) { pos = s; break; }
+    }
+    if (pos < 0) return { prev: null, next: null };
+    function faceOfSlot(si) {
+      if (si < 0 || si >= slots.length) return null;
+      var sl = slots[si];
+      if (sl.fixed !== undefined) return sl.fixed;
+      if (sl.cellIdx !== undefined) return placedFace(sl.cellIdx);
+      return null;
+    }
+    return { prev: faceOfSlot(pos - 1), next: faceOfSlot(pos + 1) };
+  }
+
   function permuteAndTry(
     rack, used, sequence, cellPositions, numTiles, board,
     isFirstMove, onValidPlay, counter, stageStart, stageBudgetMs, maxCandidates,
@@ -3072,7 +3102,42 @@
       }
       if (isDuplicate) continue;
       const cellPos = cellPositions[sequence.length]; // the cell this tile will go into
-      const assignedValues = getCandidateAssignments(tile, rack, isFirstMove, board, cellPos);
+      let assignedValues = getCandidateAssignments(tile, rack, isFirstMove, board, cellPos);
+
+      // Neighbor-aware face filter (accuracy-safe pruning of the blank/choice
+      // explosion). Drop only faces that would create an IMMEDIATELY invalid
+      // adjacency with an already-determined neighbor — exactly what validatePlay
+      // would reject — so no valid play is ever lost, but we avoid assigning the
+      // face and recursing. Only filters multi-face tiles (blanks/choices); a
+      // fixed tile keeps its single face untouched.
+      if (lineTemplate && assignedValues.length > 1) {
+        var nb = determinedNeighbors(sequence.length, sequence, rack, cellPositions, lineTemplate);
+        // Does the line already contain a determined '=' anywhere? A bingo has
+        // exactly one '=', so if one is already placed/fixed, a blank here can
+        // never be '=' — drop it (safe, validatePlay would reject two '=').
+        var alreadyHasEquals = false;
+        if (lineTemplate.slots) {
+          for (var es = 0; es < lineTemplate.slots.length; es++) {
+            var esl = lineTemplate.slots[es];
+            var ef = esl.fixed !== undefined ? esl.fixed
+                   : (esl.cellIdx !== undefined && esl.cellIdx < sequence.length ? (rack[sequence[esl.cellIdx]].assigned || rack[sequence[esl.cellIdx]].face) : null);
+            if (ef === '=') { alreadyHasEquals = true; break; }
+          }
+        }
+        if (nb.prev !== null || nb.next !== null || alreadyHasEquals) {
+          var isBinOp = function (f) { return f === '+' || f === '-' || f === '×' || f === '÷'; };
+          var prevBin = isBinOp(nb.prev), nextBin = isBinOp(nb.next);
+          var prevEq = nb.prev === '=', nextEq = nb.next === '=';
+          var filtered = assignedValues.filter(function (f) {
+            if (isBinOp(f) && (prevBin || nextBin)) return false;
+            if (f === '=' && (prevBin || nextBin)) return false;
+            if (f === '=' && (prevEq || nextEq)) return false;
+            if (f === '=' && alreadyHasEquals) return false;   // exactly one '='
+            return true;
+          });
+          if (filtered.length > 0) assignedValues = filtered;
+        }
+      }
 
       for (const assigned of assignedValues) {
         if (counter.abort) return;

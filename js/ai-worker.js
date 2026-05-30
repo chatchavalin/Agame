@@ -31,7 +31,7 @@ self.window = self;
 // Cache-bust version — bumped whenever any imported AI module changes.
 // Without this, the worker would serve cached old AI code even after a
 // hard refresh on the main page (worker has its own cache lifecycle).
-const CACHE_V = '?v=v216';
+const CACHE_V = '?v=v217';
 
 // Load all AI dependencies. Order matters — match what index.html loads.
 try {

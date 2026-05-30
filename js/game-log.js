@@ -35,7 +35,7 @@
     entries = [];
     gameStartTime = Date.now();
     info = info || {};
-    info.codeVersion = 'v212';   // bump with each ship; confirms fresh code is loaded
+    info.codeVersion = 'v217';   // bump with each ship; confirms fresh code is loaded
     log('GAME', 'New game started', info);
   }
 
