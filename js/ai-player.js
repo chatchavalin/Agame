@@ -812,6 +812,7 @@
     // saw and decided this turn (for diagnosing 'missed bingo' reports).
     window.AMath.aiPlayer._lastDecisionDiag = {
       rack: state.aiRack.tiles.map(function(t){ return t.assigned || t.face; }).join(','),
+      rackTypes: state.aiRack.tiles.map(function(t){ return t.type + ':' + t.face + (t.assigned ? '=' + t.assigned : ''); }).join(' '),
       bingoFeasible: bingoFeasible,
       bingoIsHard: bingoIsHard,
       budgetMs: timeBudget,
