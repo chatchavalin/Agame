@@ -12,6 +12,16 @@ service cloud.firestore {
       allow create: if request.auth != null && request.auth.uid == userId;
       allow update: if request.auth != null && request.auth.uid == userId;
       allow delete: if false;
+
+      // Saved analysis projects — owner-only read/write (rules don't cascade,
+      // so this subcollection needs its own match block). Capped client-side
+      // to the last 20.
+      match /analysisProjects/{projectId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // In-progress game string lives on the user doc itself (no subcollection),
+      // so it's covered by the update rule above.
     }
 
     // Game replays — one doc per finished game

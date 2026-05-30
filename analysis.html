@@ -1020,8 +1020,18 @@ function saveGamePrompt() {
                    : (S.p1Name+' vs '+S.p2Name);
   const name = prompt('Save game as:', defaultName);
   if(name===null) return; // cancelled
-  const id = saveCurrentGame(name.trim()||defaultName, existingId);
-  if(id){ S._currentId = id; showToast('💾 Saved "'+(name.trim()||defaultName)+'"'); renderSavedList(); }
+  const finalName = name.trim()||defaultName;
+  const id = saveCurrentGame(finalName, existingId);
+  if(id){
+    S._currentId = id;
+    showToast('💾 Saved "'+finalName+'"');
+    renderSavedList();
+    // Also back up to the server if logged in (last-20, silent for guests)
+    if(window.AMathBridge && !window.AMathBridge.isGuest()){
+      window.AMathBridge.saveAnalysisProject(finalName, serializeGame())
+        .then(function(cid){ if(cid){ showToast('☁️ Backed up to your account'); renderCloudList(); } });
+    }
+  }
 }
 function renameSavedPrompt(id) {
   const lib = loadSavedLibrary();
