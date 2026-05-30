@@ -2890,18 +2890,16 @@
     for (var i = 0; i < cellPositions.length; i++) {
       var faces = [];
       var pr = cellPositions[i].row - dr, pc = cellPositions[i].col - dc;
-      // stop if we reach the previous placement cell
       var prevCell = i > 0 ? cellPositions[i - 1] : null;
       while (true) {
         if (prevCell && pr === prevCell.row && pc === prevCell.col) break;
         var f = faceAt(pr, pc);
         if (f === null) break;
-        faces.unshift(f);     // collected backward, so prepend to keep line order
+        faces.unshift(f);
         pr -= dr; pc -= dc;
       }
       before.push(faces);
     }
-    // faces AFTER the last placement cell (contiguous existing tiles)
     var after = [];
     var last = cellPositions[cellPositions.length - 1];
     var ar = last.row + dr, ac = last.col + dc;
@@ -2911,7 +2909,43 @@
       after.push(af);
       ar += dr; ac += dc;
     }
-    return { before: before, after: after };
+
+    // ── Canonical READING-ORDER slot list (direction-independent) ──
+    // The search may fill cells right→left or bottom→top, but the EQUATION reads
+    // left→right / top→bottom. Build the full line as an ordered list of slots,
+    // each either { fixed: face } (an existing board tile) or { cellIdx } (a
+    // placement cell, to be filled by a rack tile). Sorting cells by (row, col)
+    // gives reading order regardless of search direction. The fixed tiles that
+    // sit between cells are the same set captured in `before`/`after`; we
+    // re-derive them in reading order here so the value prune is unambiguous.
+    var ordered = cellPositions
+      .map(function (p, idx) { return { row: p.row, col: p.col, cellIdx: idx }; })
+      .slice()
+      .sort(function (a, b) { return a.row - b.row || a.col - b.col; });
+    // Step direction in reading order (positive along the line's axis).
+    var rdr = 0, rdc = 0;
+    if (dc !== 0) rdc = 1; else rdr = 1;
+    var slots = [];
+    // Leading fixed tiles before the first cell (reading order).
+    var fr = ordered[0].row - rdr, fc = ordered[0].col - rdc;
+    var lead = [];
+    while (true) { var lf = faceAt(fr, fc); if (lf === null) break; lead.unshift(lf); fr -= rdr; fc -= rdc; }
+    for (var li = 0; li < lead.length; li++) slots.push({ fixed: lead[li] });
+    for (var oi = 0; oi < ordered.length; oi++) {
+      slots.push({ cellIdx: ordered[oi].cellIdx });
+      // fixed tiles between this cell and the next (reading order)
+      var nr = ordered[oi].row + rdr, nc = ordered[oi].col + rdc;
+      var nextCell = oi + 1 < ordered.length ? ordered[oi + 1] : null;
+      while (true) {
+        if (nextCell && nr === nextCell.row && nc === nextCell.col) break;
+        var bf = faceAt(nr, nc);
+        if (bf === null) break;
+        slots.push({ fixed: bf });
+        nr += rdr; nc += rdc;
+      }
+    }
+
+    return { before: before, after: after, slots: slots };
   }
 
   function collectPlacementCells(board, anchor, direction, numTiles) {
