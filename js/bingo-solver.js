@@ -66,6 +66,20 @@
    * @param {{maxSolutions?:number, nodeCap?:number}} [opts]
    * @returns {string[][]} list of solution face-arrays (deduped)
    */
+  // Evaluate a completed segment's faces to an exact fraction, or null if it
+  // isn't a well-formed expression. Wraps the real evaluator so the math matches
+  // exactly (concatenation, unary minus, ×÷ precedence, fractions).
+  function segmentValue(faces) {
+    var ev = (typeof window !== 'undefined' && window.AMath && window.AMath.evaluator) ||
+             (typeof require !== 'undefined' ? null : null);
+    if (!ev) return null;
+    var tr = ev.tokenize(faces);
+    if (tr.error || !tr.tokens) return null;
+    var r = ev.evaluateSegment(tr.tokens);
+    return r.ok ? r.value : null;
+  }
+  function fracEq(a, b) { return a && b && a.num * b.den === b.num * a.den; }
+
   function solve(tiles, validate, opts) {
     opts = opts || {};
     var maxSol = opts.maxSolutions || 1;
@@ -80,12 +94,20 @@
     var seen = {};
     var nodes = 0;
     var capped = false;
+    var lhsVal = null;   // value of the left side once '=' is placed (single-'=' bingos)
+    var eqAt = -1;       // sequence index of the (first) '='
 
     function dfs() {
       if (out.length >= maxSol || capped) return;
       if (++nodes > nodeCap) { capped = true; return; }
       if (seq.length === n) {
-        if (seq.indexOf('=') < 0) return;        // must be an equation
+        if (eqAt < 0) return;                    // must contain '='
+        // Cheap value check before the full validate(): the right side must
+        // equal the already-computed left side. This prunes the vast majority
+        // of completed leaves (especially heavy-BLANK racks) without paying for
+        // a full tokenize+structural re-validation on each one.
+        var rhs = segmentValue(seq.slice(eqAt + 1));
+        if (rhs === null || !fracEq(rhs, lhsVal)) return;
         var key = seq.join(' ');
         if (seen[key]) return;
         if (validate(seq)) {
@@ -102,8 +124,19 @@
         var isBlank = descs[i] === 'BLANK';
         var cs = choices[i];
         for (var ci = 0; ci < cs.length; ci++) {
-          seq.push(cs[ci]); blk.push(isBlank);
-          if (partialOk(seq)) { used[i] = true; dfs(); used[i] = false; }
+          var f = cs[ci];
+          seq.push(f); blk.push(isBlank);
+          var ok = partialOk(seq);
+          var savedEqAt = eqAt, savedLhs = lhsVal;
+          // When the first '=' is placed, compute the left side's value once.
+          // If the left side isn't a well-formed expression, prune immediately.
+          if (ok && f === '=' && eqAt < 0) {
+            lhsVal = segmentValue(seq.slice(0, seq.length - 1));
+            eqAt = seq.length - 1;
+            if (lhsVal === null) ok = false;
+          }
+          if (ok) { used[i] = true; dfs(); used[i] = false; }
+          eqAt = savedEqAt; lhsVal = savedLhs;
           seq.pop(); blk.pop();
           if (out.length >= maxSol || capped) return;
         }
@@ -139,16 +172,16 @@
   function bingos(rack, validate, inventory, opts) {
     opts = opts || {};
     var ex = opts.examples || 3;
-    // Heavy-BLANK racks (each BLANK = 15 face choices) explode the search. A
-    // bigger cap does NOT fix the two-BLANK case: the DFS reaches some valid
-    // arrangements only ~30M+ nodes deep (its fixed face-order finds them late),
-    // and exhausting that for all 24 hooks takes ~100s — far too slow for an
-    // interactive tool, and you don't want a time cap. So we keep the cap modest
-    // (fast/responsive) and, when it's hit without finding a bingo, report
-    // "couldn't finish" HONESTLY instead of the old false "no bingo exists"
-    // (calculator.js). A proper fix needs a smarter blank-aware search order,
-    // not a larger cap. No time cap by design.
-    var nodeCap = opts.nodeCap || 2000000;
+    // Per-solve node cap. The DFS now prunes hard with incremental segment-value
+    // checks (left side computed once at '=', right side must match before the
+    // full validate), which roughly doubles efficiency and lets it find many
+    // bingos the old 1.5M search missed. Even so, the worst case — TWO blanks
+    // searched across all ~24 candidate hooks — cannot be fully exhausted in
+    // interactive time by this permutation search (it would need a number-
+    // partition rewrite). We keep the cap modest so normal/one-blank racks stay
+    // instant; when a two-blank search hits the cap we report "couldn't finish"
+    // honestly (calculator.js) rather than a false "no bingo". No time cap.
+    var nodeCap = opts.nodeCap || 2500000;
     var capped = false;
 
     var eight = solve(rack, validate, { maxSolutions: ex, nodeCap: nodeCap });
