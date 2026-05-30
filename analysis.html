@@ -1896,6 +1896,62 @@ function solvePlacementsWithBlanks(target, currentTurn, boardState, maxBlanks) {
   return uniq;
 }
 
+// AGGRESSIVE no-match solver. For a turn the normal pipeline couldn't place
+// (often because earlier turns are themselves unplaced so it has no hooks, or it
+// was a cross-equation), this IGNORES the hook/connection requirement and treats
+// the board as fully open: scan every contiguous window of existing faces and try
+// up to maxBlanks cells as blanks (0 pts; square premium still applies), keeping
+// windows that form a VALID equation scoring the target. Candidates are flagged
+// aggressive:true and ALWAYS surfaced as picks (never auto-placed) since there's
+// no connection guarantee — they're educated guesses for the user to confirm.
+function solveNoMatchAggressive(target, boardState, maxBlanks) {
+  maxBlanks = maxBlanks || 3;
+  const ev = window.AMath && window.AMath.evaluator;
+  const results=[];
+  function lineScore(cells, blankSet){
+    let base=0, mult=1;
+    for(const [r,c] of cells){
+      let pt = blankSet.has(r+','+c) ? 0 : (PTS[boardState[r][c].face]||0);
+      const pr=PREMIUM[r][c];
+      if(pr==='3T')pt*=3; else if(pr==='2T')pt*=2; else if(pr==='3E')mult*=3; else if(pr==='2E')mult*=2;
+      base+=pt;
+    }
+    return base*mult;
+  }
+  function validWithBlanks(cells, blankIdxs){
+    if(!ev) return true;
+    const faces=cells.map(([r,c])=>boardState[r][c].face);
+    if(!faces.includes('=')) return false;
+    if(blankIdxs.length===0) return ev.validateEquation(faces).valid;
+    const CAND=['0','1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','+','-','×','÷','='];
+    let ok=false;
+    const rec=(k)=>{ if(ok) return; if(k===blankIdxs.length){ if(ev.validateEquation(faces).valid) ok=true; return; }
+      for(const f of CAND){ faces[blankIdxs[k]]=f; rec(k+1); if(ok) return; } };
+    rec(0); return ok;
+  }
+  for(let li=0;li<15;li++) for(const isRow of [true,false]) for(let len=2;len<=8;len++) for(let start=0;start+len<=15;start++){
+    const cells=[]; let ok=true;
+    for(let k=0;k<len;k++){ const r=isRow?li:start+k, c=isRow?start+k:li; if(!boardState[r][c]){ok=false;break;} cells.push([r,c]); }
+    if(!ok) continue;
+    const push=(blankIdxs)=>{
+      const blankSet=new Set(blankIdxs.map(i=>cells[i][0]+','+cells[i][1]));
+      if(lineScore(cells, blankSet)!==target) return;
+      if(!validWithBlanks(cells, blankIdxs)) return;
+      const blanks=blankIdxs.map(i=>cells[i]);
+      const sig=cells.map(x=>x.join(',')).sort().join('|')+'#'+blanks.map(x=>x.join(',')).sort().join('|');
+      results.push({isRow,lineIndex:li,start,len:cells.length,cells,bingo:cells.length===8,sig,blanks,aggressive:true,
+        label:(isRow?'Row ':'Col ')+li+' c'+start+'–'+(start+len-1)+(blanks.length?' (blank @ '+blanks.map(x=>x.join(',')).join(' & ')+')':'')});
+    };
+    push([]);
+    for(let i=0;i<cells.length;i++) push([i]);
+    if(maxBlanks>=2) for(let i=0;i<cells.length;i++) for(let j=i+1;j<cells.length;j++) push([i,j]);
+    if(maxBlanks>=3) for(let i=0;i<cells.length;i++) for(let j=i+1;j<cells.length;j++) for(let k=j+1;k<cells.length;k++) push([i,j,k]);
+  }
+  const seen2=new Set(); const uniq2=[];
+  results.forEach(r=>{ if(!seen2.has(r.sig)){ seen2.add(r.sig); uniq2.push(r); }});
+  return uniq2;
+}
+
 // already built (touch an existing tile from a prior turn) — except turn 1,
 // which must cover center (7,7). Classifies each turn:
 //   'auto'      → exactly 1 legal window  → assign automatically
@@ -1964,7 +2020,14 @@ function autoReconstruct() {
       } else if(withBlanks.length>1){
         results.push({turn:t+1,status:'ambiguous',options:withBlanks,blankGuess:true});
       } else {
-        results.push({turn:t+1,status:'none',options:[]});
+        // Last resort: aggressive open-board blank search (ignores hooks). These
+        // are looser guesses, capped and shown as picks tagged 'aggressive'.
+        const aggr = solveNoMatchAggressive(p.score, S.board, 3);
+        if(aggr.length>=1){
+          results.push({turn:t+1,status:'ambiguous',options:aggr.slice(0,8),blankGuess:true,aggressive:true});
+        } else {
+          results.push({turn:t+1,status:'none',options:[]});
+        }
       }
     }
   });
@@ -2488,7 +2551,9 @@ function renderAutoBuildBody(){
     amb.forEach(r=>{
       const p=S.plays[r.turn-1];
       const name=p.player==='p1'?S.p1Name:S.p2Name;
-      const blankNote = r.blankGuess ? ' <span style="color:#94a3b8;font-weight:600">(involves a blank tile — best guess)</span>' : '';
+      const blankNote = r.aggressive
+        ? ' <span style="color:#fca5a5;font-weight:600">(loose guess — no confirmed connection; verify against your memory)</span>'
+        : (r.blankGuess ? ' <span style="color:#94a3b8;font-weight:600">(involves a blank tile — best guess)</span>' : '');
       html+=`<div style="background:#0f172a;border-left:3px solid #f59e0b;border-radius:8px;padding:9px 11px;margin-bottom:8px">
         <div style="font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:5px">Turn ${r.turn} · ${name} · ${p.score}pts — which placement?${blankNote}</div>`;
       r.options.slice(0,6).forEach(o=>{
@@ -2611,7 +2676,12 @@ function recheckAutoBuild(){
       if(withBlanks.length>=1){
         newResults.push({turn:t+1,status:'ambiguous',options:withBlanks,blankGuess:true});
       } else {
-        newResults.push({turn:t+1,status:'none',options:[]});
+        const aggr = solveNoMatchAggressive(p.score, S.board, 3);
+        if(aggr.length>=1){
+          newResults.push({turn:t+1,status:'ambiguous',options:aggr.slice(0,8),blankGuess:true,aggressive:true});
+        } else {
+          newResults.push({turn:t+1,status:'none',options:[]});
+        }
       }
     }
   });
