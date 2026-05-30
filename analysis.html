@@ -1905,7 +1905,7 @@ function solvePlacementsWithBlanks(target, currentTurn, boardState, maxBlanks) {
 // aggressive:true and ALWAYS surfaced as picks (never auto-placed) since there's
 // no connection guarantee — they're educated guesses for the user to confirm.
 function solveNoMatchAggressive(target, boardState, maxBlanks) {
-  maxBlanks = maxBlanks || 3;
+  maxBlanks = Math.min(maxBlanks || 2, 2);  // 2+ blanks in ONE play is already rare; 3 is noise
   const ev = window.AMath && window.AMath.evaluator;
   const results=[];
   function lineScore(cells, blankSet){
@@ -1945,11 +1945,22 @@ function solveNoMatchAggressive(target, boardState, maxBlanks) {
     push([]);
     for(let i=0;i<cells.length;i++) push([i]);
     if(maxBlanks>=2) for(let i=0;i<cells.length;i++) for(let j=i+1;j<cells.length;j++) push([i,j]);
-    if(maxBlanks>=3) for(let i=0;i<cells.length;i++) for(let j=i+1;j<cells.length;j++) for(let k=j+1;k<cells.length;k++) push([i,j,k]);
   }
-  const seen2=new Set(); const uniq2=[];
-  results.forEach(r=>{ if(!seen2.has(r.sig)){ seen2.add(r.sig); uniq2.push(r); }});
-  return uniq2;
+  // Dedup by WINDOW (not by blank arrangement): the user picks a placement, and
+  // "same window, blank in a different cell" options are noise. Keep one entry per
+  // window — the variant using the FEWEST blanks (most plausible).
+  const byWindow=new Map();
+  results.forEach(r=>{
+    const wsig=r.cells.map(x=>x.join(',')).sort().join('|');
+    const prev=byWindow.get(wsig);
+    if(!prev || r.blanks.length<prev.blanks.length){
+      // simplify the label: drop the per-cell blank list, just note blank count
+      r.label=(r.isRow?'Row ':'Col ')+r.lineIndex+' c'+r.start+'–'+(r.start+r.len-1)+
+              (r.blanks.length?' ('+r.blanks.length+' blank'+(r.blanks.length>1?'s':'')+')':'');
+      byWindow.set(wsig, r);
+    }
+  });
+  return [...byWindow.values()];
 }
 
 // already built (touch an existing tile from a prior turn) — except turn 1,
