@@ -3212,22 +3212,15 @@
       // because blanks can duplicate (common in equations like a+a=2a).
       needed.push('0', '1', '5');
 
-      // For 2 BLANKs: add more variety including two-digit values
+      // For 2 BLANKs: ACCURACY-FIRST — try the FULL valid face set.
+      // The old code narrowed to a hand-picked ~16-19 subset that DROPPED valid
+      // options: it excluded any digit/two-digit already in the rack (but a blank
+      // can legitimately duplicate a rack face), and omitted two-digit values like
+      // 17/19 entirely (a real miss in Mathayom). For competitive play a missed
+      // bingo can lose the game, so we now enumerate every inventory-valid face.
+      // The v217 neighbor filter + grammar prune keep the breadth in check.
       if (rackBlankCount === 2) {
-        // Add all operators if not present
-        for (const op of ['+', '-', '×', '÷']) {
-          if (!needed.includes(op) && !rackFaces.has(op)) needed.push(op);
-        }
-        // Add small digits not in rack
-        for (const d of ['2', '3', '4', '6', '7', '8', '9']) {
-          if (!needed.includes(d) && !rackFaces.has(d) && needed.length < 16) needed.push(d);
-        }
-        // Add two-digit values from inventory (critical for Mathayom + Prathom)
-        for (const td of ['10', '12', '14', '16', '18', '20', '11', '13', '15']) {
-          if (fullChoices.indexOf(td) >= 0 && !needed.includes(td) && !rackFaces.has(td) && needed.length < 19) needed.push(td);
-        }
-        // Always include = for safety
-        if (!needed.includes('=')) needed.push('=');
+        return applyCrossConstraint(fullChoices, board, cellPos);
       }
 
       // For 3+ BLANKs: keep lean but include two-digit options
