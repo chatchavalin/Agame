@@ -55,3 +55,20 @@ before shipping.
   blanks like 15/6 instead of enumerating) so these plays are found within budget.
   Reproducible target: this position must yield the 76 bingo (or at least the 26 play
   rather than a swap).
+
+## CORRECTION (user was right)
+I initially dismissed 15=-5+15+5 as not tile-legal — that was WRONG. The user's
+exact placement makes "15" from the 1 and 5 TILES (cols 0,1), not a single 15 tile:
+  1@(11,0) 5@(11,1) =hook@(11,2) -@(11,3) 5@(11,4) +@(11,5) 15@(11,6) +@(11,7) 5@(11,8)
+Verified via real validatePlay: ok=true, 8 NEW tiles, equation 15=-5+15+5, score 70.
+Tile mapping: 1, 5, +/-=(-), 5, +, 15, blank=+, blank=5. Blanks are + and 5 — exactly
+as the user stated. My error: I assumed "15" had to be the single two-digit tile and
+thus miscounted operators. Lesson: a multi-digit number in a play can be composed of
+single-digit TILES, which changes tile-legality.
+
+So there are (at least) TWO missed playable bingos on this position:
+  - 15=-5+15+5  (70 pts) — blanks = + and 5 (5 is standalone → solvable)
+  - 1=6+5-15+5  (76 pts) — blanks = 6 and + (6 is standalone → solvable)
+Both are cap/time-bound misses; both have a solvable standalone-number blank +
+an operator blank → solve-for-blank is the correct fix. These are now the concrete
+regression targets the fix must satisfy.
