@@ -70,8 +70,7 @@
   // isn't a well-formed expression. Wraps the real evaluator so the math matches
   // exactly (concatenation, unary minus, ×÷ precedence, fractions).
   function segmentValue(faces) {
-    var ev = (typeof window !== 'undefined' && window.AMath && window.AMath.evaluator) ||
-             (typeof require !== 'undefined' ? null : null);
+    var ev = (typeof window !== 'undefined' && window.AMath && window.AMath.evaluator) || null;
     if (!ev) return null;
     var tr = ev.tokenize(faces);
     if (tr.error || !tr.tokens) return null;
@@ -80,13 +79,40 @@
   }
   function fracEq(a, b) { return a && b && a.num * b.den === b.num * a.den; }
 
+  // The concrete roles a rack tile can fill. Returns a list of options, each
+  // {kind, face}. kind ∈ 'digit' (single 0-9), 'fixed' (standalone 10-20),
+  // 'op' (+ - × ÷), 'eq' (=). BLANK and the choice tiles expand to many options.
+  function tileOptions(face) {
+    if (face === '+/-' || face === '±') return [{ kind: 'op', face: '+' }, { kind: 'op', face: '-' }];
+    if (face === '×/÷') return [{ kind: 'op', face: '×' }, { kind: 'op', face: '÷' }];
+    if (face === '+' || face === '-' || face === '×' || face === '÷') return [{ kind: 'op', face: face }];
+    if (face === '=') return [{ kind: 'eq' }];
+    if (/^[0-9]$/.test(face)) return [{ kind: 'digit', face: face }];
+    if (/^([1][0-9]|20)$/.test(face)) return [{ kind: 'fixed', face: face }];
+    if (face === 'BLANK') {
+      var o = [{ kind: 'op', face: '+' }, { kind: 'op', face: '-' },
+               { kind: 'op', face: '×' }, { kind: 'op', face: '÷' }, { kind: 'eq' }];
+      for (var d = 0; d <= 9; d++) o.push({ kind: 'digit', face: String(d) });
+      return o;
+    }
+    return [{ kind: 'fixed', face: face }];
+  }
+
+  // Grammar-guided search. Instead of permuting all tile POSITIONS and only
+  // checking validity at the leaf (which made heavy-BLANK racks explode), we
+  // build the face sequence under the A-Math grammar and REJECT a tile/role
+  // before recursing if it can't legally appear next. This prunes the malformed
+  // branches up front and lets even 2- and 3-BLANK racks finish (the old
+  // permutation search could not). Output format (faces/blankVals/blankIdx) and
+  // the deduped solution set are identical to before.
   function solve(tiles, validate, opts) {
     opts = opts || {};
     var maxSol = opts.maxSolutions || 1;
     var nodeCap = opts.nodeCap || 1500000;
-    var descs = tiles.slice().sort();          // sort so identical tiles are adjacent (dup-skip)
+    // Sort so identical tiles are adjacent (enables the dup-skip below).
+    var descs = tiles.slice().sort();
     var n = descs.length;
-    var choices = descs.map(choicesFor);
+    var options = descs.map(tileOptions);
     var used = new Array(n).fill(false);
     var seq = [];   // resolved faces
     var blk = [];   // parallel: was this position a BLANK tile?
@@ -94,18 +120,21 @@
     var seen = {};
     var nodes = 0;
     var capped = false;
-    var lhsVal = null;   // value of the left side once '=' is placed (single-'=' bingos)
-    var eqAt = -1;       // sequence index of the (first) '='
+    var lhsVal = null;   // value of the left side once '=' is placed
+    var eqAt = -1;       // sequence index of the '='
 
-    function dfs() {
+    // Grammar state carried down the recursion:
+    //   runLen  — length of the current trailing single-digit run (for 3-digit
+    //             cap + leading-zero checks)
+    //   segStart— are we at the start of a segment (equation start or just after '=')
+    //   hasNum  — has the current segment got a complete number since its start /
+    //             last operator? (an operator/'=' may only follow a number)
+    //   lastOp  — was the previous token a binary operator? (no two adjacent ops)
+    function dfs(runLen, segStart, hasNum, lastOp) {
       if (out.length >= maxSol || capped) return;
       if (++nodes > nodeCap) { capped = true; return; }
       if (seq.length === n) {
-        if (eqAt < 0) return;                    // must contain '='
-        // Cheap value check before the full validate(): the right side must
-        // equal the already-computed left side. This prunes the vast majority
-        // of completed leaves (especially heavy-BLANK racks) without paying for
-        // a full tokenize+structural re-validation on each one.
+        if (eqAt < 0) return;
         var rhs = segmentValue(seq.slice(eqAt + 1));
         if (rhs === null || !fracEq(rhs, lhsVal)) return;
         var key = seq.join(' ');
@@ -122,27 +151,46 @@
         if (used[i]) continue;
         if (i > 0 && descs[i] === descs[i - 1] && !used[i - 1]) continue; // skip duplicate tiles
         var isBlank = descs[i] === 'BLANK';
-        var cs = choices[i];
-        for (var ci = 0; ci < cs.length; ci++) {
-          var f = cs[ci];
+        var opts2 = options[i];
+        for (var oi = 0; oi < opts2.length; oi++) {
+          var o = opts2[oi];
+          var f, nRun = runLen, nSeg = false, nHas = hasNum, nLast = false, ok = true;
+
+          if (o.kind === 'digit') {
+            if (runLen >= 3) continue;                        // max 3-digit numbers
+            if (runLen >= 1) {                                // continuing a number
+              if (seq[seq.length - runLen] === '0') continue; // would be a leading zero
+            }
+            f = o.face; nRun = runLen + 1; nHas = true; nLast = false; nSeg = false;
+          } else if (o.kind === 'fixed') {
+            if (runLen >= 1) continue;                        // 10-20 can't attach to a digit run
+            f = o.face; nRun = 0; nHas = true; nLast = false; nSeg = false;
+          } else if (o.kind === 'op') {
+            // A binary op needs a preceding number; a unary '-' may start a segment.
+            if (!hasNum && !(o.face === '-' && segStart)) continue;
+            if (lastOp) continue;                             // no two adjacent operators
+            f = o.face; nRun = 0; nHas = false; nLast = true; nSeg = false;
+          } else { // eq
+            if (eqAt >= 0) continue;                          // exactly one '='
+            if (!hasNum || lastOp) continue;                  // a segment must end on a number
+            f = '='; nRun = 0; nSeg = true; nHas = false; nLast = false;
+          }
+
           seq.push(f); blk.push(isBlank);
-          var ok = partialOk(seq);
           var savedEqAt = eqAt, savedLhs = lhsVal;
-          // When the first '=' is placed, compute the left side's value once.
-          // If the left side isn't a well-formed expression, prune immediately.
-          if (ok && f === '=' && eqAt < 0) {
+          if (o.kind === 'eq') {
             lhsVal = segmentValue(seq.slice(0, seq.length - 1));
             eqAt = seq.length - 1;
             if (lhsVal === null) ok = false;
           }
-          if (ok) { used[i] = true; dfs(); used[i] = false; }
+          if (ok) { used[i] = true; dfs(nRun, nSeg, nHas, nLast); used[i] = false; }
           eqAt = savedEqAt; lhsVal = savedLhs;
           seq.pop(); blk.pop();
           if (out.length >= maxSol || capped) return;
         }
       }
     }
-    dfs();
+    dfs(0, true, false, false);
     out.capped = capped;
     return out;
   }

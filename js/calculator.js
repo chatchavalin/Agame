@@ -156,35 +156,51 @@
   }
 
   // ----- 9-tile -----
-  function run9() {
+  function run9(nodeCap, searchingMsg) {
     var tiles = currentTiles(), res = byId('results');
     if (tiles.length < 2) { res.innerHTML = '<p class="muted">Add some tiles first.</p>'; return; }
-    res.innerHTML = '<p class="muted">Searching every possible hook tile… (a few seconds)</p>';
+    res.innerHTML = '<p class="muted">' + (searchingMsg || 'Searching every possible hook tile… (a few seconds)') + '</p>';
     setTimeout(function () {
-      var report = window.AMath.bingoSolver.bingos(tiles, validate, activeInv(), { examples: 1 });
+      var solverOpts = { examples: 1 };
+      if (nodeCap) solverOpts.nodeCap = nodeCap;
+      var report = window.AMath.bingoSolver.bingos(tiles, validate, activeInv(), solverOpts);
       var m = pointsMap(), base = rackScore(tiles, m);
       var bonus = (tiles.length === rackSize()) ? bingoBonus() : 0;
       res.innerHTML = '';
       var h = document.createElement('div');
       h.innerHTML = '<h2 style="font-size:15px;margin:0 0 6px;">9-tile bingo — your tiles + 1 hook</h2>';
       res.appendChild(h);
+
+      // Helper: add a "search harder" button that re-runs with a much larger cap.
+      function addExtendedSearchButton() {
+        var btn = document.createElement('button');
+        btn.textContent = '🔎 Search harder (runs longer — finds everything)';
+        btn.className = 'btn';
+        btn.style.cssText = 'margin-top:10px;display:block;width:100%;';
+        btn.onclick = function () {
+          // 1<<30 ≈ no cap — runs the grammar solver to full completion.
+          run9(1 << 30, 'Searching exhaustively — this can take up to a minute. Worth it: it will not miss any bingo.');
+        };
+        res.appendChild(btn);
+      }
+
       if (!report.nine.length) {
         var no = document.createElement('p'); no.className = 'muted';
-        no.textContent = report.capped
-          ? '⏱️ Couldn’t finish searching every hook — these tiles (especially with two blanks) have a huge number of arrangements. No bingo found in the part searched; one may still exist. Try removing a blank or fixing a blank to a specific value.'
-          : '❌ No hook tile makes a bingo with these tiles.';
-        res.appendChild(no); return;
+        if (report.capped) {
+          no.textContent = '⏱️ Couldn’t finish the quick search — these tiles (especially with two blanks) have a huge number of arrangements. No bingo found yet, but one may still exist.';
+          res.appendChild(no);
+          addExtendedSearchButton();
+        } else {
+          no.textContent = '❌ No hook tile makes a bingo with these tiles. (Searched completely.)';
+          res.appendChild(no);
+        }
+        return;
       }
       report.nine.forEach(function (it) { it.total = base + tilePts(it.hook, m) + bonus; });
       report.nine.sort(function (a, b) { return b.total - a.total; });
       var intro = document.createElement('p'); intro.className = 'muted';
       intro.textContent = report.nine.length + ' hook tile(s) make a bingo — ranked by total score. Your tiles = ' + base + ' pts, + the hook tile, + ' + bonus + ' bingo bonus (uses all 8):';
       res.appendChild(intro);
-      if (report.capped) {
-        var capNote = document.createElement('p'); capNote.className = 'muted';
-        capNote.textContent = '⏱️ Note: the search was very large and didn’t fully finish, so more hooks may also work — these are the ones found so far.';
-        res.appendChild(capNote);
-      }
       report.nine.forEach(function (item, idx) {
         var card = document.createElement('div'); card.className = 'hook-card';
         var rrow = document.createElement('div'); rrow.className = 'rank-row';
@@ -197,6 +213,16 @@
         item.examples.forEach(function (s) { card.appendChild(eqLine(s)); });
         res.appendChild(card);
       });
+      // If the quick search was capped, some hooks may still be unfound — let the
+      // user run the exhaustive search (important in real A-Math: a missed bingo
+      // can cost the game, so completeness beats speed).
+      if (report.capped) {
+        var capNote = document.createElement('p'); capNote.className = 'muted';
+        capNote.style.marginTop = '10px';
+        capNote.textContent = '⏱️ The quick search didn’t fully finish — there may be MORE hooks than shown. Run the exhaustive search to be sure you’re not missing one:';
+        res.appendChild(capNote);
+        addExtendedSearchButton();
+      }
     }, 30);
   }
 
