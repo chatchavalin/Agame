@@ -2852,10 +2852,66 @@
     const used = new Array(rack.length).fill(false);
     const sequence = [];
 
+    // Build a "line template": for each placement cell, the list of EXISTING
+    // board faces that sit between the previous placement cell and this one
+    // (in line order). validatePlay reads the whole board line — including these
+    // fixed hook tiles — so grammar pruning inside permuteAndTry must see them
+    // too, or it would wrongly reject (or fail to reject) a partial. This lets
+    // the search drop structurally-dead branches early WITHOUT ever discarding a
+    // play that validatePlay would have accepted (accuracy preserved).
+    var lineTemplate = buildLineTemplate(board, cellPositions, direction);
+
     permuteAndTry(
       rack, used, sequence, cellPositions, numTiles, board,
-      isFirstMove, onValidPlay, counter, stageStart, stageBudgetMs, maxCandidates
+      isFirstMove, onValidPlay, counter, stageStart, stageBudgetMs, maxCandidates,
+      lineTemplate
     );
+  }
+
+  // For each placement cell, collect the existing-tile faces (if any) sitting
+  // immediately before it along the line, plus the faces after the last cell.
+  // Returns { before: [ [faces before cell0], [faces before cell1], ... ],
+  //           after: [faces after last cell] } — used only for grammar pruning.
+  function buildLineTemplate(board, cellPositions, direction) {
+    var dr = 0, dc = 0;
+    if (direction === 'horizontal' || direction === 'right') dc = 1;
+    else if (direction === 'left') dc = -1;
+    else if (direction === 'vertical' || direction === 'down') dr = 1;
+    else if (direction === 'up') dr = -1;
+    function faceAt(r, c) {
+      if (!Board.inBounds(r, c)) return null;
+      var cell = board.cells[r][c];
+      if (!cell || !cell.tile) return null;
+      return cell.tile.assigned || cell.tile.face;
+    }
+    var before = [];
+    // For each cell, walk backward from it (opposite the direction) collecting
+    // contiguous existing tiles until we hit the previous placement cell or a gap.
+    for (var i = 0; i < cellPositions.length; i++) {
+      var faces = [];
+      var pr = cellPositions[i].row - dr, pc = cellPositions[i].col - dc;
+      // stop if we reach the previous placement cell
+      var prevCell = i > 0 ? cellPositions[i - 1] : null;
+      while (true) {
+        if (prevCell && pr === prevCell.row && pc === prevCell.col) break;
+        var f = faceAt(pr, pc);
+        if (f === null) break;
+        faces.unshift(f);     // collected backward, so prepend to keep line order
+        pr -= dr; pc -= dc;
+      }
+      before.push(faces);
+    }
+    // faces AFTER the last placement cell (contiguous existing tiles)
+    var after = [];
+    var last = cellPositions[cellPositions.length - 1];
+    var ar = last.row + dr, ac = last.col + dc;
+    while (true) {
+      var af = faceAt(ar, ac);
+      if (af === null) break;
+      after.push(af);
+      ar += dr; ac += dc;
+    }
+    return { before: before, after: after };
   }
 
   function collectPlacementCells(board, anchor, direction, numTiles) {
@@ -2883,9 +2939,53 @@
     return positions;
   }
 
+  // Conservative grammar prune for the game search. Builds the effective partial
+  // line — fixed existing board faces (lineTemplate.before[i]) interleaved with
+  // the rack faces placed so far — and returns true ONLY when the partial already
+  // breaks a rule that NO continuation can repair. It must NEVER return true for a
+  // partial that could still complete into a play validatePlay accepts, or the AI
+  // would miss a real bingo (accuracy is paramount). So we check only monotonic
+  // violations: two adjacent binary operators, a second '=', a 4+ digit run, and a
+  // leading-zero inside a number that is already closed (followed by a non-digit).
+  function partialLineDead(sequence, rack, cellPositions, lineTemplate) {
+    // Assemble the line faces in order.
+    var faces = [];
+    for (var k = 0; k < sequence.length; k++) {
+      var bef = lineTemplate.before[k];
+      if (bef && bef.length) for (var b = 0; b < bef.length; b++) faces.push(bef[b]);
+      var tile = rack[sequence[k]];
+      faces.push(tile.assigned || tile.face);
+    }
+    var isBin = function (f) { return f === '+' || f === '-' || f === '×' || f === '÷'; };
+    var isDigit = function (f) { return f === '0' || f === '1' || f === '2' || f === '3' || f === '4' || f === '5' || f === '6' || f === '7' || f === '8' || f === '9'; };
+    var eqCount = 0;
+    var runLen = 0, runFirst = null;
+    for (var i = 0; i < faces.length; i++) {
+      var f = faces[i];
+      // second '=' can never be valid (A-Math bingo has exactly one)
+      if (f === '=') { eqCount++; if (eqCount > 1) return true; }
+      // two adjacent binary operators can never be valid
+      if (i > 0 && isBin(f) && isBin(faces[i - 1])) return true;
+      // digit-run bookkeeping
+      if (isDigit(f)) {
+        if (runLen === 0) runFirst = f;
+        runLen++;
+        if (runLen > 3) return true;                 // numbers are at most 3 digits
+      } else {
+        // a number just closed: leading zero (run length >1 starting with 0) is invalid
+        if (runLen > 1 && runFirst === '0') return true;
+        runLen = 0; runFirst = null;
+      }
+    }
+    // NOTE: we intentionally do NOT flag a still-open trailing run here — more
+    // digits (or a closing operator) may follow; only a CLOSED bad number is dead.
+    return false;
+  }
+
   function permuteAndTry(
     rack, used, sequence, cellPositions, numTiles, board,
-    isFirstMove, onValidPlay, counter, stageStart, stageBudgetMs, maxCandidates
+    isFirstMove, onValidPlay, counter, stageStart, stageBudgetMs, maxCandidates,
+    lineTemplate
   ) {
     if (counter.abort) return;
     const limit = maxCandidates || MAX_CANDIDATES_PER_STAGE;
@@ -2911,29 +3011,14 @@
       return;
     }
 
-    // Early pruning for 6+ tile placements: check partial sequence validity
-    // to avoid exploring billions of dead-end permutations
-    if (numTiles >= 6 && sequence.length >= 2) {
-      var seqLen = sequence.length;
-      var curPos = cellPositions[seqLen - 1];
-      var prevPos = cellPositions[seqLen - 2];
-      // Only prune if cells are actually adjacent (no board tile between)
-      var areAdjacent = (Math.abs(curPos.row - prevPos.row) + Math.abs(curPos.col - prevPos.col)) === 1;
-      if (areAdjacent) {
-        var lastTile = rack[sequence[seqLen - 1]];
-        var prevTile = rack[sequence[seqLen - 2]];
-        var lastFace = lastTile.assigned || lastTile.face;
-        var prevFace = prevTile.assigned || prevTile.face;
-        var isOp = function (f) { return f === '+' || f === '-' || f === '×' || f === '÷' || f === '+/-' || f === '×/÷'; };
-        var lastIsOp = isOp(lastFace);
-        var prevIsOp = isOp(prevFace);
-        // Two operators adjacent → invalid
-        if (lastIsOp && prevIsOp) return;
-        // Two equals adjacent → invalid
-        var lastIsEq = lastFace === '=';
-        var prevIsEq = prevFace === '=';
-        if (lastIsEq && prevIsEq) return;
-      }
+    // Grammar pruning: assemble the EFFECTIVE partial line so far — the fixed
+    // existing board faces (from lineTemplate) interleaved with the rack faces
+    // placed so far — and reject it if it already violates an A-Math structural
+    // rule that NO continuation could fix. This is conservative: it only drops
+    // branches validatePlay would also reject, so accuracy is preserved, but it
+    // cuts the wasted exploration that made multi-blank bingos take ~130s.
+    if (lineTemplate && sequence.length >= 1) {
+      if (partialLineDead(sequence, rack, cellPositions, lineTemplate)) return;
     }
 
     for (let i = 0; i < rack.length; i++) {
@@ -2964,7 +3049,8 @@
 
         permuteAndTry(
           rack, used, sequence, cellPositions, numTiles, board,
-          isFirstMove, onValidPlay, counter, stageStart, stageBudgetMs, maxCandidates
+          isFirstMove, onValidPlay, counter, stageStart, stageBudgetMs, maxCandidates,
+          lineTemplate
         );
 
         sequence.pop();
