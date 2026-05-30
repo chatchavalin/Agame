@@ -30,7 +30,7 @@
     if (worker) return worker;
 
     try {
-      worker = new Worker('js/ai-worker.js?v=v208');
+      worker = new Worker('js/ai-worker.js?v=v209');
       worker.onmessage = handleWorkerMessage;
       worker.onerror = function (err) {
         console.error('[AI Worker] error:', err.message, 'at', err.filename, ':', err.lineno);
@@ -198,6 +198,15 @@
   window.AMath.aiWorkerClient = {
     decideMove: decideMove,
     terminate: terminate,
-    isAvailable: function () { return !workerBroken; },
+    isAvailable: function () {
+      // Escape hatch to force the AI onto the main thread (A/B diagnosis):
+      //   - add ?noworker=1 to the URL, or
+      //   - run localStorage.setItem('amath_noworker','1') in the console.
+      try {
+        if (typeof location !== 'undefined' && /[?&]noworker=1/.test(location.search)) return false;
+        if (typeof localStorage !== 'undefined' && localStorage.getItem('amath_noworker') === '1') return false;
+      } catch (e) { /* ignore */ }
+      return !workerBroken;
+    },
   };
 })();
