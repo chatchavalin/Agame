@@ -35,6 +35,10 @@
         chessClockEnabled: state.chessClockEnabled,
         // Save score sheet too
         scoreSheet: window.AMath.scoreSheet ? window.AMath.scoreSheet.getAllEntries() : [],
+        // Save the in-progress move recording (per-turn tile placements) so a
+        // resumed game can still be sent to Analysis with full detail.
+        recording: window.AMath.replayRecorder && window.AMath.replayRecorder.snapshot
+                   ? window.AMath.replayRecorder.snapshot() : null,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
     } catch (e) {
@@ -150,6 +154,8 @@
       aiTimeSeconds: state.aiTimeSeconds,
       chessClockEnabled: state.chessClockEnabled,
       scoreSheet: window.AMath.scoreSheet ? window.AMath.scoreSheet.getAllEntries() : [],
+      recording: window.AMath.replayRecorder && window.AMath.replayRecorder.snapshot
+                 ? window.AMath.replayRecorder.snapshot() : null,
     };
     return JSON.stringify(snapshot, null, 2);
   }

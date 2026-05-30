@@ -149,6 +149,33 @@
     return _recording ? _recording.moves.length : 0;
   }
 
+  /**
+   * Non-destructive copy of the current in-progress recording (for saving to a
+   * game file). Returns null if not recording. Does NOT stop recording.
+   */
+  function snapshot() {
+    if (!_recording) return null;
+    try { return JSON.parse(JSON.stringify(_recording)); }
+    catch (e) { return null; }
+  }
+
+  /**
+   * Restore a previously-snapshotted recording (when resuming a saved game) so
+   * recording continues from where it left off. Offsets stay relative to the
+   * original startedAt, which is preserved in the snapshot.
+   */
+  function restore(snap) {
+    if (!snap || !snap.moves) { return false; }
+    _recording = {
+      startedAt: snap.startedAt || (Date.now() - (snap.durationMs || 0)),
+      tileSet: snap.tileSet || 'prathom',
+      botLevel: snap.botLevel || 'hard',
+      isPvP: !!snap.isPvP,
+      moves: Array.isArray(snap.moves) ? snap.moves.slice() : [],
+    };
+    return true;
+  }
+
   window.AMath = window.AMath || {};
   window.AMath.replayRecorder = {
     start: start,
@@ -159,5 +186,7 @@
     finish: finish,
     cancel: cancel,
     getCurrentMoveCount: getCurrentMoveCount,
+    snapshot: snapshot,
+    restore: restore,
   };
 })();

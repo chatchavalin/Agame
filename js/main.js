@@ -1159,6 +1159,22 @@
       }
     }
 
+    // Restore the move recording (per-turn placements) if the save has one, so
+    // recording continues from where it left off. If not, start fresh — at least
+    // post-resume turns get recorded, and the scoreSheet covers the turn list.
+    if (window.AMath.replayRecorder) {
+      if (saved.recording && window.AMath.replayRecorder.restore) {
+        window.AMath.replayRecorder.restore(saved.recording);
+      } else if (window.AMath.replayRecorder.start) {
+        var SetForRec = window.AMath.settings;
+        window.AMath.replayRecorder.start({
+          tileSet: (SetForRec && SetForRec.get('tileSet')) || 'prathom',
+          botLevel: (SetForRec && SetForRec.get('botLevel')) || 'hard',
+          isPvP: !!saved.isPvP,
+        });
+      }
+    }
+
     Interactions.init(session);
 
     const btnNewGame = document.getElementById('btn-new-game');
