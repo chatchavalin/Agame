@@ -2502,6 +2502,10 @@ function renderAutoBuildBody(){
 
   if(none.length){
     html+=`<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#f87171;margin:10px 0 8px">❌ No legal placement — check these</div>`;
+    // If the user has resolved some picks, offer to re-check (their tiles are now hooks).
+    if(resolved>0){
+      html+=`<button onclick="recheckAutoBuild()" style="width:100%;margin-bottom:10px;padding:9px;border:none;border-radius:8px;background:#0891b2;color:#fff;font-family:inherit;font-weight:800;font-size:12px;cursor:pointer">🔄 Re-check these using the tiles I just placed</button>`;
+    }
     none.forEach(r=>{
       const p=S.plays[r.turn-1];
       const name=p.player==='p1'?S.p1Name:S.p2Name;
@@ -2511,6 +2515,13 @@ function renderAutoBuildBody(){
         <button onclick='fixFromAutoBuild(${r.turn-1})' style="margin-top:3px;padding:5px 11px;border-radius:7px;border:none;background:#7c3aed;color:#fff;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer">Open turn to fix →</button>
       </div>`;
     });
+    // Honest guidance for the can't-remember case.
+    html+=`<div style="background:#0d1520;border:1px dashed #475569;border-radius:8px;padding:10px 12px;margin-top:4px;font-size:11px;color:#94a3b8;line-height:1.5">
+      <b style="color:#cbd5e1">Can't remember where these went?</b><br>
+      That's fine — these turns just won't have tile positions. You can still:<br>
+      • Leave them — scores & the report still work (they use the score sheet).<br>
+      • Tap ✕ and run 📊 Report — it analyzes from scores even without exact tiles.<br>
+      • The replay will show these turns dimmed (position unknown) rather than animating them.</div>`;
   }
 
   html+=`<div style="margin-top:12px"><button onclick="undoAutoBuild()" style="width:100%;padding:10px;border-radius:9px;border:1px solid #475569;background:#1e293b;color:#cbd5e1;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer">↩ Undo Auto-build (restore previous placement)</button></div>`;
@@ -2562,6 +2573,52 @@ function undoPick(turnIdx){
   renderAutoBuildBody();
 }
 function fixFromAutoBuild(turnIdx){ closeAutoBuild(); openPlayEditor(turnIdx); }
+
+// Re-run reconstruction but KEEP turns the user already resolved (their picks +
+// tile assignments stay). Only turns still unresolved get re-solved — now with
+// the user's placed tiles available as hooks, which can turn a former 'no match'
+// into a solvable turn. Use after resolving some picks.
+function recheckAutoBuild(){
+  if(!S._autoBuildResults){ runAutoBuild(); return; }
+  // Which turns are user-confirmed? Preserve their board assignment.
+  const resolvedTurns = new Set(
+    S._autoBuildResults.filter(r=>r.status==='resolved').map(r=>r.turn-1));
+  // Clear assignment ONLY for non-resolved turns.
+  for(let r=0;r<15;r++) for(let c=0;c<15;c++){
+    const cell=S.board[r][c];
+    if(cell && cell.turnIdx>=0 && !resolvedTurns.has(cell.turnIdx)){
+      cell.turnIdx=-1; cell.player='unknown';
+    }
+  }
+  // Re-solve each unresolved scoring turn against the board (now with resolved
+  // turns' tiles present as hooks). Walk in turn order so earlier hooks count.
+  const newResults=[];
+  S.plays.forEach((p,t)=>{
+    if(resolvedTurns.has(t)){
+      newResults.push({turn:t+1,status:'resolved',options:[]});
+      return;
+    }
+    if(p.type==='swap' || !p.score){ newResults.push({turn:t+1,status:'skip',options:[]}); return; }
+    const uniq = solvePlacementsFull(p.score, t, S.board, {});
+    if(uniq.length===1){
+      uniq[0].cells.forEach(([r,c])=>{ if(S.board[r][c]){ S.board[r][c].turnIdx=t; S.board[r][c].player=p.player; }});
+      p.cells=uniq[0].cells;
+      newResults.push({turn:t+1,status:'auto',options:uniq});
+    } else if(uniq.length>1){
+      newResults.push({turn:t+1,status:'ambiguous',options:uniq});
+    } else {
+      const withBlanks = solvePlacementsWithBlanks(p.score, t, S.board, 2);
+      if(withBlanks.length>=1){
+        newResults.push({turn:t+1,status:'ambiguous',options:withBlanks,blankGuess:true});
+      } else {
+        newResults.push({turn:t+1,status:'none',options:[]});
+      }
+    }
+  });
+  S._autoBuildResults = newResults;
+  renderBoard(); renderSidebar(); renderAutoBuildBody();
+  showToast('Re-checked using your placed tiles ✓');
+}
 </script>
 
 <!-- Firebase (optional) — only for logged-in users, enables cloud auto-save of analysis projects -->
