@@ -2955,16 +2955,21 @@
       // Has operator?
       const hasOp = ['+', '-', '×', '÷'].some(o => rackFaces.has(o));
 
-      // Build pruned set based on what the rack needs
+      // Build pruned set based on what the rack needs.
+      // IMPORTANT: a BLANK may legitimately DUPLICATE a face already in the
+      // rack — e.g. a rack with two '5's can still want a third '5' from a
+      // blank (the 94-pt bingo 5..=..5..5 needs exactly this). So for the
+      // common structural faces we add them REGARDLESS of whether the rack
+      // already has them; only the bulkier digit/two-digit padding is
+      // dedup-gated to keep the set small.
       const needed = [];
-      // Top priority: = if missing
+      // Top priority: = if missing (always include = below for 2-blank anyway)
       if (!hasEquals) needed.push('=');
-      // Operators if missing or only one
+      // Operators if missing
       if (!hasOp) needed.push('+', '-');
-      // Always useful: 0, 1 (small numbers, common in equations)
-      if (!rackFaces.has('0')) needed.push('0');
-      if (!rackFaces.has('1')) needed.push('1');
-      if (!rackFaces.has('5')) needed.push('5');
+      // Always-useful small numbers — include even if the rack already has them,
+      // because blanks can duplicate (common in equations like a+a=2a).
+      needed.push('0', '1', '5');
 
       // For 2 BLANKs: add more variety including two-digit values
       if (rackBlankCount === 2) {
@@ -2974,11 +2979,11 @@
         }
         // Add small digits not in rack
         for (const d of ['2', '3', '4', '6', '7', '8', '9']) {
-          if (!rackFaces.has(d) && needed.length < 15) needed.push(d);
+          if (!needed.includes(d) && !rackFaces.has(d) && needed.length < 16) needed.push(d);
         }
         // Add two-digit values from inventory (critical for Mathayom + Prathom)
         for (const td of ['10', '12', '14', '16', '18', '20', '11', '13', '15']) {
-          if (fullChoices.indexOf(td) >= 0 && !rackFaces.has(td) && needed.length < 18) needed.push(td);
+          if (fullChoices.indexOf(td) >= 0 && !needed.includes(td) && !rackFaces.has(td) && needed.length < 19) needed.push(td);
         }
         // Always include = for safety
         if (!needed.includes('=')) needed.push('=');
@@ -3003,9 +3008,13 @@
         return applyCrossConstraint(top6.slice(0, 6), board, cellPos);
       }
 
-      // Filter to valid faces in active inventory
+      // Filter to valid faces in active inventory, dedup (needed may repeat)
       const valid = new Set(fullChoices);
-      const result = needed.filter(c => valid.has(c));
+      const result = [];
+      const seenFace = new Set();
+      for (const c of needed) {
+        if (valid.has(c) && !seenFace.has(c)) { seenFace.add(c); result.push(c); }
+      }
       return applyCrossConstraint(result.length > 0 ? result : fullChoices.slice(0, 5), board, cellPos);
     }
     return [null];
