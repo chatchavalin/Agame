@@ -1618,11 +1618,13 @@ function contiguousRun(board, r, c, isRow, exists) {
   }
 }
 
-function scoreOneEquation(board, cells, newSet) {
+function scoreOneEquation(board, cells, newSet, blankSet) {
   let base=0, eqMult=1;
   for(const {r,c} of cells){
     const cell=board[r][c]; if(!cell) return null;
-    let p=PTS[cell.face]||0;
+    // A blank tile contributes 0 tile points (premiums on the SQUARE still apply
+    // to the equation multiplier, but the tile value is 0).
+    let p=(blankSet && blankSet.has(r+','+c)) ? 0 : (PTS[cell.face]||0);
     const isNew=newSet.has(r+','+c);
     if(isNew){
       const prem=PREMIUM[r][c];
@@ -1639,7 +1641,7 @@ function scoreOneEquation(board, cells, newSet) {
 // Score a full play. newCells = cells placed THIS turn. currentTurn lets us
 // treat only tiles placed in earlier turns (turnIdx 0..currentTurn-1) plus the
 // new cells as "present" — so contiguous runs don't bleed into not-yet-played tiles.
-function scoreFullPlay(board, newCells, currentTurn) {
+function scoreFullPlay(board, newCells, currentTurn, blankSet) {
   const newSet=new Set(newCells.map(([r,c])=>r+','+c));
   const exists=(r,c)=>{
     const cell=board[r][c];
@@ -1657,14 +1659,14 @@ function scoreFullPlay(board, newCells, currentTurn) {
   if(mainRun.cells.length>=2){
     const sig='|'+mainRun.cells.map(x=>x.r+','+x.c).join('|');
     if(!counted.has(sig)){ counted.add(sig);
-      const s=scoreOneEquation(board, mainRun.cells, newSet); if(s===null) return null; total+=s; }
+      const s=scoreOneEquation(board, mainRun.cells, newSet, blankSet); if(s===null) return null; total+=s; }
   }
   for(const [r,c] of newCells){
     const crossRun=contiguousRun(board, r, c, !mainIsRow, exists);
     if(crossRun.cells.length>=2){
       const sig='|'+crossRun.cells.map(x=>x.r+','+x.c).join('|');
       if(!counted.has(sig)){ counted.add(sig);
-        const s=scoreOneEquation(board, crossRun.cells, newSet); if(s===null) return null; total+=s; }
+        const s=scoreOneEquation(board, crossRun.cells, newSet, blankSet); if(s===null) return null; total+=s; }
     }
   }
   if(newCells.length===8) total+=40;
@@ -1718,10 +1720,59 @@ function solvePlacementsFull(target, currentTurn, boardState, opts) {
   return uniq;
 }
 
-// =====================================================================
-// AUTO-RECONSTRUCT ENGINE  (Step 2 of the pipeline)
-// Walks turns in order. For each turn, scans every row & column for windows
-// that (a) score exactly the recorded score, and (b) connect to the board
+// Blank-aware solver: when the exact-face solver finds nothing, a tile may have
+// been a BLANK (0 points) when this turn played it. Try every candidate window
+// and, within it, every choice of 1 or 2 cells being blank; keep windows that
+// then score the target. Returns candidates tagged with which cells are blanks.
+// These are GUESSES (a blank could be any face), so they're surfaced as "pick".
+function solvePlacementsWithBlanks(target, currentTurn, boardState, maxBlanks) {
+  maxBlanks = maxBlanks || 2;
+  const results=[];
+  for(let li=0;li<15;li++){
+    for(const isRow of [true,false]){
+      for(let len=2;len<=8;len++){
+        for(let start=0;start+len<=15;start++){
+          const cells=[];
+          let ok=true, coversCenter=false;
+          for(let k=0;k<len;k++){
+            const r=isRow?li:start+k, c=isRow?start+k:li;
+            const cell=boardState[r][c];
+            if(!cell){ ok=false; break; }
+            if(cell.turnIdx>=0 && cell.turnIdx!==currentTurn){ ok=false; break; }
+            cells.push([r,c]);
+            if(r===7&&c===7) coversCenter=true;
+          }
+          if(!ok || cells.length<2) continue;
+          if(currentTurn===0){ if(!coversCenter) continue; }
+          else { if(!windowConnects(start,len,li,isRow,currentTurn,boardState)) continue; }
+
+          // try each single-blank, then each pair-blank
+          const tryBlanks=(idxs)=>{
+            const blankSet=new Set(idxs.map(i=>cells[i][0]+','+cells[i][1]));
+            const total=scoreFullPlay(boardState, cells, currentTurn, blankSet);
+            if(total===target){
+              const blanks=idxs.map(i=>cells[i]);
+              const sig=cells.map(x=>x.join(',')).sort().join('|')+'#'+
+                        blanks.map(x=>x.join(',')).sort().join('|');
+              results.push({isRow,lineIndex:li,start,len:cells.length,cells,
+                bingo:cells.length===8, sig, blanks,
+                label:(isRow?'Row ':'Col ')+li+' c'+start+'–'+(start+len-1)+
+                      ' (blank @ '+blanks.map(x=>x.join(',')).join(' & ')+')'});
+            }
+          };
+          for(let i=0;i<cells.length;i++) tryBlanks([i]);
+          if(maxBlanks>=2)
+            for(let i=0;i<cells.length;i++)
+              for(let j=i+1;j<cells.length;j++) tryBlanks([i,j]);
+        }
+      }
+    }
+  }
+  const seen=new Set(); const uniq=[];
+  results.forEach(r=>{ if(!seen.has(r.sig)){ seen.add(r.sig); uniq.push(r); }});
+  return uniq;
+}
+
 // already built (touch an existing tile from a prior turn) — except turn 1,
 // which must cover center (7,7). Classifies each turn:
 //   'auto'      → exactly 1 legal window  → assign automatically
@@ -1779,7 +1830,19 @@ function autoReconstruct() {
     } else if(uniq.length>1){
       results.push({turn:t+1,status:'ambiguous',options:uniq});
     } else {
-      results.push({turn:t+1,status:'none',options:[]});
+      // No exact-face match — a tile may have been a BLANK. Try blank-aware.
+      const withBlanks = solvePlacementsWithBlanks(p.score, t, S.board, 2);
+      if(withBlanks.length===1){
+        // Single blank-based solution: place it but flag as a guess (needs confirm).
+        withBlanks[0].cells.forEach(([r,c])=>{ if(S.board[r][c]){ S.board[r][c].turnIdx=t; S.board[r][c].player=p.player; }});
+        p.cells=withBlanks[0].cells;
+        applied++;
+        results.push({turn:t+1,status:'ambiguous',options:withBlanks,blankGuess:true});
+      } else if(withBlanks.length>1){
+        results.push({turn:t+1,status:'ambiguous',options:withBlanks,blankGuess:true});
+      } else {
+        results.push({turn:t+1,status:'none',options:[]});
+      }
     }
   });
 
@@ -2275,8 +2338,9 @@ function runAutoBuild() {
     amb.forEach(r=>{
       const p=S.plays[r.turn-1];
       const name=p.player==='p1'?S.p1Name:S.p2Name;
+      const blankNote = r.blankGuess ? ' <span style="color:#94a3b8;font-weight:600">(involves a blank tile — best guess)</span>' : '';
       html+=`<div style="background:#0f172a;border-left:3px solid #f59e0b;border-radius:8px;padding:9px 11px;margin-bottom:8px">
-        <div style="font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:5px">Turn ${r.turn} · ${name} · ${p.score}pts — which placement?</div>`;
+        <div style="font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:5px">Turn ${r.turn} · ${name} · ${p.score}pts — which placement?${blankNote}</div>`;
       r.options.slice(0,6).forEach(o=>{
         const faces=o.cells.map(([rr,cc])=>S.board[rr][cc]?S.board[rr][cc].face:'?').join(' ');
         html+=`<button onclick='pickAmbiguous(${r.turn-1}, ${JSON.stringify(o.cells)})' style="display:block;width:100%;text-align:left;margin-bottom:4px;padding:7px 10px;border-radius:7px;border:1px solid #334155;background:#080d14;color:#cbd5e1;font-family:inherit;font-size:12px;cursor:pointer">
